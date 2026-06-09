@@ -648,10 +648,38 @@ is the inert elevation scalar the existing renderer paints for free). No new eng
 change**; opt-in behind a new `[webviz]` extra (Plotly + ipywidgets). 31-test pair added (round-trip +
 registry always-green; render smoke-tests `importorskip` on Plotly — fast, not `slow`).
 
-**Next build — the teaching notebook then Phase 3.** The chip-style thin-skin teaching notebook
-`planet.ipynb` (sliders → climate → biome map) is the remaining §9 surface. Then the shallow-water
-engine (Phase 3 — the new shared `engines/fluid`, at which point the map *registers* a `vector_overlay`
-circulation layer with no renderer edit) and the one-way coupler (Phase 4) follow.
+**Built — the teaching notebook (`planet.ipynb`, 2026-06-09)** then **Phase 3 (the shallow-water
+engine, 2026-06-09).**
+
+**Built — Phase 3: `engines/fluid` (the program's SECOND shared engine) + `circulation.py`** (2026-06-09).
+A rotating shallow-water solver on a doubly-periodic β-plane — **Arakawa C-grid, vector-invariant
+form, explicit SSP-RK3** — built standalone in `engines/fluid/` and **frozen behind
+`engines/fluid/CONTRACT.md`** before any coupling (invariant 5). It deliberately shares *no* machinery
+with the parabolic-implicit `engines/diffusion` (a hyperbolic, CFL-limited wave solver). **Validation
+triad:** gravity-wave `√(gH)` + **Poincaré dispersion `ω²=f₀²+gHk²`** to ~1e-3 (the rotation check),
+**Rossby waves** westward & dispersive (loose band, *converging to analytic as the grid refines* — a
+named numerical-dispersion edge), **geostrophic balance steady** + **geostrophic adjustment** to the
+analytic Helmholtz state over `L_R` (~1%, the published Rossby benchmark), **mass to machine
+precision**, **energy bounded & dt³-convergent**, and — the discriminating Coriolis seal — **potential
+vorticity / enstrophy bounded at FINITE amplitude** (a vortex at Rossby ~0.5, where advection
+genuinely moves PV around; the design review's key point — at small amplitude this leg is vacuous).
+**Two honest design calls baked in:** (1) the symmetric vector-invariant scheme conserves **energy**
+semi-discretely, *not* potential enstrophy (one Sadourny-class scheme conserves one or the other;
+Arakawa–Lamb conserves both, not built) — so claims are stated *as measured*, not aspirational; (2) the
+finite-amplitude PV seal came out crisp, so the engine stayed **nonlinear** (the fallback was a linear
+core; not needed). The `tracer` slot is declared on `SWState` but **not advected** (rung 1 — "seam,
+not machinery", `step` raises). `circulation.py` pins the planetary numbers (`f₀=2Ω sinφ`, `β=2Ω
+cosφ/a`, equivalent depth → `L_R ≈ 960 km` at 45°, [[shallow-water-source]]) and banks the artifact
+(`docs/figures/planet-shallowwater.png`: geostrophic adjustment + a westward Rossby wave +
+conservation diagnostics). **Gate/infra consequences realized:** `planet`'s `uses` is now
+`{engines/diffusion, engines/fluid}` — the manifest's **first genuinely multi-engine row** — and the
+**import-drift guard** (deferred to engine #2) is **built and live** in `tools/tests/test_gate.py`.
+
+**Next build — Phase 4: the one-way EBM→circulation coupler.** Force this dry flow with the EBM's
+meridional temperature gradient so a **geostrophically-balanced midlatitude jet emerges** (anchor:
+geostrophic balance of the coupled jet + jet-latitude benchmark); at that point the interactive map
+*registers* a `vector_overlay` circulation layer with no renderer edit. Two-way coupling is rung 1
+(seamed, not built).
 
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko

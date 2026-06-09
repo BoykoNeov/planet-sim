@@ -226,3 +226,92 @@ def biomes_figure(state: ClimateState, precip_cm: np.ndarray, codes: np.ndarray)
     _biome_legend(axd["legend"], codes)
     fig.suptitle("Planet Phase 2 — climate → habitability: the biome map", fontsize=13)
     return fig
+
+
+# --------------------------------------------------------------------------- #
+# Phase 3 — the shallow-water engine: geostrophic adjustment + a westward Rossby wave.
+# --------------------------------------------------------------------------- #
+def adjustment_axes(ax_init, ax_bal, adj) -> None:
+    """Two panels: the initial unbalanced height bump, and the balanced remnant over L_R.
+
+    A circle of radius ``L_R`` is drawn on the balanced panel to show the adjusted vortex has
+    spread to the deformation radius — the geostrophic-adjustment scale made visible.
+    """
+    xk, yk = adj.x / 1e3, adj.y / 1e3                       # km
+    draw = 100.0 * (1.0 - adj.eta_balanced.max() / adj.eta_init.max())
+    # each panel on its OWN scale: the balanced remnant (~0.1× the bump) would vanish on a shared
+    # one — the title carries the drawdown, the panels carry the *shape* (the L_R-scale vortex).
+    panels = (
+        (ax_init, adj.eta_init, "initial height anomaly (unbalanced)"),
+        (ax_bal, adj.eta_balanced, f"balanced remnant ({draw:.0f}% radiated away)"),
+    )
+    for ax, field, title in panels:
+        vmax = float(np.max(np.abs(field))) or 1.0
+        im = ax.pcolormesh(xk, yk, field, cmap="RdBu_r", vmin=-vmax, vmax=vmax, shading="auto")
+        ax.set_aspect("equal")
+        ax.set_xlabel("x (km)"); ax.set_ylabel("y (km)")
+        ax.set_title(title, fontsize=9)
+        ax.figure.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="η (m)")
+    cx, cy = adj.x[adj.x.size // 2] / 1e3, adj.y[adj.y.size // 2] / 1e3
+    th = np.linspace(0, 2 * np.pi, 100)
+    ax_bal.plot(cx + (adj.L_R / 1e3) * np.cos(th), cy + (adj.L_R / 1e3) * np.sin(th),
+                "--", color="#222222", lw=1.2, label=f"L_R ≈ {adj.L_R/1e3:.0f} km")
+    ax_bal.legend(fontsize=8, loc="upper right")
+
+
+def rossby_axes(ax, ros) -> None:
+    """A zonal cross-section of η through mid-latitude at successive times — the crest moves WEST.
+
+    The clearest read of the dispersion: the same wave crest shifts toward −x (westward) as time
+    advances, at the measured phase speed (printed against the analytic value)."""
+    jmid = ros.y.size // 2
+    xk = ros.x / 1e3
+    n = len(ros.snapshots)
+    for i, (snap, t) in enumerate(zip(ros.snapshots, ros.snapshot_times)):
+        shade = 0.15 + 0.75 * i / max(1, n - 1)
+        ax.plot(xk, snap[jmid, :], color=(0.1, 0.2, 0.55, shade),
+                label=f"t = {t/86400:.1f} d")
+    ax.set_xlabel("x (km)")
+    ax.set_ylabel("η at mid-latitude (m)")
+    ax.set_title(f"Rossby wave drifts WESTWARD  (c = {ros.c_measured:.1f} m/s, "
+                 f"analytic {ros.c_analytic:.1f})", fontsize=9)
+    ax.annotate("", xy=(0.12, 0.92), xytext=(0.42, 0.92), xycoords="axes fraction",
+                arrowprops=dict(arrowstyle="->", color="#c0392b", lw=1.6))
+    ax.text(0.27, 0.95, "west", transform=ax.transAxes, ha="center", fontsize=8, color="#c0392b")
+    ax.legend(fontsize=7, loc="lower right", ncols=2)
+
+
+def conservation_axes(ax, adj) -> None:
+    """The conservation diagnostics over the adjustment run: mass / energy / enstrophy drift.
+
+    Mass holds at machine precision (flux form); energy and potential enstrophy hold to small
+    bounded drifts — the honest 'invariants stay flat' panel the contract promises."""
+    td = adj.times / 86400.0
+    ax.plot(td, np.abs(adj.mass) + 1e-18, color="#27795b", label="mass |Δ| (machine-exact)")
+    ax.plot(td, np.abs(adj.energy) + 1e-18, color="#2f6fb0", label="energy |Δ|")
+    ax.plot(td, np.abs(adj.enstrophy) + 1e-18, color="#d4711f", label="enstrophy |Δ|")
+    ax.set_yscale("log")
+    ax.set_xlabel("time (days)")
+    ax.set_ylabel("relative drift")
+    ax.set_title("Conservation diagnostics hold flat", fontsize=9)
+    ax.legend(fontsize=8, loc="center right")
+
+
+def shallowwater_figure(adj, ros):
+    """The banked Phase-3 artifact: geostrophic adjustment + a westward Rossby wave + conservation.
+
+    Top row: the geostrophic adjustment — an unbalanced height bump (left) radiates gravity waves and
+    settles to a balanced vortex of scale ``L_R`` (centre). Bottom-left: the conservation diagnostics
+    (mass machine-exact; energy/enstrophy bounded). Right (spanning): a westward-propagating Rossby
+    wave. *The rotating fluid engine, exercised with planetary numbers.*
+    """
+    fig, axd = plt.subplot_mosaic(
+        [["init", "balanced", "rossby"], ["conserve", "conserve", "rossby"]],
+        figsize=(16, 8.5), constrained_layout=True,
+        gridspec_kw={"width_ratios": [1.0, 1.0, 1.2]},
+    )
+    adjustment_axes(axd["init"], axd["balanced"], adj)
+    conservation_axes(axd["conserve"], adj)
+    rossby_axes(axd["rossby"], ros)
+    fig.suptitle("Planet Phase 3 — the rotating shallow-water engine (engines/fluid)", fontsize=13)
+    return fig

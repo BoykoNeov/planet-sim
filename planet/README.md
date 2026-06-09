@@ -81,6 +81,23 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   array-aware, `equal_nan` for the annotation NaN gaps), so it is an always-green test, not a smoke
   test. Carries an **inert elevation** layer (the geography seam — round-tripped, not yet consumed by
   the climate; §9.3). NumPy/JSON only — no render deps.
+- **To work on the circulation / shallow-water engine (Phase 3):** `circulation.py` +
+  `tests/test_circulation.py`. It loads the newly-frozen `engines/fluid/CONTRACT.md` (the program's
+  **second shared engine** — a rotating shallow-water solver, hyperbolic/explicit, sharing no
+  machinery with the parabolic-implicit diffusion spine) and pins the **planetary** numbers the
+  engine leaves to its consumer: Earth's `f₀ = 2Ω sinφ`, `β = 2Ω cosφ/a`, and an equivalent depth
+  giving the cited extratropical deformation radius `L_R ≈ 1000 km` ([[shallow-water-source]]).
+  Public API: `midlatitude_beta_plane` (the configured β-plane), `geostrophic_adjustment` /
+  `rossby_wave` (the two banked demos returning plain-array records), `coriolis_f0` / `coriolis_beta`.
+  Phase 3 is **dry one-layer dynamics in isolation** — no EBM coupling yet (that is Phase 4's
+  `coupler.py`, where a forced jet emerges and the map registers its `vector_overlay` layer).
+- **To work on the Phase-3 banked artifact:** `demo_shallowwater.py` + `tests/test_demo_shallowwater.py`
+  (`slow`) and `plots.shallowwater_figure` (`[viz]`). The demo composes `geostrophic_adjustment` +
+  `rossby_wave` → `docs/figures/planet-shallowwater.png`: the adjustment (bump → balanced vortex over
+  `L_R`, with the conservation diagnostics holding flat) beside a **westward** Rossby wave.
+- **To use the shallow-water engine directly:** load `engines/fluid/CONTRACT.md` only — the frozen
+  one-page API (`ShallowWater`, `SWState`, `uniform_grid`; mass machine-exact, energy/PV bounded;
+  the `tracer` slot declared-but-unbuilt = rung 1). Never the engine internals.
 - **To use the diffusion/heat spine:** load `engines/diffusion/CONTRACT.md` only — never Steel's or
   Chip's internals. Planet instantiates the same contract in **heat mode**, with the radiation
   composed around it by operator splitting (the Jominy precedent).
@@ -120,10 +137,23 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   one genuine correctness property, vs the render's smoke-tests). Banked globe:
   `docs/figures/planet-map.html`. 31-test pair added (the Plotly render smoke-tests `importorskip` on
   the `[webviz]` extra — fast, not `slow`). **No new engine / no gate-manifest change.**
-- **Phases 3–4 — shallow-water engine / coupler: PENDING** (plan §3). Phase 3 builds & freezes
-  `engines/fluid` (the map then *registers* a `vector_overlay` circulation layer — no renderer edit);
-  Phase 4 is the one-way coupler. The chip-style teaching notebook `planet.ipynb` is the remaining §9
-  thin-skin surface (pending).
+- **Phase 3 — the shallow-water engine (`engines/fluid`): BUILT & FROZEN** (2026-06-09). The program's
+  **second shared engine** — a rotating shallow-water solver on a doubly-periodic β-plane (Arakawa
+  C-grid, vector-invariant, explicit SSP-RK3), built standalone and sealed behind
+  `engines/fluid/CONTRACT.md` before any coupling. **Validation triad:** gravity-wave `√(gH)` &
+  **Poincaré dispersion `ω²=f₀²+gHk²`** to ~1e-3 (the rotation check), **Rossby waves** westward &
+  dispersive (loose, converging to analytic with resolution), **geostrophic balance steady** +
+  **geostrophic adjustment** to the analytic Helmholtz state over `L_R` (~1%), **mass conserved to
+  machine precision**, **energy bounded & dt³-convergent**, and — the discriminating Coriolis leg —
+  **potential vorticity / enstrophy bounded at FINITE amplitude** (a vortex at Rossby ~0.5). The
+  symmetric scheme conserves energy semi-discretely (not enstrophy); claims are stated as measured
+  (honest, not aspirational). `circulation.py` pins the planetary numbers (`L_R ≈ 960 km` at 45°) and
+  banks the artifact (`docs/figures/planet-shallowwater.png`). **First multi-engine gate row**
+  (`planet` uses `{engines/diffusion, engines/fluid}`); the import-drift guard is now live.
+- **Phase 4 — the one-way EBM→circulation coupler: PENDING** (plan §3). It forces this dry flow with
+  the EBM's meridional temperature gradient so a geostrophically-balanced jet emerges, at which point
+  the interactive map *registers* a `vector_overlay` circulation layer (no renderer edit). The
+  chip-style teaching notebook `planet.ipynb` is built; extending it to Phase 3/4 is a later touch.
 
 ## Test runner (tiered gate, ADR 0003 — the per-project successor)
 
@@ -133,9 +163,12 @@ python -m tools.gate planet                  # full gate for planet (incl. the s
 ./run_tests.ps1 -m "not slow"               # whole-repo fast lane (release / CI / shared-engine edit)
 ```
 
-`pyproject.toml`'s `testpaths` already carries `projects`, so `projects/planet/tests/` is collected
-with no config change; `pythonpath = ["."]` lets planet import the frozen engine as
-`engines.diffusion…`. The full-resolution Snowball sweep (`test_demo_snowball`), the figure render,
-and the live climlab cross-check are `slow`-marked / extra-gated, so the fast lane deselects them.
-Planet's gate `uses` is `{engines/diffusion}` today; `engines/fluid` joins it in Phase 3 (making it
-the manifest's first genuinely multi-engine row).
+`pyproject.toml`'s `testpaths` already carries `projects` and `engines`, so both
+`projects/planet/tests/` and `engines/fluid/tests/` are collected with no config change;
+`pythonpath = ["."]` lets planet import the frozen engines as `engines.diffusion…` / `engines.fluid…`.
+The full-resolution Snowball sweep (`test_demo_snowball`), the shallow-water demos
+(`test_demo_shallowwater`, `test_circulation` integration), the figure renders, and the live climlab
+cross-check are `slow`-marked / extra-gated, so the fast lane deselects them. Planet's gate `uses` is
+now `{engines/diffusion, engines/fluid}` — the manifest's **first genuinely multi-engine row** (a
+`planet` commit runs both engines' seals), kept honest by the import-drift guard in
+`tools/tests/test_gate.py`.
