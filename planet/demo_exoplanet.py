@@ -26,7 +26,7 @@ import numpy as np
 
 from . import exoplanet as ex
 from .albedo import EBMParams, HysteresisLoop, present_day_climate, snowball_hysteresis
-from .ebm import ClimateState
+from .ebm import ClimateState, equilibrium_temperature_0d
 
 MDWARF_TEFF = 3050.0           # K — a cool M-dwarf (≈ M5V; Pecaut & Mamajek 2013) — the redder host star
 SIZES = (0.5, 1.0, 2.0)        # Earth radii — a small world, Earth, a super-Earth (transport-only effect)
@@ -106,12 +106,16 @@ def print_summary(r: ExoplanetResult) -> None:
     print(f"    freeze threshold S₀:             Sun {r.sun_loop.freeze_S0:.0f}  →  "
           f"{r.mdwarf_label} {r.mdwarf_loop.freeze_S0:.0f} W/m²  (must dim further to snowball)")
     print()
+    T0 = equilibrium_temperature_0d()      # the analytic constant-albedo 0-D mean — size-INVARIANT
     print("  Knob 2 — planet size → meridional transport (a bigger planet sharpens the gradient):")
-    print("    size (R⊕)   D (W m⁻² K⁻¹)   global mean T̄   ice line")
+    print("    size (R⊕)   D (W m⁻² K⁻¹)   analytic T̄₀   relaxed T̄   ice line")
     for size, st in zip(r.sizes, r.size_states):
-        print(f"      {size:4.1f}      {ex.transport_for_size(size):7.3f}        {st.global_mean_T:6.2f} °C     "
+        print(f"      {size:4.1f}      {ex.transport_for_size(size):7.3f}      {T0:6.2f} °C   {st.global_mean_T:6.2f} °C   "
               f"{st.ice_line_lat:5.1f}°")
-    print("    → the 0-D mean barely moves; the gradient steepens and the ice cap creeps equatorward.\n")
+    print(f"    → the analytic 0-D mean T̄₀ ≈ {T0:.1f} °C is size-INVARIANT (size enters only the transport),")
+    print("      so the relaxed mean barely moves from ice-free to a small cap (0.5 → 1.0 R⊕); it then drops")
+    print("      sharply at 2 R⊕ where the enlarged ice cap's albedo feedback cools the planet. Either way")
+    print("      the gradient steepens and the ice cap creeps equatorward.\n")
 
 
 def save_figure(r: ExoplanetResult) -> Path:

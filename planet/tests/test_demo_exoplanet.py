@@ -23,8 +23,12 @@ def test_demo_exoplanet_headlines():
     # the global mean barely moves (the 0-D mean is size-invariant; only the feedback shifts it).
     icelines = [st.ice_line_lat for st in r.size_states]
     assert icelines[0] > icelines[1] > icelines[2]                  # sizes (0.5, 1.0, 2.0) → ice equatorward
-    means = np.array([st.global_mean_T for st in r.size_states])
-    assert means.max() - means.min() < 13.0                          # mean moves only via the feedback (loose)
+    # the two-level mean story (the analytic T0 size-invariance is tested tightly in test_exoplanet): the
+    # relaxed mean is close ice-free→small-cap (0.5↔1.0) but drops at 2 R⊕ as the enlarged cap's albedo
+    # feedback cools it — honest, not "the mean barely moves" over the whole range.
+    means = [st.global_mean_T for st in r.size_states]
+    assert abs(means[0] - means[1]) < 3.0                            # 0.5↔1.0 R⊕: ice-free → small cap, mean ~flat
+    assert means[2] < means[1] - 4.0                                 # 2 R⊕: the ice-cap feedback cools it
 
 
 @pytest.mark.slow
