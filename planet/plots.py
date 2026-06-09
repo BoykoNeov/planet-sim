@@ -315,3 +315,135 @@ def shallowwater_figure(adj, ros):
     rossby_axes(axd["rossby"], ros)
     fig.suptitle("Planet Phase 3 — the rotating shallow-water engine (engines/fluid)", fontsize=13)
     return fig
+
+
+# --------------------------------------------------------------------------- #
+# Phase 4 — the one-way coupler: the EBM gradient forces an emergent geostrophic jet.
+# --------------------------------------------------------------------------- #
+WESTERLY_COLOR = "#b3361f"      # the emergent westerly jet
+EASTERLY_COLOR = "#2f6fb0"      # the flanking easterly return (the periodic-channel consequence)
+GEOSTROPHIC_COLOR = "#222222"   # the geostrophic estimate −(g/f)∂h/∂y
+
+
+def jet_profile_axes(ax, jet) -> None:
+    """The emergent zonal-wind profile ``u(φ)`` vs the geostrophic estimate — geostrophic balance made visible.
+
+    The modelled zonal-mean wind (a westerly jet flanked by the periodic channel's compensating easterly
+    return) lies on top of ``−(g/f)∂h/∂y`` in the jet core: the jet *is* in geostrophic balance with the
+    forced height field.
+    The jet maximum (the westerly) is marked, and the EBM gradient maximum is flagged — the jet sits
+    *there*, not at the channel centre (the emergence).
+    """
+    phi = jet.phi
+    ax.axhline(0.0, color="#999999", lw=0.8)
+    ax.fill_between(phi, jet.u_profile, 0.0, where=jet.u_profile > 0, color=WESTERLY_COLOR, alpha=0.18)
+    ax.fill_between(phi, jet.u_profile, 0.0, where=jet.u_profile < 0, color=EASTERLY_COLOR, alpha=0.18)
+    ax.plot(phi, jet.u_profile, color=WESTERLY_COLOR, lw=2.0, label="modelled u (zonal mean)")
+    ax.plot(phi, jet.u_geostrophic, "--", color=GEOSTROPHIC_COLOR, lw=1.3,
+            label="geostrophic  −(g/f)∂h/∂y")
+    ax.axvline(jet.jet_lat, color=WESTERLY_COLOR, lw=1.0, ls=":")
+    ax.plot([jet.jet_lat], [jet.jet_speed], "o", color=WESTERLY_COLOR, ms=6)
+    ax.annotate(f"westerly jet\n{jet.jet_speed:.0f} m/s @ {jet.jet_lat:.0f}°",
+                xy=(jet.jet_lat, jet.jet_speed), xytext=(0.62, 0.82), textcoords="axes fraction",
+                fontsize=8, color=WESTERLY_COLOR,
+                arrowprops=dict(arrowstyle="->", color=WESTERLY_COLOR, lw=1.0))
+    ax.axvline(jet.gradient_peak_lat, color="#7a7a7a", lw=1.0, ls="--")
+    ax.text(jet.gradient_peak_lat, ax.get_ylim()[0], " EBM ∂T/∂φ max", rotation=90,
+            va="bottom", ha="right", fontsize=7, color="#7a7a7a")
+    ax.set_xlabel("latitude (°)")
+    ax.set_ylabel("zonal wind u (m/s)   +east")
+    ax.set_title(f"Emergent jet in geostrophic balance (core residual {100*jet.core_balance_residual:.1f}%)",
+                 fontsize=9)
+    ax.legend(fontsize=8, loc="lower left")
+
+
+def coupling_chain_axes(ax, jet, state) -> None:
+    """The forcing chain: the EBM temperature gradient sets the target height field (warm → high).
+
+    Left axis: the EBM temperature at the channel latitudes (the climate gradient that does the
+    forcing). Right axis: the windowed, zero-mean target height anomaly ``η_target`` the EBM hands the
+    flow — high where warm. *Climate gradient in, height field out* — the coupler's one job.
+    """
+    phi = jet.phi
+    T_chan = np.interp(phi, state.latitude_deg(), state.T)
+    ax.plot(phi, T_chan, color="#c0392b", lw=1.8, label="EBM T(φ)")
+    ax.set_xlabel("latitude (°)")
+    ax.set_ylabel("EBM temperature (°C)", color="#c0392b")
+    ax.tick_params(axis="y", labelcolor="#c0392b")
+    ax.set_title("The forcing chain: warm climate → high target", fontsize=9)
+    ax2 = ax.twinx()
+    ax2.axhline(0.0, color="#999999", lw=0.6)
+    ax2.plot(phi, jet.eta_target, color="#1f6f4a", lw=1.8, label="η_target (forced)")
+    ax2.set_ylabel("target height anomaly η (m)", color="#1f6f4a")
+    ax2.tick_params(axis="y", labelcolor="#1f6f4a")
+    lines = ax.get_lines() + ax2.get_lines()[1:]
+    ax.legend(lines, [l.get_label() for l in lines], fontsize=8, loc="upper right")
+
+
+def jet_field_axes(ax, jet) -> None:
+    """The 2-D jet on the β-plane channel: the zonal wind painted with flow arrows over it.
+
+    The forcing is zonally symmetric, so the emergent jet is a coherent zonal band — red (eastward
+    westerly) at midlatitudes, blue (westward easterly) on the flanks — the circulation the
+    interactive map registers as a ``vector_overlay`` (Phase 4)."""
+    xk = jet.x / 1e3
+    lat = jet.phi
+    vmax = float(np.max(np.abs(jet.u2d))) or 1.0
+    im = ax.pcolormesh(xk, lat, jet.u2d, cmap="RdBu_r", vmin=-vmax, vmax=vmax, shading="auto")
+    si, sj = max(1, jet.u2d.shape[1] // 12), max(1, jet.u2d.shape[0] // 16)
+    ax.quiver(xk[::si], lat[::sj], jet.u2d[::sj, ::si], jet.v2d[::sj, ::si],
+              color="#222222", scale=400, width=0.003, alpha=0.7)
+    ax.set_xlabel("x (km)")
+    ax.set_ylabel("latitude (°)")
+    ax.set_title("The emergent circulation (zonal wind + flow)", fontsize=9)
+    ax.figure.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="u (m/s)  +east")
+
+
+def coupler_conservation_axes(ax, jet) -> None:
+    """Conservation: mass machine-exact while forced; on RELEASE the bare engine conserves all invariants.
+
+    The honest forced–dissipative story (the reframed conservation leg). During forcing, mass holds at
+    machine precision but energy and potential enstrophy are *not* conserved — the forcing–drag balance
+    is what selects the steady jet. When the forcing is switched **off** (shaded), the bare frozen engine
+    conserves mass / energy / enstrophy (its Phase-3 guarantees) — and the jet persists.
+    """
+    tf = jet.times / 86400.0
+    t0 = tf[-1] if tf.size else 0.0
+    tr = t0 + jet.times_release / 86400.0
+    eps = 1e-18
+    ax.plot(tf, np.abs(jet.mass) + eps, color="#27795b", lw=1.4, label="mass |Δ| (machine-exact)")
+    ax.plot(tf, np.abs(jet.energy) + eps, color="#2f6fb0", lw=1.4, label="energy |Δ| (forced: not conserved)")
+    ax.plot(tf, np.abs(jet.enstrophy) + eps, color="#d4711f", lw=1.4, label="enstrophy |Δ|")
+    ax.plot(tr, np.abs(jet.mass_release) + eps, color="#27795b", lw=1.4)
+    ax.plot(tr, np.abs(jet.energy_release) + eps, color="#2f6fb0", lw=1.4)
+    ax.plot(tr, np.abs(jet.enstrophy_release) + eps, color="#d4711f", lw=1.4)
+    if tr.size:
+        ax.axvspan(t0, tr[-1], color="#cccccc", alpha=0.25)
+        ax.text(0.5 * (t0 + tr[-1]), ax.get_ylim()[1] if False else 1e-1, "forcing OFF\n(release)",
+                ha="center", va="top", fontsize=7, color="#555555")
+    ax.axvline(t0, color="#555555", lw=0.8, ls="--")
+    ax.set_yscale("log")
+    ax.set_xlabel("time (days)")
+    ax.set_ylabel("relative drift")
+    ax.set_title("Conservation: mass forced-exact; release re-confirms the engine", fontsize=9)
+    ax.legend(fontsize=7, loc="lower right")
+
+
+def coupler_figure(jet, state):
+    """The banked Phase-4 artifact: the EBM gradient forces an emergent, geostrophically-balanced jet.
+
+    Top-left: the emergent zonal-wind profile on top of the geostrophic estimate (balance made visible).
+    Top-right: the forcing chain (warm EBM → high target height). Bottom-left: the 2-D jet on the
+    channel. Bottom-right: the conservation diagnostics — mass forced-exact, then the release test
+    re-confirming the frozen engine's invariants. *Climate in, circulation out — the two engines coupled.*
+    """
+    fig, axd = plt.subplot_mosaic(
+        [["jet", "chain"], ["field", "conserve"]],
+        figsize=(15, 9), constrained_layout=True,
+    )
+    jet_profile_axes(axd["jet"], jet)
+    coupling_chain_axes(axd["chain"], jet, state)
+    jet_field_axes(axd["field"], jet)
+    coupler_conservation_axes(axd["conserve"], jet)
+    fig.suptitle("Planet Phase 4 — one-way EBM → shallow-water coupler: the emergent jet", fontsize=13)
+    return fig

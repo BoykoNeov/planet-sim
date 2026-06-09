@@ -281,9 +281,18 @@ pressure/height field that forces the shallow-water flow → midlatitude jets em
   settle into `f×u = −g∇h` — a jet at the latitude the climate gradient puts it. This is
   *distinct* from Phase 3's seal (which tests geostrophic *adjustment in isolation*):
   Phase 4 tests that the **coupled** system produces a balanced jet in the right place.
-- *Conservation.* The **shallow-water invariants** (mass `∫h`, PV, energy) preserved
-  under the steady EBM forcing — the frozen engine's guarantees re-confirmed in the
-  forced/coupled configuration.
+- *Conservation* (**reframed at build, 2026-06-09 — advisor-blessed honesty call**). The
+  original wording ("mass, PV, energy preserved under the steady forcing") is internally
+  inconsistent with this phase's own *forced* prose: a **forced–dissipative** system does **not**
+  conserve energy or PV — the forcing (thermal relaxation) injects available potential energy and the
+  drag removes kinetic energy, and *that balance is precisely what selects the steady jet*. So the leg
+  is reframed to what is actually true (the Phase-3 "energy *or* enstrophy, as measured" honesty
+  class): **(a)** mass `∫h` is **machine-exact under forcing** (a discretely zero-mean height target +
+  the engine's exact mass invariant), and **(b)** a **release test** — switch the forcing & drag *off*
+  and run the bare frozen engine: mass / energy / potential enstrophy are conserved (the engine's
+  Phase-3 guarantees re-confirmed in the coupled configuration) **and the jet persists**, proving it is
+  a genuine balanced state, not a forcing-propped artifact. *That* is "the frozen engine's guarantees
+  re-confirmed", read honestly.
 - *Benchmark.* **Jet latitude and strength** vs the observed midlatitude jet
   (~30–45°, tens of m/s — loose).
 
@@ -614,7 +623,9 @@ third consumer-in-waiting. Promotion is **not** done pre-emptively (the existing
 
 ## 10. Immediate next step
 
-**Where Planet stands (2026-06-09).** **Phases 1–2 are built.** *Phase 1* — the latitudinal EBM &
+**Where Planet stands (2026-06-09).** **All four phases are built — the capstone is complete** (the
+build records for Phases 3–4 + the interactive map + the teaching notebook are below; the Phase-1/2
+detail that follows is retained as the foundation narrative). *Phase 1* — the latitudinal EBM &
 the Snowball bifurcation, the diffusion spine's third reuse with Strang-split radiation (banked:
 present-day ~73° ice line, freeze at ~8 % dimming). *Phase 2* — the **climate→biome map** (the
 payoff, banked early): `precip.py` (a diagnostic precipitation parameterization — a circulation-set
@@ -675,11 +686,37 @@ conservation diagnostics). **Gate/infra consequences realized:** `planet`'s `use
 `{engines/diffusion, engines/fluid}` — the manifest's **first genuinely multi-engine row** — and the
 **import-drift guard** (deferred to engine #2) is **built and live** in `tools/tests/test_gate.py`.
 
-**Next build — Phase 4: the one-way EBM→circulation coupler.** Force this dry flow with the EBM's
-meridional temperature gradient so a **geostrophically-balanced midlatitude jet emerges** (anchor:
-geostrophic balance of the coupled jet + jet-latitude benchmark); at that point the interactive map
-*registers* a `vector_overlay` circulation layer with no renderer edit. Two-way coupling is rung 1
-(seamed, not built).
+**Built — Phase 4: the one-way EBM→circulation coupler (2026-06-09 — the capstone complete).**
+`projects/planet/coupler.py` (+ `demo_coupler.py`, `plots.coupler_figure`, the 9-test `test_coupler`
+triad + 2-test `test_demo_coupler`) **couples the two shared engines**: the frozen diffusion spine's
+EBM equilibrium hands its meridional temperature gradient to the frozen shallow-water engine, and a
+**geostrophically-balanced midlatitude westerly jet emerges** (banked: ~16.5 m/s @ ~42°, core
+geostrophic residual ~0.6%, `docs/figures/planet-coupler.png`). The forcing is composed *around* the
+bare frozen engine by **operator splitting — the third reuse of the EBM/Jominy idiom**: exact-exponential
+**thermal relaxation** of `h` toward the EBM-derived target + weak **Rayleigh drag** (`τ_drag ≫ 1/f`,
+near-geostrophic), *half-forcing / full bare-engine-step / half-forcing*. Three calls baked in:
+**(1) y-periodicity** — the engine is doubly-periodic (walls are its named, unbuilt BC extension), so a
+monotonic warm→cold target would jump at the seam and force a spurious boundary jet; the target is a
+**windowed (Tukey), discretely zero-mean** height anomaly → C¹-periodic + mass-neutral, and the
+periodic channel exacts a real **flanking easterly return** (∮u≈0). Its east–west–east *sign* banding
+qualitatively resembles the general circulation, but the single-layer periodic channel does **not**
+reproduce the observed westerly-dominant magnitudes — here the poleward easterly is actually the
+strongest band, and its concentration is window-shaped, not observed — so this is a **named scope
+edge**, not a faithful trade-wind/polar-easterly reconstruction. **(2) emergence, not
+placement** — the channel brackets the *smooth* midlatitude baroclinic zone (excluding the ice-line
+albedo cliff) and the jet lands at the **EBM gradient maximum** (~45°), *poleward of the channel
+centre* (40°); a synthetic off-centre gradient makes the jet **follow it** (the decisive emergence
+test). **(3) the conservation reframe** above (mass forced-exact + the release test). Non-circularity:
+the jet *latitude* and geostrophic balance are amplitude-independent (validated); the height-per-Kelvin
+`α` → jet *speed* is calibrated (tuning). Scope edge: **one-way, dry single layer** — no poleward heat
+transport / reduction-to-EBM (rung 1, needs the tracer) and no thermal wind (rung 3, needs vertical
+shear). The **interactive map now paints the `vector_overlay`** seam (`planetmap.circulation_layer` +
+`_vector_overlay_trace` Plotly cones; `build_view(jet=…)`) — the deferred Phase-4 machinery built, the
+jet registered as a `circulation` layer over the temperature field (`docs/figures/planet-coupler-map.html`),
+round-tripping through `planet_spec`; it is **computed-then-viewed**, not in the live-slider loop (the
+first compute too heavy for the rung-0 instant remap, §9.2). No engine modified; planet's `uses`
+unchanged (`{diffusion, fluid}`); full planet gate **140 passed, 1 skipped**. Two-way coupling is rung 1
+(seamed at the engine's `tracer` slot, not built).
 
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko

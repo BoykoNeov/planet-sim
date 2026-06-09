@@ -26,10 +26,13 @@ casing: that *is* the proof that "phases just register, the renderer is unchange
 Later phases register more — circulation streamlines / the jet axis (Phase 4, the
 ``vector_overlay`` kind), elevation & coastlines (the geography seam) — at the same seam.
 
-``vector_overlay`` is a **declared-but-unpainted** kind in v1 (the dispatch raises a clear
-``NotImplementedError`` naming Phase 4): painting a vector field is genuinely new render code Phase 4
-adds when it has a flow to draw — "build the seam, not the machinery" (ADR 0004), not a synthetic
-overlay with no consumer.
+``vector_overlay`` was a **declared-but-unpainted** kind through Phases 1–3 ("build the seam, not the
+machinery" — ADR 0004): :func:`render` raised for it until there was a real flow to draw. **Phase 4
+builds the machinery** (:func:`_vector_overlay_trace`): a Phase-4 coupled jet
+(:func:`projects.planet.coupler.couple_jet`) registers a ``circulation`` ``vector_overlay`` layer
+(:func:`circulation_layer`), painted as flow arrows on the globe — the emergent jet *is* the consumer.
+The jet is **not** part of the live-slider loop (it is a separate integration, the first compute too
+heavy for the rung-0 instant remap; §9.2): a circulation view is *computed, then viewed*.
 
 Three layers of code, by the ADR-0002 / Steel-``app.py`` discipline
 -------------------------------------------------------------------
@@ -120,9 +123,11 @@ class LayerKind(str, Enum):
 
     ``SCALAR_FIELD`` — a 2-D lat×lon field painted as the globe surface (temperature, precip, biome,
     elevation). ``ANNOTATION`` — a line/marker overlay given as ``(k, 2)`` ``[lat, lon]`` points (the
-    ice line). ``VECTOR_OVERLAY`` — a flow field (circulation streamlines / the jet axis), **declared
-    here but unpainted in v1**: :func:`render` raises for it, naming Phase 4 (build the seam, not the
-    machinery). A ``str``-valued enum so ``kind.value`` serializes straight into the planet-spec JSON.
+    ice line). ``VECTOR_OVERLAY`` — a flow field (the emergent circulation), ``data`` a stacked
+    ``(2, n_lat, n_lon)`` velocity ``[u, v]``, painted as flow arrows (:func:`render` /
+    :func:`_vector_overlay_trace`) — **Phase 4** built this machinery; it was a declared-but-unpainted
+    seam through Phases 1–3. A ``str``-valued enum so ``kind.value`` serializes straight into the
+    planet-spec JSON.
     """
 
     SCALAR_FIELD = "scalar_field"
@@ -250,15 +255,37 @@ def _biome_style() -> dict:
     }
 
 
-def build_view(result, n_lon: int = N_LON, elevation: np.ndarray | None = None) -> PlanetView:
+def circulation_layer(jet, lat_full: np.ndarray, n_lon: int = N_LON) -> Layer:
+    """A ``VECTOR_OVERLAY`` circulation layer from a Phase-4 coupled jet (the §9 Phase-4 registration).
+
+    Maps the coupler's zonal-wind profile ``u(φ)`` (a midlatitude channel band, NH) onto the full-globe
+    latitude grid — **mirrored to both hemispheres** (mid-latitude westerlies in each) and zero outside
+    the channel band — and broadcasts it across longitude. The layer ``data`` is the stacked
+    ``(2, n_lat, n_lon)`` velocity ``[u, v]`` (m/s; ``v ≡ 0`` for this zonally-symmetric jet, but the
+    two-component shape is the general vector-field seam). The renderer paints it as flow arrows
+    (:func:`render`). This is the layer Phase 4 *registers* — the deferred ``VECTOR_OVERLAY`` kind, now
+    painted (build the seam, *then* the machinery).
+    """
+    abs_lat = np.abs(np.asarray(lat_full, dtype=float))
+    u1d = np.interp(abs_lat, jet.phi, jet.u_profile, left=0.0, right=0.0)   # 0 outside the channel band
+    u_field = np.repeat(u1d[:, None], n_lon, axis=1)
+    data = np.stack([u_field, np.zeros_like(u_field)])                      # (2, n_lat, n_lon) = [u, v]
+    return Layer("circulation", LayerKind.VECTOR_OVERLAY, data, "m/s",
+                 style={"colorscale": "RdBu_r", "arrow_color": "#1a1a1a",
+                        "label": f"zonal wind — jet {jet.jet_speed:.0f} m/s @ {jet.jet_lat:.0f}°"},
+                 z_order=2)
+
+
+def build_view(result, n_lon: int = N_LON, elevation: np.ndarray | None = None, jet=None) -> PlanetView:
     """Turn a Phase-2 climate result into the v1 :class:`PlanetView` — the biome-map layer stack.
 
     Consumes a :class:`~projects.planet.demo_biomes.BiomeResult` (the validated climate → precip →
     biome composition) and registers the v1 layers: **temperature** & **precipitation** & **biome**
     (``SCALAR_FIELD`` — each the hemisphere profile mirrored + broadcast across longitude), the **ice
     line** (``ANNOTATION``), and an inert **elevation** layer (the geography seam, §9.3 — flat zeros by
-    default, or an imported full-globe heightmap). No physics here — only re-shaping validated arrays
-    into the renderer-input seam.
+    default, or an imported full-globe heightmap). With a Phase-4 ``jet`` it *also* registers the
+    **circulation** (``VECTOR_OVERLAY``) — the seam the renderer paints with no restructuring (ADR 0004
+    #1). No physics here — only re-shaping validated arrays into the renderer-input seam.
 
     Parameters
     ----------
@@ -269,6 +296,10 @@ def build_view(result, n_lon: int = N_LON, elevation: np.ndarray | None = None) 
     elevation : ndarray | None
         Optional full-globe ``(n_lat, n_lon)`` elevation field (m) for the inert geography layer;
         defaults to flat (zeros). Carried and round-tripped, never consumed by the climate at v1.
+    jet : CoupledJet | None
+        Optional Phase-4 emergent jet (:func:`projects.planet.coupler.couple_jet`); if given, a
+        ``circulation`` ``VECTOR_OVERLAY`` layer is registered. (Not part of the live-slider loop — the
+        jet is a separate integration, the first compute too heavy for the rung-0 instant remap, §9.2.)
     """
     state = result.state
     lat_full = _mirror_latitude(state.latitude_deg())
@@ -283,7 +314,7 @@ def build_view(result, n_lon: int = N_LON, elevation: np.ndarray | None = None) 
         if elevation_field.shape != (n_lat, n_lon):
             raise ValueError(f"elevation must be {(n_lat, n_lon)} (full-globe lat×lon), got {elevation_field.shape}")
 
-    layers = (
+    layers = [
         Layer("temperature", LayerKind.SCALAR_FIELD, _broadcast_field(state.T, n_lon), "°C",
               style={"colorscale": "RdBu_r"}, z_order=0),
         Layer("precipitation", LayerKind.SCALAR_FIELD, _broadcast_field(result.precip_cm, n_lon), "cm/yr",
@@ -294,8 +325,10 @@ def build_view(result, n_lon: int = N_LON, elevation: np.ndarray | None = None) 
               style={"color": "#c0392b", "label": "ice line (T = T_freeze)"}, z_order=3),
         Layer("elevation", LayerKind.SCALAR_FIELD, elevation_field, "m",
               style={"colorscale": "Earth"}, z_order=-1, inert=True),
-    )
-    return PlanetView(grid=grid, layers=layers)
+    ]
+    if jet is not None:
+        layers.append(circulation_layer(jet, lat_full, n_lon))
+    return PlanetView(grid=grid, layers=tuple(layers))
 
 
 def climate_view(S0: float = S0_EARTH, A: float = A_OLR, D: float = D_TRANSPORT, *,
@@ -358,6 +391,42 @@ def _hovertext(grid: Grid, layer: Layer) -> np.ndarray:
     return np.vectorize(fmt)(LAT, LON, val)
 
 
+def _vector_overlay_trace(go, grid: Grid, layer: Layer):
+    """A Plotly ``Cone`` trace painting a ``VECTOR_OVERLAY`` velocity field as flow arrows on the globe.
+
+    ``layer.data`` is the stacked ``(2, n_lat, n_lon)`` horizontal velocity ``[u, v]`` (m/s). At each
+    (sub-sampled) cell the eastward/northward components are rotated onto the **sphere-tangent** 3-D
+    directions (east ``ê_λ``, north ``ê_φ``) and drawn as a cone (arrowhead) just above the surface, so
+    a band of eastward cones at mid-latitudes *is* the emergent westerly jet. Cones are coloured by
+    wind speed. This is the machinery the ``VECTOR_OVERLAY`` seam deferred to Phase 4 (ADR 0004 #1)."""
+    u_field, v_field = np.asarray(layer.data[0], dtype=float), np.asarray(layer.data[1], dtype=float)
+    lat = np.radians(grid.lat)
+    lon = np.radians(grid.lon)
+    # sub-sample so the globe is not crowded (≈16 lat × 12 lon arrows); skip negligible wind.
+    sj = max(1, lat.size // 16)
+    si = max(1, lon.size // 12)
+    xs, ys, zs, us, vs, ws = [], [], [], [], [], []
+    umax = float(np.max(np.abs(u_field))) or 1.0
+    for j in range(0, lat.size, sj):
+        for i in range(0, lon.size, si):
+            u, v = u_field[j, i], v_field[j, i]
+            if abs(u) + abs(v) < 0.05 * umax:
+                continue
+            la, lo = lat[j], lon[i]
+            east = np.array([-np.sin(lo), np.cos(lo), 0.0])
+            north = np.array([-np.sin(la) * np.cos(lo), -np.sin(la) * np.sin(lo), np.cos(la)])
+            pos = 1.02 * np.array([np.cos(la) * np.cos(lo), np.cos(la) * np.sin(lo), np.sin(la)])
+            vec = u * east + v * north
+            xs.append(pos[0]); ys.append(pos[1]); zs.append(pos[2])
+            us.append(vec[0]); vs.append(vec[1]); ws.append(vec[2])
+    return go.Cone(
+        x=xs, y=ys, z=zs, u=us, v=vs, w=ws,
+        colorscale=layer.style.get("colorscale", "RdBu_r"), showscale=False,
+        sizemode="scaled", sizeref=0.8, anchor="tail",
+        name=layer.style.get("label", layer.name), hoverinfo="name",
+    )
+
+
 def render(view: PlanetView, active: str = "biome"):
     """Paint a :class:`PlanetView` as an interactive Plotly globe — the generic, kind-dispatching renderer.
 
@@ -367,9 +436,9 @@ def render(view: PlanetView, active: str = "biome"):
     renderer is **generic over** :class:`LayerKind` — it dispatches, it does not special-case a phase —
     so registering a new scalar or annotation layer needs no edit here (ADR 0004 #1).
 
-    ``VECTOR_OVERLAY`` layers raise ``NotImplementedError`` naming Phase 4: painting a flow field is new
-    render code added when there is a circulation to draw (build the seam, not the machinery). Requires
-    the optional ``[webviz]`` extra (Plotly); raises ``ImportError`` without it (caught by callers).
+    ``VECTOR_OVERLAY`` layers are painted as flow arrows (:func:`_vector_overlay_trace` — Plotly cones on
+    the sphere-tangent plane) — the Phase-4 machinery the seam deferred through Phases 1–3. Requires the
+    optional ``[webviz]`` extra (Plotly); raises ``ImportError`` without it (caught by callers).
     """
     import plotly.graph_objects as go
 
@@ -406,9 +475,7 @@ def render(view: PlanetView, active: str = "biome"):
                 x=ax, y=ay, z=az, mode="lines", name=ly.style.get("label", ly.name),
                 line=dict(color=ly.style.get("color", "#000000"), width=5), hoverinfo="name"))
         elif ly.kind is LayerKind.VECTOR_OVERLAY:
-            raise NotImplementedError(
-                f"vector_overlay layer {ly.name!r} renders in Phase 4 (the coupler's emergent jets); "
-                "v1 paints scalar fields + annotations (ADR 0004: build the seam, not the machinery)")
+            traces.append(_vector_overlay_trace(go, grid, ly))
 
     title = (f"Planet — {surface_layer.name} ({surface_layer.units})"
              if not surface_layer.style.get("categorical") else "Planet — biome map")

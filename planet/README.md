@@ -95,6 +95,24 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   (`slow`) and `plots.shallowwater_figure` (`[viz]`). The demo composes `geostrophic_adjustment` +
   `rossby_wave` → `docs/figures/planet-shallowwater.png`: the adjustment (bump → balanced vortex over
   `L_R`, with the conservation diagnostics holding flat) beside a **westward** Rossby wave.
+- **To work on the one-way coupler (Phase 4 — the capstone payoff):** `coupler.py` +
+  `tests/test_coupler.py`. It **couples the two frozen engines**: the EBM's meridional temperature
+  gradient (a `ClimateState`) is mapped to a doubly-periodic, zero-mean **height target**
+  (`height_target` — windowed for the wall-less engine), and the flow is forced toward it by
+  **operator splitting around the bare engine** (`couple_jet`: exact-exponential thermal relaxation +
+  weak Rayleigh drag — the third reuse of the EBM/Jominy idiom) until a **geostrophically-balanced
+  westerly jet emerges** (`geostrophic_balance` is the anchor). The jet sits at the EBM gradient
+  maximum (emergent, *not* the channel centre — `gradient_peak_latitude`); the periodic channel exacts
+  a **flanking easterly return** (named). Conservation is **reframed** (forced–dissipative): mass
+  forced-exact + a **release test** (forcing off → the bare engine conserves + the jet persists).
+  One-way, dry single layer (two-way = rung 1, the `tracer` seam). The module docstring is its contract.
+- **To work on the Phase-4 banked artifact:** `demo_coupler.py` + `tests/test_demo_coupler.py` (`slow`)
+  and `plots.coupler_figure` (`[viz]`). The demo forces the present-day climate → emergent jet →
+  `docs/figures/planet-coupler.png` (the jet on the geostrophic estimate + the forcing chain + the 2-D
+  jet + the forced/release conservation diagnostics); with `[webviz]` it also banks the **interactive
+  globe** `docs/figures/planet-coupler-map.html` — the jet drawn as a `circulation` `vector_overlay`
+  (Plotly cones) over the temperature field (`planetmap.circulation_layer` / `_vector_overlay_trace`,
+  `build_view(jet=…)`; computed-then-viewed, not in the live-slider loop).
 - **To use the shallow-water engine directly:** load `engines/fluid/CONTRACT.md` only — the frozen
   one-page API (`ShallowWater`, `SWState`, `uniform_grid`; mass machine-exact, energy/PV bounded;
   the `tracer` slot declared-but-unbuilt = rung 1). Never the engine internals.
@@ -150,10 +168,17 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   (honest, not aspirational). `circulation.py` pins the planetary numbers (`L_R ≈ 960 km` at 45°) and
   banks the artifact (`docs/figures/planet-shallowwater.png`). **First multi-engine gate row**
   (`planet` uses `{engines/diffusion, engines/fluid}`); the import-drift guard is now live.
-- **Phase 4 — the one-way EBM→circulation coupler: PENDING** (plan §3). It forces this dry flow with
-  the EBM's meridional temperature gradient so a geostrophically-balanced jet emerges, at which point
-  the interactive map *registers* a `vector_overlay` circulation layer (no renderer edit). The
-  chip-style teaching notebook `planet.ipynb` is built; extending it to Phase 3/4 is a later touch.
+- **Phase 4 — the one-way EBM→circulation coupler: BUILT** (2026-06-09 — the capstone complete). The
+  EBM's meridional temperature gradient forces the dry shallow-water flow (thermal relaxation + weak
+  drag split around the bare engine) and a **geostrophically-balanced westerly jet emerges** (~16.5 m/s
+  @ ~42°, core residual ~0.6%) at the **EBM gradient maximum** — emergent, not channel-placed — flanked
+  by the easterly return the doubly-periodic channel requires. **Conservation reframed**
+  (forced–dissipative): mass forced-exact + a **release test** re-confirming the engine's invariants
+  while the jet persists. The interactive map now **paints** the `vector_overlay` (the deferred
+  Phase-4 seam): a `circulation` layer over the temperature field. One-way / dry single layer; two-way
+  is rung 1 (the `tracer` seam). No engine modified; `planet` uses `{engines/diffusion, engines/fluid}`
+  unchanged. The chip-style teaching notebook `planet.ipynb` is built (Phases 1–2); a Phase-3/4 notebook
+  section is a later touch.
 
 ## Test runner (tiered gate, ADR 0003 — the per-project successor)
 

@@ -9,7 +9,7 @@ physics check); the genuine correctness property — the state round-trip — li
 * **always-green** (NumPy only): the registry primitives, the layer builders (the renderer-input
   seam — mirroring + broadcast), the live recompute, and robustness at the slider extremes;
 * **importorskip("plotly")** (fast — no kernel, so **not** ``@slow``): the figure builds, switches
-  active layer, draws the annotation, and raises for the unpainted vector kind;
+  active layer, draws the annotation, and paints the Phase-4 circulation ``vector_overlay`` (cones);
 * **untested**: :func:`~projects.planet.planetmap.interactive_map` (the live ipywidgets loop — the
   ``main()`` analogue, reach).
 
@@ -238,13 +238,39 @@ def test_render_switches_the_active_scalar_layer(active):
     assert any(type(t).__name__ == "Surface" for t in fig.data)
 
 
-def test_render_unpainted_vector_kind_raises_naming_phase4():
+def _fake_jet(jet_lat=42.0, jet_speed=16.0):
+    """A minimal stand-in for a Phase-4 CoupledJet (no slow integration) — just the fields the
+    circulation layer-builder consumes: the channel latitudes + the zonal-wind profile."""
+    import types
+    phi = np.linspace(19.0, 61.0, 40)
+    u = jet_speed * np.exp(-((phi - jet_lat) / 8.0) ** 2) - 4.0      # a westerly bump + weak easterly mean
+    return types.SimpleNamespace(phi=phi, u_profile=u, jet_lat=jet_lat, jet_speed=jet_speed)
+
+
+def test_circulation_layer_maps_jet_to_both_hemispheres():
+    # always-green builder check: the VECTOR_OVERLAY layer is the jet mapped onto the full globe.
+    result = _coarse_result()
+    view = pm.build_view(result, jet=_fake_jet())
+    circ = view.layer("circulation")
+    assert circ.kind is pm.LayerKind.VECTOR_OVERLAY
+    assert circ.data.shape == (2, view.grid.lat.size, view.grid.lon.size)   # stacked [u, v]
+    u = circ.data[0]
+    assert np.allclose(circ.data[1], 0.0)                                   # v ≡ 0 for the zonal jet
+    # westerly band present in BOTH hemispheres (mirrored), and zero outside the channel band
+    lat = view.grid.lat
+    assert u[np.argmin(np.abs(lat - 42.0)), 0] > 5.0                        # NH westerly
+    assert u[np.argmin(np.abs(lat + 42.0)), 0] > 5.0                        # SH westerly (same sign)
+    assert np.allclose(u[np.argmin(np.abs(lat - 5.0))], 0.0)                # equator: outside the band → 0
+
+
+def test_render_paints_the_circulation_vector_overlay():
     pytest.importorskip("plotly.graph_objects")
-    view = pm.climate_view(**COARSE)
-    jet = pm.Layer("jet", pm.LayerKind.VECTOR_OVERLAY, np.zeros((4, 2)), "m/s")
-    with_vector = pm.PlanetView(view.grid, view.layers + (jet,))
-    with pytest.raises(NotImplementedError, match="Phase 4"):
-        pm.render(with_vector)
+    result = _coarse_result()
+    view = pm.build_view(result, jet=_fake_jet())
+    fig = pm.render(view)
+    kinds = [type(t).__name__ for t in fig.data]
+    assert "Surface" in kinds                        # the scalar surface
+    assert "Cone" in kinds                            # the Phase-4 circulation overlay (now painted)
 
 
 def test_render_unknown_active_layer_raises_keyerror():
