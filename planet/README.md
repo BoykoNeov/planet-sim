@@ -43,6 +43,22 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   (the end-to-end integration test, `slow`-marked) and `plots.py` (the figure — `[viz]` extra). The
   demo wires `present_day_climate` + `snowball_hysteresis` → `plots.snowball_figure` and saves
   `docs/figures/planet-snowball.png` (the hysteresis loop + ice-line loop + present-day `T(φ)` profile).
+- **To work on the biome map (Phase 2 — the payoff, banked early):** `biomes.py` + `precip.py` +
+  `tests/test_biomes.py` + `tests/test_precip.py`. `precip.py` is the **diagnostic precipitation**
+  parameterization — a circulation-set Gaussian latitude pattern (ITCZ-wet / subtropics-dry /
+  midlat-wet / poles-dry, in **cm/yr**) times a **Clausius–Clapeyron** global-moisture amplitude
+  (`precipitation`, `precip_field`). `biomes.py` is the **Whittaker `(T,P)→biome` classifier** — an
+  *original*, total, sloped-boundary partition of the (T,P) plane (the **Irvin precedent**: the
+  copyrighted diagram is reproduced by an independent computation calibrated to it, not digitized),
+  with cold biomes temperature-limited and warm biomes moisture-limited on diagonal thresholds
+  (`Biome`, `classify`, `classify_field`, `biome_area_fractions`). Both reuse only the EBM — no new
+  engine. The module docstrings are their contracts.
+- **To work on the Phase-2 banked artifact:** `demo_biomes.py` + `tests/test_demo_biomes.py`
+  (`slow`) and `plots.biomes_figure` (`[viz]`). The demo composes `present_day_climate` → `precip` →
+  `biomes` and saves `docs/figures/planet-biomes.png` — the **biome-band map** + the **Whittaker
+  (T,P) plane** shaded by biome with the planet's climate trajectory drawn through it (the mechanism:
+  *why* deserts sit at ~30°) + the `T(φ)`/`P(φ)` profiles. It also warms the planet (a CO₂ proxy) to
+  show the bands migrate poleward.
 - **To work on the benchmark (Phase 1):** `climate_reference.py` + `tests/test_climate_reference.py`.
   A **frozen reference table** of the climlab/North benchmark facts (present ice line ~70°, the
   Snowball threshold, the hysteresis) keeps the triad green without the `[climate]` extra; the live
@@ -64,10 +80,22 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   ≈ 14.7 °C / ice line ≈ 73° (the finite-cap branch — Earth's, in the bistable zone); the planet
   **freezes over** (Snowball) when the sun dims ~8 % and **re-melts only ~580 W/m² brighter** (a wide
   hysteresis loop). 26-test triad green (+1 skipped live-climlab cross-check).
-- **Phases 2–4 — biomes / shallow-water engine / coupler: PENDING** (plan §3). Phase 2 (biomes) is
-  banked *early* (before the new engine); Phase 3 builds & freezes `engines/fluid`; Phase 4 is the
-  one-way coupler. The teaching notebook `planet.ipynb` and the deep-end interactive map
-  `planetmap.py` (the `[webviz]` surface, plan §9) come with the later phases.
+- **Phase 2 — biomes & habitability (the consequence payoff, banked early): BUILT** (2026-06-09).
+  `precip.py` (the diagnostic precipitation parameterization — circulation pattern × C–C amplitude,
+  cm/yr) + `biomes.py` (the original total Whittaker `(T,P)→biome` partition) + the banked biome-map
+  demo (`docs/figures/planet-biomes.png`). **Validation:** the classifier is an **exact, total
+  partition** (every (T,P) → one biome, area fractions sum to 1), nine canonical **probe points** land
+  in their textbook biome, the present-day **band ordering** (equator→pole: rain forest → savanna →
+  desert/grassland → temperate forest → boreal → tundra) is reproduced, and the C–C global-water
+  budget is **monotone** in T̄ (a *consistency* check, not a conservation law — named). **No new
+  engine** (project-local reuse of the EBM only); 20-test triad added (3 `slow`). Scope edges named:
+  Whittaker not Köppen (annual `T,P`, no seasonal precip), prescribed precip not a water cycle, fixed
+  band centres (migration is the rung-1/2 circulation enhancement), the C–C 7 %/K is moisture-capacity
+  not the energy-constrained ~2–3 %/K global precip rate.
+- **Phases 3–4 — shallow-water engine / coupler: PENDING** (plan §3). Phase 3 builds & freezes
+  `engines/fluid`; Phase 4 is the one-way coupler. The teaching notebook `planet.ipynb` and the
+  deep-end interactive map `planetmap.py` (the `[webviz]` surface, plan §9) come with the later phases
+  — the interactive map's first version is to be the biome map (plan §10, the next build step).
 
 ## Test runner (tiered gate, ADR 0003 — the per-project successor)
 

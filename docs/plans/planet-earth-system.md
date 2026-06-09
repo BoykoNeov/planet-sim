@@ -614,21 +614,28 @@ third consumer-in-waiting. Promotion is **not** done pre-emptively (the existing
 
 ## 10. Immediate next step
 
-**Where Planet stands (2026-06-09).** **Phase 1 is built** — the latitudinal EBM & the
-Snowball bifurcation, the diffusion spine's third reuse with Strang-split radiation
-(banked: present-day ~73° ice line, freeze at ~8 % dimming). The **interactive-map
-design is converged this batch** and written up (ADR 0004 + §9 here): a Plotly+ipywidgets
-**layer registry**, a tier-dependent interaction model, the **planet-spec** export/import
-schema, and the editable-geography seam — all preplanned to the user's forward
-requirements (editable elevation/water; layer-by-layer round-trip into a future editor).
+**Where Planet stands (2026-06-09).** **Phases 1–2 are built.** *Phase 1* — the latitudinal EBM &
+the Snowball bifurcation, the diffusion spine's third reuse with Strang-split radiation (banked:
+present-day ~73° ice line, freeze at ~8 % dimming). *Phase 2* — the **climate→biome map** (the
+payoff, banked early): `precip.py` (a diagnostic precipitation parameterization — a circulation-set
+Gaussian latitude pattern in cm/yr × a Clausius–Clapeyron global-moisture amplitude) + `biomes.py`
+(an **original, total** Whittaker `(T,P)→biome` partition — the Irvin precedent: the copyrighted
+diagram reproduced by an independent calibrated computation, *not* digitized — with cold biomes
+temperature-limited and warm biomes moisture-limited on diagonal thresholds). Banked
+(`docs/figures/planet-biomes.png`): the biome-band map + the Whittaker (T,P) plane with the planet's
+climate trajectory + the poleward migration under a CO₂ warming knob. No new engine; the 20-test
+triad is green. The **interactive-map design is converged** and written up (ADR 0004 + §9 here): a
+Plotly+ipywidgets **layer registry**, a tier-dependent interaction model, the **planet-spec**
+export/import schema, and the editable-geography seam.
 
-**Next build — Phase 2 (biomes), *then* the interactive map (user decision, D3-B).** The
-interactive map's first version should *be* the biome map (the §9 centerpiece, the
-dramatic payoff), and Phase 2 is small, low-risk spine-reuse (Whittaker `(T,P)→biome`
-classifier + a diagnostic precipitation parameterization — no new engine). So the order
-is **biomes first → then `planetmap.py` v1 + `planet_spec.py`** (the map showing the
-biome bands, with the geography-spec contract written but inert per §9.3). The
-shallow-water engine (Phase 3) and the coupler (Phase 4) follow.
+**Next build — the interactive map (user decision, D3-B): `planetmap.py` v1 + `planet_spec.py`.** Now
+that Phase 2 is banked, the interactive map's first version should *be* the **biome map** (the §9
+centerpiece, the dramatic payoff): the Plotly+ipywidgets layer registry painting the temperature / ice
+/ biome / precipitation layers, with knob-sliders (S₀, CO₂, obliquity, transport `D`) driving an
+instant recompute-and-remap (rung-0 live loop), the **planet-spec** export/import schema with a
+round-trip-identity test, and the geography-spec contract **written but inert** per §9.3. The teaching
+notebook `planet.ipynb` is the chip-style thin skin alongside it. The shallow-water engine (Phase 3)
+and the coupler (Phase 4) follow.
 
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
