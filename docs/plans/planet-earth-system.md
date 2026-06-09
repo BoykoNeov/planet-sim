@@ -335,7 +335,8 @@ BigSim/
     circulation.py            # planet's instantiation of engines/fluid (β-plane channel, planetary params)      (Phase 3)
     coupler.py                # one-way EBM → shallow-water forcing (cadence-based, timescale-separated)          (Phase 4)
     plots.py                  # planet-local static figures (→ promote to viz/ by rule-of-three)
-    planetmap.py              # the deep-end INTERACTIVE map (Plotly/web) — §9 chosen surface
+    planetmap.py              # the deep-end INTERACTIVE map: a LAYER REGISTRY painted by Plotly+ipywidgets (ADR 0004 #1, §9.1)
+    planet_spec.py            # the planet-spec interchange schema: export/import the layer stack; round-trip-identity tested (ADR 0004 #3-4, §9.3)
     planet.ipynb              # single teaching notebook (sliders → climate → biome map)
     demo_snowball.py / demo_biomes.py / demo_shallowwater.py / demo_coupler.py    # banked artifacts
     climate_reference.py      # frozen climlab reference table (keeps the triad green without the [climate] extra)
@@ -394,6 +395,21 @@ under one-way + dry single-layer live on the staircase: **poleward heat transpor
 and the **reduction-to-diffusive-EBM limit** arrive at **rung 1** (with the advected
 tracer), and **thermal wind** at **rung 3** (with vertical structure) — so the climb is
 where those anchors belong, not a v1 phase.
+
+**Two staircase consequences for the interactive map (ADR 0004 / §9).** (1) **The
+interaction model changes with the rung, the renderer does not.** At rung 0 a slider
+drives an instant recompute-and-remap; as compute climbs (rungs 3+: 3-D, many
+timesteps), that live loop becomes impossible and the model shifts to **set parameters →
+launch a run → view the result** — but the map renderer, a pure array consumer, is
+unchanged (named so a future session does not engineer to preserve the live loop past
+where compute allows). (2) **"Editable planet" is itself a climb on this staircase, not a
+v1 feature.** The cheap tier — elevation as a **lapse-rate** map diagnostic, land/ocean
+as an **albedo difference**, land/ocean fraction per band as continentality-lite — rides
+**rungs 0–1** (no engine change); **ocean heat capacity → seasonality** needs the
+seasonal cycle the annual-mean v1 lacks (the §3 scope edge); and **true longitudinal
+geography → regional climate, orographic precip, rain shadows** (the user's north star)
+is the **rung-5** exit from the zonal-mean planet — new transport that leaves the frozen
+1-D engine. Until those rungs, an imported/edited geography is **inert** (§9.3).
 
 ---
 
@@ -475,7 +491,12 @@ smoke-test; any long shallow-water integration).
 ## 9. Visualization & UX
 
 Per ARCHITECTURE.md §12 / ADR 0002: compute stays headless; views consume the engines'
-plain arrays; a figure is never in the correctness path.
+plain arrays; a figure is never in the correctness path. Planet is the **first project
+to reach the deep end** of ADR 0002 §4, so its interactive map is governed by the
+doctrine `docs/decisions/0004-interactive-maps-and-state-interchange.md` (ADR 0004 —
+the layer registry, the tier-dependent interaction model, and the state-interchange
+schema, all first-instanced here). The map's design was converged with the user
+(2026-06-09); the decisions and their rationale are recorded inline below.
 
 - **Floor (universal):** the §3 banked figures — the Snowball hysteresis loop, the
   `T(φ)` profile + ice line, the biome-band map, the geostrophic-adjustment / Rossby
@@ -487,49 +508,132 @@ plain arrays; a figure is never in the correctness path.
   migrating** as a knob turns (why deserts sit at 30°), and the **jet emerging from the
   EBM-imposed height field** (geostrophic balance made visible — thermal wind itself is
   the rung-3 upgrade).
-- **Experimentation — the deep-end interactive map (user decision, 2026-06-09).**
-  Planet's payoff is inherently a **map**, exactly the case ADR 0002 §4 reserves the
-  *selective deep-end* (Plotly / web) for ("planet maps"). So Planet ships, **beyond**
-  the floor + a single teaching notebook (`planet.ipynb`, the chip-style thin skin):
-  an **interactive planet map** (`planetmap.py`) — knob sliders (solar constant, CO₂,
-  obliquity) drive a live **temperature / ice-line / biome map**, with the Phase-4
-  **circulation overlay** when coupled. This is the one project in the trio that earns
-  the deep-end viz; it is **opt-in behind a `[webviz]` extra**, consumes only the
-  validated array outputs (never a live solver object — the ADR-0001/0002 data
-  boundary), and its test is an **execution smoke-test**, not a physics check (the
-  triads in §3 are the validation).
-- **Toolkit:** plot primitives start planet-local in `plots.py`; the **2-D field /
-  heatmap** and **time-animation** primitives are exactly the ADR-0002 §3 candidates a
-  third reuse (after steel/chip) would **promote to the shared `viz/`** by
-  rule-of-three (ARCHITECTURE.md §6).
 
-Responsiveness is free at rung 0: compute is laptop-seconds, so knob → re-run →
-re-map needs no special engineering (ADR 0001 scope). (Rungs 3+ are where the
-ADR-0001 escalation is exercised — §5.)
+### 9.1 The deep-end interactive map (the chosen surface)
+
+Planet's payoff is inherently a **map**, exactly the case ADR 0002 §4 reserves the
+*selective deep-end* for. Beyond the floor + a single teaching notebook (`planet.ipynb`,
+the chip-style thin skin), Planet ships an **interactive planet map** (`planetmap.py`),
+**opt-in behind a `[webviz]` extra**, consuming only validated array outputs (never a
+live solver object — the ADR 0001/0002 boundary). Its render test is an **execution
+smoke-test**, not a physics check (the §3 triads are the validation) — *except* the
+state-interchange round-trip, which is a real invariant and is tested as one (below).
+
+- **Tech (D5):** **Plotly + ipywidgets** — a genuinely interactive globe (rotate / zoom /
+  hover) driven by knob-sliders, runnable in a notebook *and* as a thin standalone page.
+  Matplotlib is too weak for the deep-end map; a full custom web app is the *editable*
+  future (§9.3), not v1. All behind the `[webviz]` extra (the `[viz]`/`[climate]`
+  pattern) so the core sim and the test suite never depend on it.
+- **Layers, not a monolith (D4 / ADR 0004 #1).** The renderer is a generic painter over
+  a stack of `(name, kind, data-array, style, z-order)` layers, `kind ∈ {scalar field,
+  vector/line overlay, annotation}`. Each phase **registers** layers — temperature & ice
+  mask (Phase 1) → biome & precipitation fields (Phase 2) → circulation streamlines /
+  jet axis (Phase 4) → elevation/bathymetry & coastlines (the geography seam, §9.3) —
+  and **never edits the renderer**. This *is* the user's "show more features as the
+  phases progress" requirement made structural. The registry stays planet-local; it is
+  the **third consumer** that will eventually promote the 2-D-field / animation
+  primitives to shared `viz/` by rule-of-three (it does not pre-empt that — ADR 0004).
+- **Knobs — the "knob in, climate out" panel, and the exoplanet sandbox.** v1 sliders:
+  **solar constant `S₀`** (the *amount* of radiation — already the Snowball lever),
+  **CO₂** (→ lower `A`), **obliquity**, and transport `D`. Two further "exoplanet" knobs
+  are *named here, built when their phase/source is pinned* (the `[[…-source]]`
+  discipline): **stellar spectrum / type** enters as an **albedo modifier** (a redder /
+  cooler star → near-IR ice albedo drops → the ice-albedo feedback weakens → harder to
+  snowball — a real, modest, citeable effect; full spectral radiative transfer is the
+  rung-4 deferral); and **planet size**, which in a rung-0 EBM **leaves the 0-D
+  global-mean `T` untouched** (that is `S₀, α, A, B` only) and enters *only the
+  transport* — a larger planet transports heat less effectively per unit area, so it
+  **sharpens the equator-to-pole gradient**. Size's richer effects route through
+  **rotation** (the real circulation lever — Rossby radius / β-plane), which lives in the
+  Phase-3 fluid engine, not the EBM. So both deepen up the staircase rather than being
+  faked at rung 0.
+
+### 9.2 The interaction model is tier-dependent; the renderer is not (ADR 0004 #2)
+
+Because the map only consumes arrays, it is **invariant up the whole §5 staircase** —
+only the *trigger* changes: **live slider → instant remap** (rung 0, compute is
+laptop-seconds, no special engineering — ADR 0001 scope) **→ set parameters → launch a
+run → view the result** (the heavy upper rungs, where a live loop is impossible). The
+slider is a *driver of compute*, the map a *consumer of arrays*; only the former is
+tier-dependent. This is recorded as an explicit staircase consequence (§5) so a future
+session does not try to keep the live loop alive past where compute allows.
+
+### 9.3 Editable planet & state interchange — preplanned, not built (D1/D2 + ADR 0004 #3–4)
+
+The user's forward requirements (2026-06-09): the planet should be **editable** —
+elevation/depth, water/surface areas — and the map should **export/import** layer-by-layer
+in a simple format, so a *future* custom map-editing app can author a world the current
+app imports and runs models on. Both are **preplanned in the architecture, not built in
+v1** — satisfied by a written contract + a non-foreclosing seam, the same discipline as
+the rest of this plan. Two seams, kept distinct:
+
+- **Renderer-input seam (built 2-D-ready now).** The map consumes a **2-D lat×lon field**;
+  v1, being zonal-mean (§3 scope edge), simply **broadcasts `T(φ)` across longitude** — so
+  the globe paints **latitude bands**, honestly. This is the natural shape for a globe,
+  not premature 2-D.
+- **Geography-physics seam (design-only now).** A documented **"geography spec"** —
+  elevation grid + bathymetry + land/ocean mask, as plain *input* arrays — that the
+  compute layer *will* consume. v1 writes the contract and names the consuming rungs; it
+  **builds no machinery**. **Honesty flag (the user is aware):** an imported/edited
+  geography is **inert** at v1 — carried, displayed, round-tripped, but it **does not
+  change the climate** until the climb below. The round-trip guarantee is therefore
+  *array identity*, not a changed climate.
+
+**The "editable planet" is a climb on the §5 staircase, not a v1 feature** — with a real
+cost gradient (mirrored into the §5 table):
+
+| Tier | What it edits | What responds | Cost |
+|---|---|---|---|
+| **cheap — stays 1-D, annual-mean** | elevation `z`; land/ocean fraction per band | elevation → a **lapse-rate** map diagnostic `T_surf = T_band − Γ·z`; land/ocean → an **albedo difference** into the existing per-band albedo; fraction-per-band = continentality-lite | no engine change |
+| **needs seasonality** | ocean depth / **heat capacity** | thermal lag, continentality | **v1 cannot** — annual-mean drops `C` at equilibrium; named, not built |
+| **needs 2-D** (the north star) | true longitudinal geography | **regional climate, orographic precip, rain shadows** | new transport — **leaves the frozen 1-D engine** |
+
+**State interchange (ADR 0004 #3–4): pin a schema, not a format.** A documented
+**planet-spec** schema — grid geometry, **explicit units** (self-describing), the
+**layer list** (the §9.1 registry *is* the export manifest — one structure, not two), the
+knob values, and a **`schema_version`**. Encoding per consumer, behind the schema:
+v1 lean = a **JSON manifest + `.npz`** arrays; **editable-geography heightmaps**
+(elevation/bathymetry/mask) interchange as **16-bit grayscale PNG** (the native currency
+of paint tools / web canvases — 8-bit is too coarse; this is the round-trip a future
+editor needs); **NetCDF** is a documented future encoding for climate-tool interop
+(deliberately *not* the v1 choice — NetCDF is browser-hostile, and the editor is the
+consumer). **Round-trip identity (`import(export(s)) == s`) is a genuine correctness
+property and gets a genuine test**, unlike the map's smoke-tests.
+
+### 9.4 Toolkit promotion
+
+Plot primitives start planet-local (`plots.py` static floor; the `planetmap.py` layer
+registry for the deep end). The **2-D field / heatmap** and **time-animation** primitives
+are the ADR 0002 §3 candidates whose third reuse (after steel/chip) would **promote to
+the shared `viz/`** by rule-of-three (ARCHITECTURE.md §6); the layer registry is that
+third consumer-in-waiting. Promotion is **not** done pre-emptively (the existing three
+`plots.py` share conventions, not copy-pasted code — the thin-extraction finding,
+2026-06-09).
 
 ---
 
 ## 10. Immediate next step
 
-**Plan banked (this document).** The build order (ARCHITECTURE.md §4) advances from a
-100%-complete Steel + Microchip to the **Planet capstone**, with all four scope
-decisions locked (2026-06-09): **biomes banked early** (Phase 2, before the new
-engine), **one-way coupler in v1** (two-way = rung 1), **v1 = rung 0** with the **GCM
-staircase documented** as the growth axis (§5), and the **deep-end interactive map** as
-the chosen viz surface (§9).
+**Where Planet stands (2026-06-09).** **Phase 1 is built** — the latitudinal EBM & the
+Snowball bifurcation, the diffusion spine's third reuse with Strang-split radiation
+(banked: present-day ~73° ice line, freeze at ~8 % dimming). The **interactive-map
+design is converged this batch** and written up (ADR 0004 + §9 here): a Plotly+ipywidgets
+**layer registry**, a tier-dependent interaction model, the **planet-spec** export/import
+schema, and the editable-geography seam — all preplanned to the user's forward
+requirements (editable elevation/water; layer-by-layer round-trip into a future editor).
 
-**Phase 1 — the EBM & the Snowball bifurcation.** Build `ebm.py` (0-D global balance →
-1-D latitudinal EBM, the **frozen-diffusion transport + Strang-split radiation** — the
-Jominy-2a idiom reused) and `albedo.py` (ice-albedo feedback + the **continuation-sweep
-hysteresis**). Validation triad: the **0-D + North two-mode** analytic anchors, **net-TOA
-global energy balance**, and the **climlab** ice-line / Snowball-threshold / hysteresis
-benchmark (behind the `[climate]` extra + a frozen reference table). This is **low-risk
-spine reuse** that banks a complete planet-scale artifact and re-proves the program
-thesis — the diffusion spine reuses a *third* time, now as a sphere's heat transport.
+**Next build — Phase 2 (biomes), *then* the interactive map (user decision, D3-B).** The
+interactive map's first version should *be* the biome map (the §9 centerpiece, the
+dramatic payoff), and Phase 2 is small, low-risk spine-reuse (Whittaker `(T,P)→biome`
+classifier + a diagnostic precipitation parameterization — no new engine). So the order
+is **biomes first → then `planetmap.py` v1 + `planet_spec.py`** (the map showing the
+biome bands, with the geography-spec contract written but inert per §9.3). The
+shallow-water engine (Phase 3) and the coupler (Phase 4) follow.
 
-**Phase-1 reference sources — to pin at build (the `[[…-source]]` discipline, not
-carried from memory):** the **EBM radiation/albedo constants** (`A, B, D, α, T_freeze` —
-Budyko 1969 / North 1975 / climlab defaults → `[[ebm-radiation-source]]`); later phases
-pin **`[[whittaker-biome-source]]`** + **`[[precip-parameterization-source]]`** (Phase 2)
-and **`[[shallow-water-source]]`** (Phase 3 test-case parameters). Gather and pin each
-when its phase is built, as Steel/Chip did.
+**Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
+memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
+1969 / North 1975 / climlab defaults). Phase 2 pins **`[[whittaker-biome-source]]`** +
+**`[[precip-parameterization-source]]`**; Phase 3 pins **`[[shallow-water-source]]`**.
+The exoplanet knobs (§9.1) pin their own when built: a **stellar-spectrum/ice-albedo**
+source for the spectrum-as-albedo-modifier knob, and (rung 4) a radiative-transfer source
+if spectral radiation is ever computed rather than parameterized.
