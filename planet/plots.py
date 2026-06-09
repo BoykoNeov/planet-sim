@@ -24,7 +24,7 @@ from matplotlib.patches import Patch
 
 from .albedo import HysteresisLoop
 from .biomes import Biome, BIOME_COLORS, BIOME_NAMES, classify_field
-from .ebm import ClimateState, T_FREEZE, S0_EARTH
+from .ebm import ClimateState, T_FREEZE, S0_EARTH, ALBEDO_A0
 
 # Stable colours: cool blue = the dimming/cooling (down) branch, warm red = the brightening (up) branch.
 COOLING_COLOR = "#2f6fb0"       # the sun dims → ice advances → the freeze jump
@@ -446,4 +446,96 @@ def coupler_figure(jet, state):
     jet_field_axes(axd["field"], jet)
     coupler_conservation_axes(axd["conserve"], jet)
     fig.suptitle("Planet Phase 4 — one-way EBM → shallow-water coupler: the emergent jet", fontsize=13)
+    return fig
+
+
+# --------------------------------------------------------------------------- #
+# §9.1 — the exoplanet knobs: stellar spectrum → ice albedo, planet size → transport.
+# --------------------------------------------------------------------------- #
+SUN_COLOR = "#d98a1f"           # the Sun-like (G-type) host star
+MDWARF_COLOR = "#7b3fb0"        # the redder, cooler M-dwarf host star
+
+
+def stellar_hysteresis_axes(ax, sun_loop: HysteresisLoop, mdwarf_loop: HysteresisLoop,
+                            mdwarf_label: str) -> None:
+    """Overlay the Snowball hysteresis loops of a Sun-like vs an M-dwarf planet — redder = harder to snowball.
+
+    Two T̄-vs-S₀ loops (solid = dimming/freeze branch, dashed = brightening/re-melt branch), one per
+    host star, with each star's freeze threshold marked. The M-dwarf's weaker ice-albedo feedback gives
+    a **narrower loop shifted to a lower freeze threshold** — it must be dimmed *further* to snowball,
+    and re-melts sooner. The mechanism made visible (ADR 0002 §5).
+    """
+    for loop, color, lbl in ((sun_loop, SUN_COLOR, "Sun (G2V)"), (mdwarf_loop, MDWARF_COLOR, mdwarf_label)):
+        ax.plot(loop.S0_down, loop.Tbar_down, "-", color=color, lw=1.8, label=f"{lbl}: dimming → freeze")
+        ax.plot(loop.S0_up, loop.Tbar_up, "--", color=color, lw=1.4, label=f"{lbl}: brightening → melt")
+        ax.axvline(loop.freeze_S0, ls=":", color=color, lw=1.0, alpha=0.8)
+        ax.annotate(f"freeze\n{loop.freeze_S0:.0f}", (loop.freeze_S0, loop.Tbar_down.min()),
+                    textcoords="offset points", xytext=(6, 12), fontsize=7, color=color)
+    ax.axhline(0.0, color="#cccccc", lw=0.6, zorder=0)
+    ax.set_xlabel("solar constant  S₀  (W m⁻²)")
+    ax.set_ylabel("global-mean temperature  T̄  (°C)")
+    ax.set_title("A redder star is harder to snowball\n(weaker ice-albedo feedback → narrower loop)", fontsize=10)
+    ax.legend(fontsize=7, loc="lower right")
+
+
+def stellar_albedo_axes(ax, stellar_ai: dict) -> None:
+    """Bar the effective ice albedo by stellar type — the bright-ice albedo falls toward the redder stars.
+
+    The knob's mechanism in one panel: cooler (redder) host stars emit more near-IR, where ice is dark,
+    so the broadband ice albedo drops; the ice-free ocean/land albedo line shows the contrast weakening
+    but never inverting (the bounded, *modest* effect).
+    """
+    names = list(stellar_ai)
+    vals = [stellar_ai[n] for n in names]
+    colors = plt.cm.YlOrRd_r(np.linspace(0.15, 0.8, len(names)))
+    ax.bar(names, vals, color=colors, edgecolor="#444444", width=0.7)
+    ax.axhline(ALBEDO_A0, ls="--", color="#2f6fb0", lw=1.2, label=f"ice-free ocean/land α₀ = {ALBEDO_A0:.2f}")
+    ax.set_ylabel("effective ice albedo  a_ice")
+    ax.set_ylim(0.0, 0.75)
+    ax.tick_params(axis="x", labelrotation=35, labelsize=7)
+    ax.set_title("Ice albedo weakens toward redder stars\n(never below the ocean albedo)", fontsize=10)
+    ax.legend(fontsize=7, loc="upper left")
+
+
+def size_profiles_axes(ax, size_states, sizes) -> None:
+    """Overlay the relaxed T(φ) for several planet sizes — a bigger planet sharpens the equator–pole gradient.
+
+    Bigger planet → weaker per-area transport (``D ∝ 1/size²``) → a steeper gradient and a colder pole,
+    so the ice cap reaches further equatorward — while the global mean is (nearly) fixed (the 0-D mean
+    is size-invariant; the relaxed mean drifts only through the ice-albedo feedback). The label carries
+    each size's mean T̄ and ice-line latitude.
+    """
+    colors = plt.cm.viridis(np.linspace(0.15, 0.82, len(sizes)))
+    for st, size, c in zip(size_states, sizes, colors):
+        lat = st.latitude_deg()
+        label = f"{size:g} R⊕  (T̄ {st.global_mean_T:.1f}°C, ice {st.ice_line_lat:.0f}°)"
+        ax.plot(lat, st.T, "-", color=c, lw=2.0, label=label)
+        if 0.0 < st.ice_line_lat < 90.0:
+            ax.axvline(st.ice_line_lat, ls=":", color=c, lw=1.0, alpha=0.7)
+    ax.axhline(T_FREEZE, ls="--", color=FREEZE_COLOR, lw=1.0, label=f"freeze isotherm ({T_FREEZE:.0f} °C)")
+    ax.set_xlabel("latitude  φ  (°)")
+    ax.set_ylabel("temperature  T  (°C)")
+    ax.set_xlim(0, 90)
+    ax.set_title("A bigger planet sharpens the gradient\n(transport-only: D ∝ 1/size²)", fontsize=10)
+    ax.legend(fontsize=7, loc="lower left")
+
+
+def exoplanet_figure(sun_loop: HysteresisLoop, mdwarf_loop: HysteresisLoop, mdwarf_label: str,
+                     stellar_ai: dict, size_states, sizes):
+    """The banked §9.1 artifact: the two exoplanet knobs — stellar spectrum and planet size.
+
+    Top-left: the Snowball hysteresis loops of a Sun-like vs an M-dwarf planet (redder = harder to
+    snowball). Top-right: the effective ice albedo by stellar type (the knob's mechanism, bounded above
+    the ocean albedo). Bottom (spanning): the relaxed T(φ) for a range of planet sizes (a bigger planet
+    sharpens the equator-to-pole gradient, transport-only). *Other-world knobs in, other-world climate out.*
+    """
+    fig, axd = plt.subplot_mosaic(
+        [["stellar", "albedo"], ["size", "size"]],
+        figsize=(14, 9), constrained_layout=True,
+        gridspec_kw={"height_ratios": [1.0, 0.9]},
+    )
+    stellar_hysteresis_axes(axd["stellar"], sun_loop, mdwarf_loop, mdwarf_label)
+    stellar_albedo_axes(axd["albedo"], stellar_ai)
+    size_profiles_axes(axd["size"], size_states, sizes)
+    fig.suptitle("Planet §9.1 — the exoplanet knobs: stellar spectrum & planet size", fontsize=13)
     return fig

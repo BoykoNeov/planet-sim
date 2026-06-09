@@ -186,6 +186,31 @@ def test_transport_knob_flattens_the_gradient():
     assert spread(pm.climate_view(D=0.9, **COARSE)) < spread(pm.climate_view(D=0.3, **COARSE))
 
 
+def test_exoplanet_knobs_default_to_the_earth_model_exactly():
+    # The clean-perturbation guard: Sun + Earth-size recover the present-day map bit-for-bit, so wiring
+    # the two exoplanet knobs cannot move the default globe (the §9.1 build kept the v1 map invariant).
+    base = pm.climate_view(**COARSE)
+    explicit = pm.climate_view(T_star=pm.T_SUN, size=1.0, **COARSE)
+    assert np.array_equal(base.layer("temperature").data, explicit.layer("temperature").data)
+
+
+def test_star_knob_resists_snowball():
+    # The §9.1 stellar knob end-to-end: at a dimmed sun, a redder host star (lower ice albedo → weaker
+    # feedback) leaves a far warmer climate than a Sun-like star — a redder star is harder to snowball.
+    dimmed = 1150.0
+    mean = lambda v: float(np.mean(v.layer("temperature").data))
+    sun = pm.climate_view(S0=dimmed, T_star=pm.T_SUN, **COARSE)
+    redder = pm.climate_view(S0=dimmed, T_star=3000.0, **COARSE)
+    assert mean(redder) > mean(sun) + 20.0
+
+
+def test_size_knob_sharpens_the_gradient():
+    # The §9.1 size knob end-to-end: a bigger planet has weaker per-area transport (D ∝ 1/size²) → a
+    # steeper equator-to-pole temperature spread.
+    spread = lambda v: float(np.ptp(v.layer("temperature").data))
+    assert spread(pm.climate_view(size=1.8, **COARSE)) > spread(pm.climate_view(size=0.6, **COARSE))
+
+
 def test_present_day_bands_run_rainforest_to_tundra():
     # The loose Phase-2 benchmark, seen through the map: at present insolation the equatorial band is
     # tropical rain forest and the polar band is tundra (the data the globe paints — full resolution).

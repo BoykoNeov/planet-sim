@@ -66,7 +66,8 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
 - **To work on the deep-end interactive map (§9 / ADR 0004):** `planetmap.py` + `tests/test_planetmap.py`.
   The **layer registry** — `LayerKind` (`scalar_field` / `vector_overlay` / `annotation`) + `Layer` +
   `Grid` + `PlanetView` — and the builders that turn a climate result into the v1 **biome-map** layer
-  stack (`build_view`, `climate_view` = the rung-0 live recompute over S₀ / CO₂→A / D). `render` paints
+  stack (`build_view`, `climate_view` = the rung-0 live recompute over S₀ / CO₂→A / D + the two §9.1
+  exoplanet knobs star `T_star` / planet `size`). `render` paints
   it as a Plotly globe (3-D `go.Surface` + the ice-line annotation; lazy import, `[webviz]` extra);
   `save_html` banks the standalone globe (`docs/figures/planet-map.html`); `interactive_map` is the
   in-notebook live-slider loop (the `main()` analogue — ipywidgets, not unit-tested). The renderer is
@@ -81,6 +82,19 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   array-aware, `equal_nan` for the annotation NaN gaps), so it is an always-green test, not a smoke
   test. Carries an **inert elevation** layer (the geography seam — round-tripped, not yet consumed by
   the climate; §9.3). NumPy/JSON only — no render deps.
+- **To work on the exoplanet knobs (§9.1 — stellar spectrum & planet size):** `exoplanet.py` +
+  `tests/test_exoplanet.py`. Two **parameter-deriving** knobs (no engine, no new EBM physics) the
+  interactive map wires: **stellar spectrum → ice albedo** (`stellar_ice_albedo` — a two-band
+  blackbody-weighted snow/ice albedo, applied as the *ratio* to the solar value so the Sun recovers
+  the climlab `ai = 0.62` exactly; a redder star lowers it → harder to snowball; pinned empirical bands
+  [[stellar-spectrum-ice-albedo-source]]) and **planet size → transport** (`transport_for_size` —
+  `D ∝ 1/size²`, **derived** from the spherical Laplacian in `x = sin φ`; a bigger planet sharpens the
+  equator-pole gradient, the 0-D mean size-invariant). `exoplanet_params(T_star, size, base)` composes
+  both onto an `EBMParams`. The module docstring is its contract.
+- **To work on the §9.1 banked artifact:** `demo_exoplanet.py` + `tests/test_demo_exoplanet.py`
+  (`slow`) and `plots.exoplanet_figure` (`[viz]`). The demo traces a Sun-vs-M-dwarf Snowball loop pair
+  + size-scaled `T(φ)` profiles → `docs/figures/planet-exoplanet.png` (a redder star → a narrower loop;
+  a bigger planet → a steeper gradient).
 - **To work on the circulation / shallow-water engine (Phase 3):** `circulation.py` +
   `tests/test_circulation.py`. It loads the newly-frozen `engines/fluid/CONTRACT.md` (the program's
   **second shared engine** — a rotating shallow-water solver, hyperbolic/explicit, sharing no
@@ -150,7 +164,8 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   **layer registry** (temperature / precipitation / biome scalar fields + the ice-line annotation +
   an inert elevation seam), with **S₀ / CO₂→A / D** knob-sliders driving an instant recompute-and-remap
   (the rung-0 live loop; **obliquity** is a *named, deferred* slider awaiting its pinned `s₂(obliquity)`
-  source). Pure consumer of `demo_biomes.compute` — no new physics. The **planet-spec** schema
+  source). Pure consumer of `demo_biomes.compute` — no new physics. *(The two §9.1 exoplanet knobs —
+  star `T_star` / planet `size` — were since wired in; see the §9.1 status entry below.)* The **planet-spec** schema
   exports/imports the registry (JSON + `.npz`) with a **real round-trip-identity test** (the deep end's
   one genuine correctness property, vs the render's smoke-tests). Banked globe:
   `docs/figures/planet-map.html`. 31-test pair added (the Plotly render smoke-tests `importorskip` on
@@ -179,6 +194,23 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   is rung 1 (the `tracer` seam). No engine modified; `planet` uses `{engines/diffusion, engines/fluid}`
   unchanged. The chip-style teaching notebook `planet.ipynb` is built (Phases 1–2); a Phase-3/4 notebook
   section is a later touch.
+- **§9.1 — the exoplanet knobs (stellar spectrum & planet size): BUILT** (2026-06-09, a growth-axis
+  batch on the complete capstone). `exoplanet.py` adds two **parameter-deriving** knobs (no engine, no
+  new EBM physics — both compute an `EBMParams` the existing machinery consumes): **(1) stellar
+  spectrum → ice albedo** — a two-band blackbody-weighted snow/ice albedo (bright visible / dark
+  near-IR, [[stellar-spectrum-ice-albedo-source]]), applied as the *ratio* to the solar value so the
+  Sun recovers `ai = 0.62` exactly; a redder host star lowers the ice albedo → the ice-albedo feedback
+  weakens → **harder to snowball** (banked: an M-dwarf's Snowball loop ~83% narrower, freeze threshold
+  lower; matches Joshi & Haberle 2012). **(2) planet size → transport** — `D ∝ 1/size²`, **derived**
+  from the spherical Laplacian in `x = sin φ` (the `D` value [[ebm-radiation-source]]); a bigger planet
+  transports heat less per unit area → a **sharper equator-pole gradient** (ice line 90°→71°→42° over
+  0.5→1→2 R⊕), the 0-D mean size-invariant (the relaxed mean drifts only via the ice feedback — named).
+  Both wired into the interactive map (`climate_view` / `interactive_map` sliders) — defaults (Sun,
+  Earth-size) recover the present-day map **bit-for-bit**. Banked `docs/figures/planet-exoplanet.png`;
+  **no new engine, no gate-manifest change** (numpy-only, planet-local). **Obliquity** remains the lone
+  deferred knob (its `s₂(obliquity)` source still unpinned). Scope edge: only the bright-ice albedo
+  responds to the star (ocean/land left unchanged); size is transport-only (rotation effects route
+  through the fluid engine — a different rung).
 
 ## Test runner (tiered gate, ADR 0003 — the per-project successor)
 
