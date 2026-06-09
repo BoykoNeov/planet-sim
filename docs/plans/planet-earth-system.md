@@ -626,16 +626,32 @@ temperature-limited and warm biomes moisture-limited on diagonal thresholds). Ba
 climate trajectory + the poleward migration under a CO₂ warming knob. No new engine; the 20-test
 triad is green. The **interactive-map design is converged** and written up (ADR 0004 + §9 here): a
 Plotly+ipywidgets **layer registry**, a tier-dependent interaction model, the **planet-spec**
-export/import schema, and the editable-geography seam.
+export/import schema, and the editable-geography seam. **The interactive map is now BUILT** (2026-06-09):
+`planetmap.py` (the layer registry — `LayerKind`/`Layer`/`Grid`/`PlanetView` + the biome-map builders +
+the Plotly globe renderer + the ipywidgets live loop) and `planet_spec.py` (the pin-the-schema
+JSON+`.npz` interchange with the round-trip-identity test). Its first version *is* the biome map; the
+banked artifact is `docs/figures/planet-map.html`.
 
-**Next build — the interactive map (user decision, D3-B): `planetmap.py` v1 + `planet_spec.py`.** Now
-that Phase 2 is banked, the interactive map's first version should *be* the **biome map** (the §9
-centerpiece, the dramatic payoff): the Plotly+ipywidgets layer registry painting the temperature / ice
-/ biome / precipitation layers, with knob-sliders (S₀, CO₂, obliquity, transport `D`) driving an
-instant recompute-and-remap (rung-0 live loop), the **planet-spec** export/import schema with a
-round-trip-identity test, and the geography-spec contract **written but inert** per §9.3. The teaching
-notebook `planet.ipynb` is the chip-style thin skin alongside it. The shallow-water engine (Phase 3)
-and the coupler (Phase 4) follow.
+**Built — the interactive map (user decision, D3-B): `planetmap.py` v1 + `planet_spec.py`** (2026-06-09).
+The map's first version *is* the **biome map** (the §9 centerpiece): a Plotly 3-D globe painted from
+the **layer registry** (temperature / precipitation / biome scalar fields + the ice-line annotation +
+an inert elevation seam), with knob-sliders **S₀ / CO₂→A / transport `D`** driving an instant
+recompute-and-remap (rung-0 live loop, a pure consumer of `demo_biomes.compute` — no new physics). The
+**planet-spec** export/import schema ships the v1 lean encoding (JSON manifest + `.npz`) with the
+**round-trip-identity test** (the deep end's one real correctness property), and the geography-spec
+seam is **written but inert** (the elevation layer is carried/round-tripped, not consumed) per §9.3.
+Two non-obvious calls, advisor-blessed: **obliquity is a named, deferred slider** (wiring it needs the
+`s₂(obliquity)` annual-mean-insolation relation pinned to a source — the same `[[…-source]]` discipline
+as the exoplanet knobs), and **`vector_overlay` is a declared-but-unpainted `LayerKind`** (the renderer
+raises `NotImplementedError` naming Phase 4 — build the seam, not the machinery; the extensibility proof
+is the inert elevation scalar the existing renderer paints for free). No new engine, **no gate-manifest
+change**; opt-in behind a new `[webviz]` extra (Plotly + ipywidgets). 31-test pair added (round-trip +
+registry always-green; render smoke-tests `importorskip` on Plotly — fast, not `slow`).
+
+**Next build — the teaching notebook then Phase 3.** The chip-style thin-skin teaching notebook
+`planet.ipynb` (sliders → climate → biome map) is the remaining §9 surface. Then the shallow-water
+engine (Phase 3 — the new shared `engines/fluid`, at which point the map *registers* a `vector_overlay`
+circulation layer with no renderer edit) and the one-way coupler (Phase 4) follow.
 
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko

@@ -63,6 +63,24 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   A **frozen reference table** of the climlab/North benchmark facts (present ice line ~70°, the
   Snowball threshold, the hysteresis) keeps the triad green without the `[climate]` extra; the live
   climlab cross-check (`climlab_present_day`) is a `slow` / `importorskip` test (the pycalphad pattern).
+- **To work on the deep-end interactive map (§9 / ADR 0004):** `planetmap.py` + `tests/test_planetmap.py`.
+  The **layer registry** — `LayerKind` (`scalar_field` / `vector_overlay` / `annotation`) + `Layer` +
+  `Grid` + `PlanetView` — and the builders that turn a climate result into the v1 **biome-map** layer
+  stack (`build_view`, `climate_view` = the rung-0 live recompute over S₀ / CO₂→A / D). `render` paints
+  it as a Plotly globe (3-D `go.Surface` + the ice-line annotation; lazy import, `[webviz]` extra);
+  `save_html` banks the standalone globe (`docs/figures/planet-map.html`); `interactive_map` is the
+  in-notebook live-slider loop (the `main()` analogue — ipywidgets, not unit-tested). The renderer is
+  **generic over `LayerKind`**: later phases *register* layers (circulation = `vector_overlay`, Phase 4;
+  it raises `NotImplementedError` until then), never edit the renderer. Built matplotlib-free; the
+  module docstring is its contract.
+- **To work on the state-interchange schema (§9.3 / ADR 0004 #3–4):** `planet_spec.py` +
+  `tests/test_planet_spec.py`. The **planet-spec** — grid + explicit units + the layer list (the
+  registry *is* the manifest) + the knob values + a `schema_version` — with `from_view` / `save` /
+  `load` (the v1 lean encoding = a JSON manifest + a `.npz`). **Round-trip identity
+  `load(save(spec)) == spec` is the one *real* correctness property of the deep end** (`__eq__` is
+  array-aware, `equal_nan` for the annotation NaN gaps), so it is an always-green test, not a smoke
+  test. Carries an **inert elevation** layer (the geography seam — round-tripped, not yet consumed by
+  the climate; §9.3). NumPy/JSON only — no render deps.
 - **To use the diffusion/heat spine:** load `engines/diffusion/CONTRACT.md` only — never Steel's or
   Chip's internals. Planet instantiates the same contract in **heat mode**, with the radiation
   composed around it by operator splitting (the Jominy precedent).
@@ -92,10 +110,20 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   Whittaker not Köppen (annual `T,P`, no seasonal precip), prescribed precip not a water cycle, fixed
   band centres (migration is the rung-1/2 circulation enhancement), the C–C 7 %/K is moisture-capacity
   not the energy-constrained ~2–3 %/K global precip rate.
+- **The deep-end interactive map — `planetmap.py` v1 + `planet_spec.py`: BUILT** (2026-06-09, plan §9 /
+  ADR 0004). The interactive map's **first version is the biome map**: a Plotly 3-D globe painted from a
+  **layer registry** (temperature / precipitation / biome scalar fields + the ice-line annotation +
+  an inert elevation seam), with **S₀ / CO₂→A / D** knob-sliders driving an instant recompute-and-remap
+  (the rung-0 live loop; **obliquity** is a *named, deferred* slider awaiting its pinned `s₂(obliquity)`
+  source). Pure consumer of `demo_biomes.compute` — no new physics. The **planet-spec** schema
+  exports/imports the registry (JSON + `.npz`) with a **real round-trip-identity test** (the deep end's
+  one genuine correctness property, vs the render's smoke-tests). Banked globe:
+  `docs/figures/planet-map.html`. 31-test pair added (the Plotly render smoke-tests `importorskip` on
+  the `[webviz]` extra — fast, not `slow`). **No new engine / no gate-manifest change.**
 - **Phases 3–4 — shallow-water engine / coupler: PENDING** (plan §3). Phase 3 builds & freezes
-  `engines/fluid`; Phase 4 is the one-way coupler. The teaching notebook `planet.ipynb` and the
-  deep-end interactive map `planetmap.py` (the `[webviz]` surface, plan §9) come with the later phases
-  — the interactive map's first version is to be the biome map (plan §10, the next build step).
+  `engines/fluid` (the map then *registers* a `vector_overlay` circulation layer — no renderer edit);
+  Phase 4 is the one-way coupler. The chip-style teaching notebook `planet.ipynb` is the remaining §9
+  thin-skin surface (pending).
 
 ## Test runner (tiered gate, ADR 0003 — the per-project successor)
 

@@ -71,21 +71,29 @@ def _classify(state: ClimateState) -> tuple[np.ndarray, np.ndarray]:
     return precip_cm, biomes.classify_field(state.T, precip_cm)
 
 
-def compute(params: EBMParams | None = None) -> BiomeResult:
-    """Present-day climate → precip → biomes → :class:`BiomeResult` (no plotting)."""
+def compute(params: EBMParams | None = None, n_tau: float = PRESENT_N_TAU) -> BiomeResult:
+    """Present-day climate → precip → biomes → :class:`BiomeResult` (no plotting).
+
+    ``n_tau`` is the relaxation step (a multiple of τ_rad) passed through to the equilibration; it
+    defaults to the fine present-day step :data:`PRESENT_N_TAU`. The interactive map
+    (:mod:`projects.planet.planetmap`) calls this with the same fine step so its live globe matches the
+    banked figure — the steady state carries an O(Δt) operator-splitting bias, so it must *not* be
+    coarsened for speed.
+    """
     if params is None:
         params = EBMParams()
-    state = present_day_climate(params, n_tau=PRESENT_N_TAU)
+    state = present_day_climate(params, n_tau=n_tau)
     precip_cm, codes = _classify(state)
     return BiomeResult(params=params, state=state, precip_cm=precip_cm, codes=codes)
 
 
-def warmed(params: EBMParams | None = None, delta_A: float = CO2_WARMING_DELTA_A) -> BiomeResult:
+def warmed(params: EBMParams | None = None, delta_A: float = CO2_WARMING_DELTA_A,
+           n_tau: float = PRESENT_N_TAU) -> BiomeResult:
     """A warmer planet (CO₂ up ≈ lower OLR offset ``A``) — to show the bands migrate poleward."""
     if params is None:
         params = EBMParams()
     warm_params = replace(params, A=params.A - delta_A)
-    state = present_day_climate(warm_params, n_tau=PRESENT_N_TAU)
+    state = present_day_climate(warm_params, n_tau=n_tau)
     precip_cm, codes = _classify(state)
     return BiomeResult(params=warm_params, state=state, precip_cm=precip_cm, codes=codes)
 
