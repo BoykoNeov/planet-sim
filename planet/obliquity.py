@@ -64,9 +64,12 @@ significant ``s₄`` as ``ε`` rises (the latitude profile flattens and then hum
 P₂ truncation cannot carry. So the knob is most faithful near present tilt and **progressively
 truncates at high obliquity** — the analogue of the EBM's "linear OLR accurate only near the present
 climate". The sign reversal is real and surfaced, but asserted only as a **loose bracket** (negative at
-45°, positive by 65°), not at a pinned crossing. Combined with the **annual-mean** model (no seasonal
-extremes — the very thing high obliquity makes dramatic), this is the named ceiling. Eccentricity and
-precession are a separate deferred Milankovitch axis (above).
+45°, positive by 65°), not at a pinned crossing. Likewise **only the insolation ``s₂`` responds to
+tilt — the ice-free albedo's poleward ``a₂`` structure (:data:`~projects.planet.ebm.ALBEDO_A2`) is held
+fixed** (the standard EBM treatment: North 1975 varies the *insolation* with obliquity, not the albedo's
+zenith-angle dependence). Combined with the **annual-mean** model (no seasonal extremes — the very thing
+high obliquity makes dramatic), this is the named ceiling. Eccentricity and precession are a separate
+deferred Milankovitch axis (above).
 
 Units — SI/astronomical (W m⁻² implied, °C, x = sin φ dimensionless; obliquity in degrees)
 ------------------------------------------------------------------------------------------
