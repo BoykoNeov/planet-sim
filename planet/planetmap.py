@@ -336,6 +336,27 @@ def build_view(result, n_lon: int = N_LON, elevation: np.ndarray | None = None, 
     return PlanetView(grid=grid, layers=tuple(layers))
 
 
+def climate_params(S0: float = S0_EARTH, A: float = A_OLR, D: float = D_TRANSPORT, *,
+                   T_star: float = T_SUN, size: float = 1.0, obliquity_deg: float = OBLIQUITY_EARTH,
+                   n_cells: int = 180) -> EBMParams:
+    """The knobs → the :class:`~planet.albedo.EBMParams` the live map solves — the **one** place the
+    obliquity + exoplanet composition lives.
+
+    Factored out of :func:`climate_view` so the three consumers of "knobs → params" — the live map, the
+    planet-spec exporter (:func:`planet.planet_spec.build_spec`), and a notebook design bench — share
+    a single composition and cannot drift as knobs are added (the §9.1 trap: a naive
+    ``from_view(climate_view(...), EBMParams(S0, A, D))`` would store the *un-perturbed* knobs for any
+    non-default star/size/tilt). The composition is: the climate levers into an :class:`EBMParams`
+    with ``s2`` from the **obliquity** knob (:func:`planet.obliquity.insolation_s2`), then the two
+    **exoplanet** knobs replacing ``ai``/``D`` (:func:`planet.exoplanet.exoplanet_params`). The
+    defaults (Sun, Earth-size, Earth-tilt) return the present-day Earth params **exactly**
+    (``insolation_s2(OBLIQUITY_EARTH)`` is ``S2_INSOLATION`` and ``exoplanet_params(T_SUN, 1.0, base)``
+    is ``base``), so the present-day map/spec are unchanged.
+    """
+    base = EBMParams(S0=S0, A=A, D=D, s2=insolation_s2(obliquity_deg), n_cells=n_cells)
+    return exoplanet_params(T_star=T_star, size=size, base=base)
+
+
 def climate_view(S0: float = S0_EARTH, A: float = A_OLR, D: float = D_TRANSPORT, *,
                  T_star: float = T_SUN, size: float = 1.0, obliquity_deg: float = OBLIQUITY_EARTH,
                  n_cells: int = 180, n_tau: float = LIVE_N_TAU, n_lon: int = N_LON,
@@ -358,8 +379,7 @@ def climate_view(S0: float = S0_EARTH, A: float = A_OLR, D: float = D_TRANSPORT,
     at these knobs* — **not** the hysteresis branch-tracking, which is the Snowball demo's continuation
     sweep (a different, path-dependent question).
     """
-    base = EBMParams(S0=S0, A=A, D=D, s2=insolation_s2(obliquity_deg), n_cells=n_cells)
-    params = exoplanet_params(T_star=T_star, size=size, base=base)
+    params = climate_params(S0, A, D, T_star=T_star, size=size, obliquity_deg=obliquity_deg, n_cells=n_cells)
     result = demo_biomes.compute(params, n_tau=n_tau)
     return build_view(result, n_lon=n_lon, elevation=elevation)
 

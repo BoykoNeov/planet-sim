@@ -157,3 +157,130 @@ def test_view_round_trips_to_a_renderable_planetview(tmp_path):
     view = ps.load(tmp_path / "w").view()
     assert isinstance(view, pm.PlanetView)
     assert {ly.name for ly in view.layers} == {ly.name for ly in spec.layers}
+
+
+# --------------------------------------------------------------------------- #
+# 4. build_spec — the knobs → saveable-spec "design a world" entry point (§9.1 / ADR 0004 #4)
+# --------------------------------------------------------------------------- #
+def test_build_spec_defaults_recover_the_present_day_earth_and_round_trip(tmp_path):
+    # build_spec() with default knobs is the Sun/Earth-size/Earth-tilt world: its params equal the live
+    # map's climate_params, and it round-trips identically — the property the design bench rests on.
+    spec = ps.build_spec(**COARSE)
+    assert spec.to_params() == pm.climate_params(n_cells=COARSE["n_cells"])
+    ps.save(spec, tmp_path / "earth")
+    assert ps.load(tmp_path / "earth") == spec
+
+
+def test_build_spec_captures_the_composed_knobs_not_the_base(tmp_path):
+    # The trap guard (§9.1): a naive from_view(climate_view(...), EBMParams(S0, A, D)) would store the
+    # UN-perturbed knobs for any non-default star/size/tilt (climate_view discards the real params), so
+    # the exported world would re-run to the WRONG climate. build_spec must serialize the COMPOSED params
+    # (ai←spectrum, D←size, s2←tilt) — and they must survive the round-trip.
+    knobs = dict(T_star=3000.0, size=1.8, obliquity_deg=40.0)
+    spec = ps.build_spec(**knobs, **COARSE)
+    p = spec.to_params()
+    assert p == pm.climate_params(**knobs, n_cells=COARSE["n_cells"])     # the composed params, not the base
+    assert p != EBMParams(n_cells=COARSE["n_cells"])                      # genuinely perturbed off Earth
+    ps.save(spec, tmp_path / "exo")
+    assert ps.load(tmp_path / "exo") == spec
+
+
+def test_build_spec_equals_the_explicit_from_view_path():
+    # build_spec is exactly the one-call form of "relax the view + capture the params that made it":
+    # the present-day spec equals the hand-composed from_view(climate_view(), climate_params()) — a guard
+    # that build_spec cannot silently diverge from the live map it mirrors.
+    spec = ps.build_spec(**COARSE)
+    params = pm.climate_params(n_cells=COARSE["n_cells"])
+    assert spec == ps.from_view(pm.climate_view(**COARSE), params)
+
+
+# --------------------------------------------------------------------------- #
+# 5. diff — the two-world "what changed from a to b" compare path (the design-bench follow-on)
+# --------------------------------------------------------------------------- #
+EXO = dict(T_star=3000.0, size=1.8, obliquity_deg=40.0)     # a world clearly off Earth (star/size/tilt)
+
+
+def test_diff_self_is_empty_and_is_the_inverse_of_equality():
+    # The reflexive property that mirrors the round-trip identity: a world diffed against itself reports
+    # NO change on any axis, and bool(diff) is exactly the inverse of __eq__ (empty iff equal).
+    spec = ps.build_spec(**COARSE)
+    d = ps.diff(spec, spec)
+    assert not d.knobs and not d.fields and not d.other_changed
+    assert not d.only_in_a and not d.only_in_b and d.grids_compatible
+    assert bool(d) is False and (spec == spec)                # empty diff  <=>  equal worlds
+
+
+def test_diff_earth_vs_exoplanet_flags_the_composed_knobs_and_the_climate():
+    # The headline case: design an exoplanet off Earth and ask "what changed?". The KNOB diff is exactly
+    # the §9.1 composition (ai←spectrum, D←size, s2←tilt) — never the raw star/size/tilt levers; the
+    # CLIMATE diff is the three scalar fields that moved (temperature/precip numeric, biome categorical),
+    # the ice line shows in other_changed (an annotation, not cell-differenced), and bool == a != b.
+    a = ps.build_spec(**COARSE)
+    b = ps.build_spec(**EXO, **COARSE)
+    d = ps.diff(a, b)
+
+    assert set(d.knobs) == {"ai", "D", "s2"}                  # the composed knobs, not {T_star, size, obliquity}
+    assert all(d.knobs[k][0] != d.knobs[k][1] for k in d.knobs)
+    assert d.knob_units["D"] == "W/m^2/K"                     # the diff is self-describing (carries units)
+
+    assert set(d.fields) == {"temperature", "precipitation", "biome"}   # elevation flat in both → unchanged
+    temp = d.fields["temperature"]
+    assert not temp.categorical and temp.max_abs_delta > 0 and temp.delta.shape == a.grid.lat.shape + (a.grid.lon.size,)
+    biome = d.fields["biome"]
+    assert biome.categorical and 0.0 < biome.changed_fraction < 1.0 and np.isnan(biome.max_abs_delta)
+
+    assert d.other_changed == ("ice_line",)                  # the ice line moved (annotation, flagged not differenced)
+    assert not d.only_in_a and not d.only_in_b and d.grids_compatible
+    assert bool(d) is True and (a != b)
+
+
+def test_diff_field_only_change_is_not_gated_on_a_knob_change():
+    # The geography-seam case (and the guard that field comparison is NOT gated on knob differences):
+    # import a heightmap into one world, leave every knob identical → an empty knob diff but a real field
+    # diff on exactly the elevation layer. A diff that keyed fields off knob changes would miss this.
+    a = ps.build_spec(**COARSE)
+    heightmap = np.random.default_rng(1).random(a.view().layer("elevation").data.shape) * 1000.0
+    b = ps.build_spec(elevation=heightmap, **COARSE)
+    d = ps.diff(a, b)
+    assert d.knobs == {}                                      # identical knobs — same climate
+    assert set(d.fields) == {"elevation"} and d.fields["elevation"].changed_fraction > 0
+    assert not d.other_changed and d.grids_compatible
+    assert bool(d) is True and (a != b)
+
+
+def test_diff_an_added_layer_shows_in_only_in_b():
+    # The interchange edge: a world carrying an extra (future) layer the other lacks shows up in
+    # only_in_b — and only_in_a under the reverse diff. Grids stay compatible (matching-shape layer).
+    base = ps.build_spec(**COARSE)
+    shape = base.view().layer("temperature").data.shape
+    extra = pm.Layer("future_salinity", pm.LayerKind.SCALAR_FIELD, np.full(shape, 35.0), "psu", z_order=5)
+    withlayer = dataclasses.replace(base, layers=base.layers + (extra,))
+
+    d = ps.diff(base, withlayer)
+    assert d.only_in_b == ("future_salinity",) and d.only_in_a == ()
+    assert not d.fields and d.grids_compatible and bool(d) is True and (base != withlayer)
+    assert ps.diff(withlayer, base).only_in_a == ("future_salinity",)    # reversed
+
+
+def test_diff_is_symmetric_the_deltas_negate():
+    # diff(a, b) and diff(b, a) describe the same difference from opposite ends: the same knobs changed
+    # (values swapped), and the numeric field delta b−a is exactly the negation of a−b.
+    a = ps.build_spec(**COARSE)
+    b = ps.build_spec(**EXO, **COARSE)
+    ab, ba = ps.diff(a, b), ps.diff(b, a)
+    assert set(ab.knobs) == set(ba.knobs)
+    assert all(ab.knobs[k] == (ba.knobs[k][1], ba.knobs[k][0]) for k in ab.knobs)
+    assert np.array_equal(ab.fields["temperature"].delta, -ba.fields["temperature"].delta)
+    assert np.array_equal(ab.fields["biome"].delta, ba.fields["biome"].delta)   # a≠b mask is symmetric
+
+
+def test_diff_incompatible_grids_skips_the_fields_but_keeps_the_knobs():
+    # Two worlds at different resolution (n_cells) have non-aligned grids: the per-cell field deltas are
+    # meaningless and must be SKIPPED (grids_compatible False, empty fields) — but the knob diff (here
+    # n_cells itself) still stands, so the comparison is not silently empty (the cell must surface this).
+    a = ps.build_spec(**COARSE)
+    b = ps.build_spec(n_cells=COARSE["n_cells"] + 20, n_tau=COARSE["n_tau"])
+    d = ps.diff(a, b)
+    assert d.grids_compatible is False and d.fields == {}
+    assert "n_cells" in d.knobs and d.knobs["n_cells"] == (COARSE["n_cells"], COARSE["n_cells"] + 20)
+    assert bool(d) is True

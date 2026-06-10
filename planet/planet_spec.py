@@ -55,8 +55,13 @@ from pathlib import Path
 
 import numpy as np
 
+from planet import demo_biomes
 from planet.albedo import EBMParams
-from planet.planetmap import Grid, Layer, LayerKind, PlanetView
+from planet.ebm import A_OLR, D_TRANSPORT, S0_EARTH
+from planet.exoplanet import T_SUN
+from planet.obliquity import OBLIQUITY_EARTH
+from planet.planetmap import (Grid, Layer, LayerKind, LIVE_N_TAU, N_LON, PlanetView,
+                              build_view, climate_params)
 
 SCHEMA_VERSION = 1
 
@@ -149,6 +154,166 @@ def from_view(view: PlanetView, params: EBMParams, schema_version: int = SCHEMA_
     knobs = dataclasses.asdict(params)
     return PlanetSpec(schema_version=schema_version, grid=view.grid, layers=tuple(view.layers),
                       knobs=knobs, knob_units=dict(KNOB_UNITS))
+
+
+def build_spec(S0: float = S0_EARTH, A: float = A_OLR, D: float = D_TRANSPORT, *,
+               T_star: float = T_SUN, size: float = 1.0, obliquity_deg: float = OBLIQUITY_EARTH,
+               n_cells: int = 180, n_tau: float = LIVE_N_TAU, n_lon: int = N_LON,
+               elevation: np.ndarray | None = None) -> PlanetSpec:
+    """Knobs → a fresh equilibrium climate → a saveable :class:`PlanetSpec` (the *design-a-world* entry point).
+
+    The one-call path a "design your own planet" workflow needs: compose the knobs into the climate
+    params (:func:`planet.planetmap.climate_params` — the single source of truth), relax to the
+    biome-map :class:`~planet.planetmap.PlanetView` (:func:`planet.demo_biomes.compute` +
+    :func:`planet.planetmap.build_view`), and bundle **that view with the params that produced it**
+    into a spec ready for :func:`save`.
+
+    Capturing the *composed* params is the whole point: a naive
+    ``from_view(climate_view(...), EBMParams(S0, A, D))`` would store the **un-perturbed** knobs for any
+    non-default star/size/tilt (``climate_view`` builds and discards the real params), so the exported
+    world would be re-runnable to the *wrong* climate. Here :func:`climate_params` builds the params
+    once and they are both solved *and* serialized, so :meth:`PlanetSpec.to_params` reconstructs the
+    exact world (the §9.1 / ADR 0004 #4 re-runnability). The Sun/Earth-size/Earth-tilt defaults produce
+    the present-day Earth spec, identical to ``from_view(climate_view(), EBMParams())``.
+    """
+    params = climate_params(S0, A, D, T_star=T_star, size=size, obliquity_deg=obliquity_deg, n_cells=n_cells)
+    result = demo_biomes.compute(params, n_tau=n_tau)
+    view = build_view(result, n_lon=n_lon, elevation=elevation)
+    return from_view(view, params)
+
+
+# --------------------------------------------------------------------------- #
+# Two-world diff — "what changed between world a and world b" (the design-bench *compare* path)
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True, eq=False)
+class FieldDelta:
+    """How one scalar-field layer differs between two worlds — the render-ready per-cell delta.
+
+    ``delta`` is the full-globe lat×lon difference, read according to ``categorical``: for a **numeric**
+    field (temperature, precipitation, elevation) it is the signed ``b − a`` (a Δ-map paints straight
+    from it); for a **categorical** field (the biome codes — code arithmetic is meaningless) it is instead
+    the boolean ``a ≠ b`` *changed mask*. ``changed_fraction`` is the share of cells that differ — the
+    honest metric for both, and *the* metric for the categorical field. ``max_abs_delta`` / ``mean_delta``
+    summarise the numeric delta (both ``nan`` for a categorical field); ``mean_delta`` is an honest
+    **area-weighted** mean because the grid is uniform in ``sin φ`` (equal-area latitude bands) and in
+    longitude. ``eq=False`` for the same array reason as :class:`~planet.planetmap.Layer`.
+    """
+
+    name: str
+    units: str
+    categorical: bool
+    delta: np.ndarray
+    changed_fraction: float
+    max_abs_delta: float
+    mean_delta: float
+
+
+@dataclass(frozen=True, eq=False)
+class SpecDiff:
+    """The structured difference between two planet-specs — world ``a`` → world ``b`` (the *compare* sibling of :meth:`PlanetSpec.__eq__`).
+
+    Where ``__eq__`` answers *are these the same world*, :func:`diff` answers *how do they differ*, along
+    the axes a "design two worlds and compare them" workflow cares about:
+
+    * ``knobs`` — the design inputs that changed: ``name → (a_value, b_value)`` for each differing knob
+      (an exoplanet off Earth differs in exactly ``ai``/``D``/``s2`` — the §9.1 composition);
+      ``knob_units`` carries their unit strings so a diff renders without the original specs.
+    * ``fields`` — the climate that changed: a :class:`FieldDelta` per **scalar-field** layer present in
+      *both* worlds whose data differs (temperature, precipitation, biome, the inert elevation seam).
+    * ``only_in_a`` / ``only_in_b`` — layer names present in one world but not the other (an imported
+      future layer, a Phase-4 circulation overlay): the interchange edge.
+    * ``other_changed`` — layers present in both whose data differs but that were **not** cell-differenced:
+      non-scalar layers (the ice-line annotation, a vector overlay), *and* — when ``grids_compatible`` is
+      ``False`` — any scalar layer too (a mismatched grid makes the per-cell ``b − a`` meaningless).
+    * ``grids_compatible`` — ``False`` when the two grids do not match (e.g. different ``n_cells``); the
+      per-cell ``fields`` deltas are then **skipped** (cell-to-cell subtraction is not meaningful) while
+      the ``knobs`` diff still stands. A consumer must surface this rather than read an empty ``fields``
+      as "no climate change".
+
+    The diff is **data-scoped** — it compares knob values and layer *data*, not layer metadata
+    (units/style/z_order/inert). So for specs that share the v1 layer metadata (everything
+    :func:`build_spec` / :func:`from_view` produces), ``bool(diff(a, b))`` is exactly ``a != b``: the diff
+    is empty iff the worlds are equal — the inverse of the round-trip invariant. ``eq=False`` for the same
+    array reason as :class:`~planet.planetmap.Layer`.
+    """
+
+    knobs: dict
+    knob_units: dict
+    fields: dict
+    only_in_a: tuple
+    only_in_b: tuple
+    other_changed: tuple
+    grids_compatible: bool
+
+    def __bool__(self) -> bool:
+        """``True`` iff the two worlds differ on any tracked axis (knobs, fields, layer set, grid)."""
+        return bool(self.knobs or self.fields or self.only_in_a or self.only_in_b
+                    or self.other_changed or not self.grids_compatible)
+
+
+def _grids_compatible(a: Grid, b: Grid) -> bool:
+    """Two grids are field-comparable iff their coordinates *and* units match exactly (so a per-cell
+    ``b − a`` aligns cell-for-cell)."""
+    return (a.lat_units == b.lat_units and a.lon_units == b.lon_units
+            and _arrays_equal(a.lat, b.lat) and _arrays_equal(a.lon, b.lon))
+
+
+def _field_delta(a: Layer, b: Layer) -> FieldDelta:
+    """The per-cell :class:`FieldDelta` for one scalar-field layer — numeric ``b − a``, or the categorical
+    ``a ≠ b`` changed-mask for the biome codes (code subtraction is meaningless)."""
+    categorical = bool(a.style.get("categorical") or b.style.get("categorical"))
+    a_data, b_data = np.asarray(a.data), np.asarray(b.data)
+    if categorical:
+        changed = a_data != b_data
+        return FieldDelta(a.name, a.units, True, changed, float(np.mean(changed)),
+                          float("nan"), float("nan"))
+    delta = b_data.astype(float) - a_data.astype(float)
+    return FieldDelta(a.name, a.units, False, delta, float(np.mean(delta != 0)),
+                      float(np.max(np.abs(delta))), float(delta.mean()))
+
+
+def diff(a: PlanetSpec, b: PlanetSpec) -> SpecDiff:
+    """Compare two worlds — *what changed from* ``a`` *to* ``b`` (the design-bench two-world diff).
+
+    The :func:`diff` counterpart to :meth:`PlanetSpec.__eq__`: instead of a single same/different bit it
+    returns a structured, render-ready :class:`SpecDiff` — the changed **knobs** (the design inputs), a
+    per-cell :class:`FieldDelta` for each changed **scalar field** (the climate that moved), the layer-set
+    edges (``only_in_a`` / ``only_in_b`` / ``other_changed``), and a ``grids_compatible`` flag. Pure and
+    headless (no Plotly / ipywidgets), it reuses the schema's own :func:`_arrays_equal` (``equal_nan``) so
+    "changed" here means exactly "not array-identical" there.
+
+    The per-cell ``fields`` deltas need aligned grids; when the grids differ (e.g. two worlds at different
+    ``n_cells``) ``grids_compatible`` is ``False`` and ``fields`` is left empty while the knob diff still
+    stands — a consumer must surface that rather than read empty ``fields`` as "no climate change". The
+    diff is **data-scoped** (knob values + layer *data*, not layer metadata), so for the v1-metadata specs
+    :func:`build_spec` produces, ``bool(diff(a, b)) == (a != b)``.
+    """
+    knob_changes = {}
+    for k in (*a.knobs, *(k for k in b.knobs if k not in a.knobs)):
+        va, vb = a.knobs.get(k), b.knobs.get(k)
+        if va != vb:
+            knob_changes[k] = (va, vb)
+    knob_units = {k: a.knob_units.get(k, b.knob_units.get(k)) for k in knob_changes}
+
+    b_layers = {ly.name: ly for ly in b.layers}
+    only_in_a = tuple(ly.name for ly in a.layers if ly.name not in b_layers)
+    a_names = {ly.name for ly in a.layers}
+    only_in_b = tuple(ly.name for ly in b.layers if ly.name not in a_names)
+
+    grids_ok = _grids_compatible(a.grid, b.grid)
+    fields: dict = {}
+    other_changed = []
+    for la in a.layers:                                   # layers in BOTH, in a's registration order
+        lb = b_layers.get(la.name)
+        if lb is None or _arrays_equal(la.data, lb.data):  # absent, or identical data → not a change
+            continue
+        if grids_ok and LayerKind(la.kind) is LayerKind.SCALAR_FIELD and LayerKind(lb.kind) is LayerKind.SCALAR_FIELD:
+            fields[la.name] = _field_delta(la, lb)
+        else:
+            other_changed.append(la.name)
+    return SpecDiff(knobs=knob_changes, knob_units=knob_units, fields=fields,
+                    only_in_a=only_in_a, only_in_b=only_in_b,
+                    other_changed=tuple(other_changed), grids_compatible=grids_ok)
 
 
 def _stem_paths(path) -> tuple[Path, Path]:

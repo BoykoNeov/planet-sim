@@ -194,6 +194,19 @@ def test_exoplanet_knobs_default_to_the_earth_model_exactly():
     assert np.array_equal(base.layer("temperature").data, explicit.layer("temperature").data)
 
 
+def test_climate_params_is_the_single_composition_climate_view_rides_on():
+    # climate_params is the ONE place the obliquity + exoplanet composition lives (the §9.1 trap-guard:
+    # knobs → params captured once, so climate_view / planet_spec.build_spec / a notebook bench can't
+    # drift). Defaults recover the present-day Earth params exactly; the knobs compose onto exactly
+    # ai (spectrum) / D (size) / s2 (tilt) and touch nothing else.
+    import dataclasses
+    base = EBMParams(n_cells=40)
+    assert pm.climate_params(n_cells=40) == base                          # Sun/Earth-size/Earth-tilt = Earth
+    p = pm.climate_params(T_star=3000.0, size=1.8, obliquity_deg=40.0, n_cells=40)
+    changed = {k for k, v in dataclasses.asdict(p).items() if v != dataclasses.asdict(base)[k]}
+    assert changed == {"ai", "D", "s2"}                                   # only the three knobs bit
+
+
 def test_star_knob_resists_snowball():
     # The §9.1 stellar knob end-to-end: at a dimmed sun, a redder host star (lower ice albedo → weaker
     # feedback) leaves a far warmer climate than a Sun-like star — a redder star is harder to snowball.
