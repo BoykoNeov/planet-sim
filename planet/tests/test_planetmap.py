@@ -26,6 +26,7 @@ import numpy as np
 import pytest
 
 from planet import planetmap as pm
+from planet import planet_spec as ps
 from planet import demo_biomes
 from planet.albedo import EBMParams
 from planet.biomes import Biome, biome_area_fractions
@@ -321,3 +322,33 @@ def test_save_html_writes_a_standalone_globe(tmp_path):
     pytest.importorskip("plotly.graph_objects")
     out = pm.save_html(pm.climate_view(**COARSE), tmp_path / "globe.html")
     assert out.exists() and out.stat().st_size > 1000          # a real, non-empty HTML document
+
+
+# --------------------------------------------------------------------------- #
+# 6. The two-world comparison renderer — A · B · Δ triptych ([webviz]-gated; render is reach)
+# --------------------------------------------------------------------------- #
+def _two_coarse_worlds():
+    """A fast (coarse) Earth + off-Earth spec pair for the comparison smoke tests."""
+    return ps.build_spec(**COARSE), ps.build_spec(T_star=3000.0, **COARSE)
+
+
+@pytest.mark.parametrize("active", ["biome", "temperature"])
+def test_render_comparison_builds_three_globes(active):
+    pytest.importorskip("plotly.graph_objects")
+    a, b = _two_coarse_worlds()
+    dv = ps.delta_view(a, b, active=active)
+    fig = pm.render_comparison(a.view(), b.view(), dv, active=active, labels=("Earth", "exo"))
+    surfaces = [t for t in fig.data if type(t).__name__ == "Surface"]
+    assert len(surfaces) == 3                                  # world A · world B · the Δ globe
+    assert fig.layout.scene is not None and fig.layout.scene3 is not None   # a 1×3 scene subplot
+    # the three colorbars must not all stack on top of each other (advisor #1: A shares B's scale)
+    assert sum(1 for s in surfaces if s.showscale) <= 2
+
+
+def test_save_comparison_html_writes_a_standalone_triptych(tmp_path):
+    pytest.importorskip("plotly.graph_objects")
+    a, b = _two_coarse_worlds()
+    dv = ps.delta_view(a, b, active="temperature")
+    out = pm.save_comparison_html(a.view(), b.view(), dv, tmp_path / "cmp.html",
+                                  active="temperature", labels=("Earth", "exo"))
+    assert out.exists() and out.stat().st_size > 1000

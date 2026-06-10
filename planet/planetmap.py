@@ -461,6 +461,53 @@ def _vector_overlay_trace(go, grid: Grid, layer: Layer):
     )
 
 
+def _scalar_surface(go, grid: Grid, layer: Layer, *, showscale: bool = True, colorbar_x=None):
+    """A ``go.Surface`` painting one ``SCALAR_FIELD`` layer on the unit sphere (the surface-building core).
+
+    Shared by :func:`render` (one globe) and :func:`render_comparison` (three): a discrete colorscale for a
+    categorical layer (the biome codes), else a continuous one — honoring an optional ``cmid`` **style
+    hint** so a diverging Δ field can be centred at zero (the two-world Δ globe). ``showscale`` /
+    ``colorbar_x`` let a caller place or hide the colorbar (three side-by-side globes would otherwise stack
+    three bars over each other); ``render`` leaves them at the single-globe defaults.
+    """
+    LON, LAT = np.meshgrid(grid.lon, grid.lat)       # both (n_lat, n_lon); rows = lat, cols = lon
+    X, Y, Z = _sphere_xyz(LAT, LON)
+    hover = _hovertext(grid, layer)
+    if layer.style.get("categorical"):
+        scale, cmin, cmax, ticks = _discrete_colorscale(layer)
+        colorbar = dict(tickvals=[t[0] for t in ticks], ticktext=[t[1] for t in ticks],
+                        title=layer.style.get("colorbar_title", "biome"), len=0.8)
+        surf_kw = dict(colorscale=scale, cmin=cmin, cmax=cmax, colorbar=colorbar)
+    else:
+        colorbar = dict(title=layer.style.get("colorbar_title", f"{layer.name} ({layer.units})"), len=0.8)
+        surf_kw = dict(colorscale=layer.style.get("colorscale", "Viridis"), colorbar=colorbar)
+        if "cmid" in layer.style:
+            surf_kw["cmid"] = layer.style["cmid"]                 # centre a diverging Δ scale at 0
+    if colorbar_x is not None:
+        surf_kw["colorbar"] = {**surf_kw["colorbar"], "x": colorbar_x, "len": 0.5}
+    return go.Surface(x=X, y=Y, z=Z, surfacecolor=layer.data,
+                      text=hover, hoverinfo="text", showscale=showscale, **surf_kw)
+
+
+def _overlay_traces(go, grid: Grid, view: PlanetView) -> list:
+    """The non-scalar overlay traces for a view — every ``ANNOTATION`` as a 3-D line and every
+    ``VECTOR_OVERLAY`` as flow cones (the scalar surface is drawn separately by :func:`_scalar_surface`)."""
+    traces = []
+    for ly in view.ordered():
+        if ly.kind is LayerKind.SCALAR_FIELD:
+            continue                                          # one scalar is the surface; others switch via `active`
+        if ly.kind is LayerKind.ANNOTATION:
+            if ly.data.size == 0:
+                continue                                      # degenerate ice line (ice-free / Snowball): nothing to draw
+            ax, ay, az = _sphere_xyz(ly.data[:, 0], ly.data[:, 1])
+            traces.append(go.Scatter3d(
+                x=ax, y=ay, z=az, mode="lines", name=ly.style.get("label", ly.name),
+                line=dict(color=ly.style.get("color", "#000000"), width=5), hoverinfo="name"))
+        elif ly.kind is LayerKind.VECTOR_OVERLAY:
+            traces.append(_vector_overlay_trace(go, grid, ly))
+    return traces
+
+
 def render(view: PlanetView, active: str = "biome"):
     """Paint a :class:`PlanetView` as an interactive Plotly globe — the generic, kind-dispatching renderer.
 
@@ -477,39 +524,12 @@ def render(view: PlanetView, active: str = "biome"):
     import plotly.graph_objects as go
 
     grid = view.grid
-    scalars = view.scalar_fields(include_inert=True)
-    names = [ly.name for ly in scalars]
+    names = [ly.name for ly in view.scalar_fields(include_inert=True)]
     if active not in names:
         raise KeyError(f"no scalar layer {active!r} to paint; have {names}")
     surface_layer = view.layer(active)
 
-    LON, LAT = np.meshgrid(grid.lon, grid.lat)       # both (n_lat, n_lon); rows = lat, cols = lon
-    X, Y, Z = _sphere_xyz(LAT, LON)
-    hover = _hovertext(grid, surface_layer)
-    if surface_layer.style.get("categorical"):
-        scale, cmin, cmax, ticks = _discrete_colorscale(surface_layer)
-        colorbar = dict(tickvals=[t[0] for t in ticks], ticktext=[t[1] for t in ticks],
-                        title="biome", len=0.8)
-        surf_kw = dict(colorscale=scale, cmin=cmin, cmax=cmax, colorbar=colorbar)
-    else:
-        surf_kw = dict(colorscale=surface_layer.style.get("colorscale", "Viridis"),
-                       colorbar=dict(title=f"{surface_layer.name} ({surface_layer.units})", len=0.8))
-
-    traces = [go.Surface(x=X, y=Y, z=Z, surfacecolor=surface_layer.data,
-                         text=hover, hoverinfo="text", showscale=True, **surf_kw)]
-
-    for ly in view.ordered():
-        if ly.kind is LayerKind.SCALAR_FIELD:
-            continue                                          # one scalar is the surface; others switch via `active`
-        if ly.kind is LayerKind.ANNOTATION:
-            if ly.data.size == 0:
-                continue                                      # degenerate ice line (ice-free / Snowball): nothing to draw
-            ax, ay, az = _sphere_xyz(ly.data[:, 0], ly.data[:, 1])
-            traces.append(go.Scatter3d(
-                x=ax, y=ay, z=az, mode="lines", name=ly.style.get("label", ly.name),
-                line=dict(color=ly.style.get("color", "#000000"), width=5), hoverinfo="name"))
-        elif ly.kind is LayerKind.VECTOR_OVERLAY:
-            traces.append(_vector_overlay_trace(go, grid, ly))
+    traces = [_scalar_surface(go, grid, surface_layer)] + _overlay_traces(go, grid, view)
 
     title = (f"Planet — {surface_layer.name} ({surface_layer.units})"
              if not surface_layer.style.get("categorical") else "Planet — biome map")
@@ -530,6 +550,58 @@ def save_html(view: PlanetView, path, active: str = "biome") -> Path:
     server and no extra dependency beyond Plotly (no kaleido/PNG export). Returns the written path.
     """
     fig = render(view, active=active)
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.write_html(str(path), include_plotlyjs="cdn")
+    return path
+
+
+def render_comparison(view_a: PlanetView, view_b: PlanetView, view_delta: PlanetView,
+                      active: str = "biome", labels=("world A", "world B")):
+    """Paint two worlds and their difference as **three side-by-side globes** — the deep-end two-world diff.
+
+    The globe form of :func:`planet.planet_spec.diff`: world ``a`` and world ``b`` each painted at the same
+    ``active`` field (so they are visually comparable), and a third globe coloured by the **difference** —
+    ``view_delta``, the single-layer :func:`planet.planet_spec.delta_view` (a diverging ``b − a`` for a
+    continuous field, or the *changed-mask* for the categorical biome). It **reuses the §6 renderer
+    unchanged** — each panel is the same :func:`_scalar_surface` + :func:`_overlay_traces` the single globe
+    uses (the Δ is just another layer the generic renderer paints, ADR 0004 #1) — laid into a 1×3 scene
+    subplot. A and B share one field colorbar (A's is hidden), the Δ globe carries its own; the three scenes
+    share an initial camera (Plotly does not auto-link 3-D scenes, so this is a static, not synced, view).
+    Requires the ``[webviz]`` extra (Plotly); raises ``ImportError`` without it.
+    """
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+
+    delta_layer = view_delta.scalar_fields(include_inert=True)[0]      # the single Δ layer delta_view built
+    titles = (f"{labels[0]} — {active}", f"{labels[1]} — {active}", delta_layer.name)
+    fig = make_subplots(rows=1, cols=3, specs=[[{"type": "scene"}] * 3],
+                        subplot_titles=titles, horizontal_spacing=0.02)
+
+    # A shares B's scale (hide A's bar); B carries the field colorbar; Δ carries its own — positioned so the
+    # three bars do not stack over each other (the 1×3 footgun a build-only smoke test cannot catch).
+    panels = [(view_a, view_a.layer(active), False, None),
+              (view_b, view_b.layer(active), True, 0.62),
+              (view_delta, delta_layer, True, 1.0)]
+    for col, (view, layer, showscale, cbx) in enumerate(panels, start=1):
+        fig.add_trace(_scalar_surface(go, view.grid, layer, showscale=showscale, colorbar_x=cbx), row=1, col=col)
+        for tr in _overlay_traces(go, view.grid, view):
+            fig.add_trace(tr, row=1, col=col)
+
+    no_axis = dict(showbackground=False, showticklabels=False, showgrid=False, zeroline=False, visible=False)
+    scene = dict(xaxis=no_axis, yaxis=no_axis, zaxis=no_axis, aspectmode="data",
+                 camera=dict(eye=dict(x=1.5, y=1.5, z=0.9)))
+    fig.update_layout(title=f"Two worlds compared — {labels[0]} · {labels[1]} · Δ",
+                      width=1320, height=560, margin=dict(l=0, r=0, t=60, b=0),
+                      scene=scene, scene2=scene, scene3=scene)
+    return fig
+
+
+def save_comparison_html(view_a: PlanetView, view_b: PlanetView, view_delta: PlanetView, path,
+                         active: str = "biome", labels=("world A", "world B")) -> Path:
+    """Render the A · B · Δ comparison and write it as a standalone HTML triptych (the :func:`save_html`
+    analogue for :func:`render_comparison`). Returns the written path (Plotly only)."""
+    fig = render_comparison(view_a, view_b, view_delta, active=active, labels=labels)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(str(path), include_plotlyjs="cdn")

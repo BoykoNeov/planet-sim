@@ -316,6 +316,49 @@ def diff(a: PlanetSpec, b: PlanetSpec) -> SpecDiff:
                     other_changed=tuple(other_changed), grids_compatible=grids_ok)
 
 
+def delta_view(spec_a: PlanetSpec, spec_b: PlanetSpec, active: str = "biome") -> PlanetView:
+    """A single-layer :class:`~planet.planetmap.PlanetView` painting *what changed* in one field between
+    two worlds — the **Δ-globe data** for :func:`planet.planetmap.render_comparison`.
+
+    The headless data side of the deep-end two-world diff (it builds a :class:`~planet.planetmap.Layer`,
+    pulls **no** Plotly — only the paint step needs the ``[webviz]`` extra). From :func:`diff` it takes the
+    ``active`` field's :class:`FieldDelta` and wraps it as a renderable scalar layer on ``spec_a``'s grid:
+
+    * a **continuous** field (temperature / precipitation / elevation) → the signed ``b − a`` with a
+      *diverging* colorscale centred at zero (a ``cmid`` style hint the renderer honors); or
+    * the **categorical** biome → the ``a ≠ b`` *changed-mask* (code arithmetic is meaningless), a 2-tone
+      "unchanged / changed" layer answering *where did the biome flip*.
+
+    Identical worlds give an all-zero Δ (a flat globe); the field must be a scalar layer present in both,
+    and the two grids must match — a per-cell Δ across different ``n_cells`` is meaningless, so an
+    incompatible grid raises (mirroring :attr:`SpecDiff.grids_compatible`). The style dicts are JSON-safe,
+    so this module stays Plotly/ipywidgets-free.
+    """
+    d = diff(spec_a, spec_b)
+    if not d.grids_compatible:
+        raise ValueError("delta_view needs two worlds on the same grid — a per-cell Δ is meaningless across "
+                         "different n_cells; build both at one resolution.")
+    a_layer = spec_a.view().layer(active)              # validates `active`, and is the unchanged-case reference
+    if LayerKind(a_layer.kind) is not LayerKind.SCALAR_FIELD:
+        raise ValueError(f"delta_view differences a scalar field; {active!r} is "
+                         f"{LayerKind(a_layer.kind).value}, not a SCALAR_FIELD")
+    fd = d.fields.get(active)
+    if a_layer.style.get("categorical"):
+        mask = (np.asarray(fd.delta) if fd is not None
+                else np.zeros_like(np.asarray(a_layer.data), dtype=bool)).astype(int)
+        layer = Layer(f"{active} changed", LayerKind.SCALAR_FIELD, mask, "changed",
+                      style={"categorical": True, "colorbar_title": "biome Δ",
+                             "colors": {"0": "#d9d9d9", "1": "#d62728"},
+                             "names": {"0": "unchanged", "1": "changed"}}, z_order=0)
+    else:
+        delta = (np.asarray(fd.delta, dtype=float) if fd is not None
+                 else np.zeros(np.asarray(a_layer.data).shape, dtype=float))
+        layer = Layer(f"Δ {active}", LayerKind.SCALAR_FIELD, delta, a_layer.units,
+                      style={"colorscale": "RdBu_r", "cmid": 0.0,
+                             "colorbar_title": f"Δ {active} ({a_layer.units})"}, z_order=0)
+    return PlanetView(grid=spec_a.grid, layers=(layer,))
+
+
 def _stem_paths(path) -> tuple[Path, Path]:
     """The ``(manifest.json, arrays.npz)`` pair for a path stem (a suffix is stripped)."""
     stem = Path(path).with_suffix("")

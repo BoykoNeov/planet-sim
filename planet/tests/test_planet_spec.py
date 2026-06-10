@@ -284,3 +284,48 @@ def test_diff_incompatible_grids_skips_the_fields_but_keeps_the_knobs():
     assert d.grids_compatible is False and d.fields == {}
     assert "n_cells" in d.knobs and d.knobs["n_cells"] == (COARSE["n_cells"], COARSE["n_cells"] + 20)
     assert bool(d) is True
+
+
+# --------------------------------------------------------------------------- #
+# 6. delta_view — the headless Δ-globe data for the deep-end comparison (batch 2; no Plotly)
+# --------------------------------------------------------------------------- #
+def test_delta_view_numeric_field_is_a_diverging_zero_centred_delta():
+    # A continuous field's Δ globe is the signed b−a, painted diverging and centred at 0 (a cmid style hint
+    # the renderer honors) — and it IS exactly the layer difference, on world A's grid. Headless (a Layer).
+    a = ps.build_spec(**COARSE)
+    b = ps.build_spec(**EXO, **COARSE)
+    dv = ps.delta_view(a, b, active="temperature")
+    assert isinstance(dv, pm.PlanetView) and dv.grid is a.grid and len(dv.layers) == 1
+    layer = dv.layers[0]
+    assert layer.kind is pm.LayerKind.SCALAR_FIELD and not layer.style.get("categorical")
+    assert layer.style.get("cmid") == 0.0 and layer.style.get("colorscale")        # diverging, centred at 0
+    expected = b.view().layer("temperature").data - a.view().layer("temperature").data
+    assert np.array_equal(layer.data, expected)
+
+
+def test_delta_view_categorical_biome_is_a_changed_mask():
+    # The biome Δ globe is a 2-tone changed-mask (code arithmetic is meaningless) — exactly the cells whose
+    # biome flipped, marked 1. The style is JSON-safe (the headless-import guard rests on it).
+    a = ps.build_spec(**COARSE)
+    b = ps.build_spec(**EXO, **COARSE)
+    layer = ps.delta_view(a, b, active="biome").layers[0]
+    assert layer.style.get("categorical") and set(np.unique(layer.data)) <= {0, 1}
+    changed = (a.view().layer("biome").data != b.view().layer("biome").data).astype(int)
+    assert np.array_equal(layer.data, changed)
+    assert all(isinstance(k, str) and isinstance(v, str)                            # JSON-safe style
+               for k, v in {**layer.style["colors"], **layer.style["names"]}.items())
+
+
+def test_delta_view_identical_worlds_is_a_zero_delta():
+    # Δ of a world with itself is flat — zeros for a numeric field, an all-unchanged mask for the biome.
+    a = ps.build_spec(**COARSE)
+    assert np.all(ps.delta_view(a, a, active="temperature").layers[0].data == 0.0)
+    assert np.all(ps.delta_view(a, a, active="biome").layers[0].data == 0)
+
+
+def test_delta_view_requires_a_shared_grid():
+    # A per-cell Δ across different resolutions is meaningless → raise (mirrors SpecDiff.grids_compatible).
+    a = ps.build_spec(**COARSE)
+    b = ps.build_spec(n_cells=COARSE["n_cells"] + 20, n_tau=COARSE["n_tau"])
+    with pytest.raises(ValueError):
+        ps.delta_view(a, b, active="temperature")
