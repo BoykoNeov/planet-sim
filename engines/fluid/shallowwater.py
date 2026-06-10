@@ -48,7 +48,7 @@ Discretization
   the fastest signal ``√(gH) + |u|`` (gravity-wave CFL binds; ``f·dt ≪ 1`` is automatic,
   so the explicit Coriolis needs no semi-implicit treatment).
 
-The frozen data boundary (ADR 0001)
+The stable data boundary (ADR 0001)
 -----------------------------------
 The ``state`` is a :class:`SWState` — three plain 2-D ``ndarray`` fields
 ``(h, u, v)`` of identical shape ``(ny, nx)``, *stacked fields* and nothing more.
@@ -59,9 +59,10 @@ are **construction-time configuration** (they reduce to numbers / arrays during 
 assembly), exactly as the diffusion engine treats its ``Grid``/``D``/BCs. The
 stacked-field shape is the GCM-climb seam: **N vertical layers** is a leading-axis
 extension, and an **advected tracer** is one more field — both contract *extensions*
-that do not change the per-step array boundary. The tracer slot is declared on
-:class:`SWState` (``tracer``) but **not advected in v1** (:meth:`step` raises if it
-is set), naming rung 1 of the §5 staircase — build the seam, not the machinery.
+that do not change the per-step array boundary. The **advected tracer is built** (rung 1):
+a ``tracer`` set on :class:`SWState` is advected in flux form by :meth:`step` as a strictly
+**passive** scalar (no feedback on the dynamics). **N vertical layers** remain a named,
+unbuilt extension (rung 3 — baroclinic).
 
 Units & sign convention
 -----------------------
@@ -144,11 +145,11 @@ class SWState:
     """Shallow-water prognostic state: stacked plain 2-D fields on the C-grid.
 
     ``h`` (layer thickness, cell centers), ``u`` (east–west faces), ``v`` (north–south
-    faces) — all shape ``(ny, nx)``, the frozen array boundary (ADR 0001). ``tracer``
-    is the **declared-but-unbuilt** advected-scalar slot (rung 1 of the GCM climb,
-    §5): carrying it is a contract extension; :meth:`ShallowWater.step` *raises* if it
-    is set, naming the deferral rather than silently failing to advect it (the same
-    "seam, not machinery" idiom as the map's unpainted ``vector_overlay``).
+    faces) — all shape ``(ny, nx)``, the stable array boundary (ADR 0001). ``tracer`` is the
+    optional **passively-advected scalar** (rung 1 of the GCM climb, §5) — a
+    temperature/moisture proxy at cell centers: when set, :meth:`ShallowWater.step` advects it
+    in flux form (conserving ``∫hθ`` to machine precision) with **no feedback** on ``(h, u, v)``;
+    ``None`` runs the dry dynamics.
     """
 
     h: np.ndarray
@@ -319,9 +320,38 @@ class ShallowWater:
         q = self.potential_vorticity(state)
         return float(np.sum(0.5 * q ** 2 * self._h_corner(state.h)) * self.grid.cell_area)
 
+    def tracer_mass(self, state: SWState) -> float:
+        """Total advected tracer ``∫ hθ dA = Σ (hθ) ΔxΔy`` (cell centers).
+
+        The conserved quantity of the passive flux-form advection: like the fluid mass ``∫h``,
+        it telescopes on the periodic domain, so it holds to **machine precision** for any
+        state/step (rung-1's clean anchor). Raises if no tracer is set.
+        """
+        if state.tracer is None:
+            raise ValueError("state carries no tracer (state.tracer is None)")
+        return float(np.sum(state.h * state.tracer) * self.grid.cell_area)
+
+    def tracer_variance(self, state: SWState) -> float:
+        """Tracer 'energy' / variance ``∫ ½ h θ² dA`` (cell centers) — bounded, dt→0 convergent drift.
+
+        A Casimir of the continuous advection (materially conserved), but the centered,
+        non-limited scheme conserves it only to a small, dt-convergent drift — the same honesty
+        class as :meth:`energy` (and the reason no monotonicity / boundedness of θ is claimed:
+        sharp gradients over/undershoot). Raises if no tracer is set.
+        """
+        if state.tracer is None:
+            raise ValueError("state carries no tracer (state.tracer is None)")
+        return float(np.sum(0.5 * state.h * state.tracer ** 2) * self.grid.cell_area)
+
     # -- the right-hand side (method of lines) ------------------------------ #
-    def _rhs(self, h: np.ndarray, u: np.ndarray, v: np.ndarray):
-        """Tendencies ``(dh/dt, du/dt, dv/dt)`` of the vector-invariant shallow-water system.
+    def _rhs(self, h: np.ndarray, u: np.ndarray, v: np.ndarray, m: Optional[np.ndarray] = None):
+        """Tendencies of the vector-invariant shallow-water system.
+
+        Returns ``(dh/dt, du/dt, dv/dt)`` for the dry dynamics; if a tracer mass ``m = h·θ``
+        is supplied, also returns its flux-form tendency ``dm/dt`` as a 4th element (the
+        passive-tracer extension, rung 1). The ``(dh, du, dv)`` computation is **independent of
+        ``m``** — it runs the identical operations whether or not a tracer rides along, so the
+        dry trajectory is bit-for-bit unchanged (the passivity guarantee, ADR 0005).
 
         All quantities live on their C-grid positions; ``np.roll`` realizes the periodic
         neighbour stencils described in the module docstring.
@@ -360,24 +390,34 @@ class ShallowWater:
 
         du = cor_u - (B - _xm(B)) / dx
         dv = cor_v - (B - _ym(B)) / dy
-        return dh, du, dv
+        if m is None:
+            return dh, du, dv
+
+        # Passive tracer (rung 1): flux-form advection of the tracer mass m = h·θ,
+        # ∂m/∂t = −∇·(θ·hu), REUSING the mass fluxes U, V already assembled above. The face
+        # tracer is the centered 2-point average (matching the centered scheme). This
+        # telescopes on the periodic domain ⇒ ∫m conserved to machine precision (like mass),
+        # and is *consistent*: for a uniform θ it reduces to θ·dh, so a constant tracer is
+        # preserved (no spurious source). It does NOT feed back on (h, u, v) — strictly passive.
+        theta = m / h
+        Fx = U * 0.5 * (theta + _xm(theta))       # tracer flux at u-faces
+        Fy = V * 0.5 * (theta + _ym(theta))       # tracer flux at v-faces
+        dm = -((_xp(Fx) - Fx) / dx + (_yp(Fy) - Fy) / dy)
+        return dh, du, dv, dm
 
     # -- time stepping (SSP-RK3) -------------------------------------------- #
     def step(self, state: SWState, dt: float) -> SWState:
         """Advance ``state`` by one SSP-RK3 step ``dt``; returns the new state (no mutation).
 
-        Raises if ``dt`` is non-positive, if a tracer is set (the unbuilt rung-1 slot),
-        or if ``dt`` exceeds the CFL limit (a wrong-by-design large step would blow up —
-        the explicit-solver analogue of the diffusion engine's stability guarantee, but
-        here *conditional*, so it is enforced rather than promised).
+        Raises if ``dt`` is non-positive or exceeds the CFL limit (a wrong-by-design large step
+        would blow up — the explicit-solver analogue of the diffusion engine's stability
+        guarantee, but here *conditional*, so it is enforced rather than promised). If
+        ``state.tracer`` is set, the passive tracer mass ``h·θ`` is advected by the **same**
+        SSP-RK3 (flux form, rung 1 of the GCM climb); the tracer is **strictly passive**, so the
+        ``(h, u, v)`` trajectory is bit-for-bit identical to the no-tracer run (ADR 0005).
         """
         if dt <= 0.0:
             raise ValueError("dt must be positive")
-        if state.tracer is not None:
-            raise NotImplementedError(
-                "tracer advection is the rung-1 extension (GCM climb §5); v1 carries the "
-                "slot on SWState but does not advect it"
-            )
         # Guard the *true* stability threshold (Courant ≈ 1 on the fastest signal), not the
         # conservative recommended step (safety≈0.3) — so passing max_dt(0.3) never false-trips.
         cfl_limit = self.max_dt(state, safety=1.0)
@@ -388,20 +428,43 @@ class ShallowWater:
             )
         h, u, v = state.h, state.u, state.v
 
-        # SSP-RK3 (Shu–Osher): three convex-combination stages.
-        k1h, k1u, k1v = self._rhs(h, u, v)
-        h1, u1, v1 = h + dt * k1h, u + dt * k1u, v + dt * k1v
+        # SSP-RK3 (Shu–Osher): three convex-combination stages. The dry (h, u, v) update is the
+        # same code whether or not a tracer rides along (the tracer mass m = h·θ is carried
+        # through the identical stages and does not feed back) — hence bit-for-bit passivity.
+        if state.tracer is None:
+            k1h, k1u, k1v = self._rhs(h, u, v)
+            h1, u1, v1 = h + dt * k1h, u + dt * k1u, v + dt * k1v
 
-        k2h, k2u, k2v = self._rhs(h1, u1, v1)
+            k2h, k2u, k2v = self._rhs(h1, u1, v1)
+            h2 = 0.75 * h + 0.25 * (h1 + dt * k2h)
+            u2 = 0.75 * u + 0.25 * (u1 + dt * k2u)
+            v2 = 0.75 * v + 0.25 * (v1 + dt * k2v)
+
+            k3h, k3u, k3v = self._rhs(h2, u2, v2)
+            hn = (1.0 / 3.0) * h + (2.0 / 3.0) * (h2 + dt * k3h)
+            un = (1.0 / 3.0) * u + (2.0 / 3.0) * (u2 + dt * k3u)
+            vn = (1.0 / 3.0) * v + (2.0 / 3.0) * (v2 + dt * k3v)
+            return SWState(h=hn, u=un, v=vn)
+
+        # Tracer path: carry the conserved tracer mass m = h·θ through the SSP-RK3 convex
+        # combinations (combine m, NOT θ — the conserved quantity is what telescopes), then
+        # recover θ = m/h at the new state. ∫m is preserved to machine precision.
+        m = h * state.tracer
+        k1h, k1u, k1v, k1m = self._rhs(h, u, v, m)
+        h1, u1, v1, m1 = h + dt * k1h, u + dt * k1u, v + dt * k1v, m + dt * k1m
+
+        k2h, k2u, k2v, k2m = self._rhs(h1, u1, v1, m1)
         h2 = 0.75 * h + 0.25 * (h1 + dt * k2h)
         u2 = 0.75 * u + 0.25 * (u1 + dt * k2u)
         v2 = 0.75 * v + 0.25 * (v1 + dt * k2v)
+        m2 = 0.75 * m + 0.25 * (m1 + dt * k2m)
 
-        k3h, k3u, k3v = self._rhs(h2, u2, v2)
+        k3h, k3u, k3v, k3m = self._rhs(h2, u2, v2, m2)
         hn = (1.0 / 3.0) * h + (2.0 / 3.0) * (h2 + dt * k3h)
         un = (1.0 / 3.0) * u + (2.0 / 3.0) * (u2 + dt * k3u)
         vn = (1.0 / 3.0) * v + (2.0 / 3.0) * (v2 + dt * k3v)
-        return SWState(h=hn, u=un, v=vn)
+        mn = (1.0 / 3.0) * m + (2.0 / 3.0) * (m2 + dt * k3m)
+        return SWState(h=hn, u=un, v=vn, tracer=mn / hn)
 
     def max_dt(self, state: SWState, safety: float = 0.3) -> float:
         """CFL-stable step ``safety · min(dx,dy)/(√(gH) + |u|_max)`` (s).

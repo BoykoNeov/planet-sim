@@ -63,8 +63,8 @@ sw   = ShallowWater(grid, g, mean_depth,         # g, H  → c=√(gH), L_R
                     f0=0.0, beta=0.0,            # β-plane: f = f0 + β(y − y_ref)
                     y_ref=None, bottom=None)     # y_ref defaults to domain centre
 
-state = SWState(h, u, v, tracer=None)            # stacked plain (ny,nx) arrays
-state = sw.step(state, dt)                        # one SSP-RK3 step; returns new state
+state = SWState(h, u, v, tracer=None)            # stacked plain (ny,nx) arrays; tracer optional
+state = sw.step(state, dt)                        # one SSP-RK3 step; advects the tracer if set
 state = sw.solve(state, t_end, dt=None)           # march to t_end (dt=None → CFL step)
 dt    = sw.max_dt(state, safety=0.3)              # recommended CFL step
 
@@ -74,14 +74,17 @@ sw.energy(state)                # ∫[½h(u²+v²)+½gh²]dA — bounded, dt³-c
 sw.potential_vorticity(state)   # q=(f+ζ)/h at corners
 sw.potential_enstrophy(state)   # ∫½q²h dA         — bounded (spatial-limited) drift
 sw.relative_vorticity(state)    # ζ at corners     (∫ζ dA = 0 to machine precision)
+sw.tracer_mass(state)           # ∫hθ dA           — machine-precision conserved (passive tracer)
+sw.tracer_variance(state)       # ∫½hθ² dA         — bounded drift (NOT monotone — no limiter)
 sw.gravity_wave_speed           # √(gH);   sw.rossby_radius  √(gH)/|f0|
 ```
 
 - **`SWState`** is the stable (ADR-0001) data boundary: three plain `(ny, nx)` `ndarray` fields
   `(h, u, v)` — *stacked fields and nothing more* — plus an **optional `tracer`** slot.
-- **`step`** does not mutate its input; it **raises** on non-positive `dt`, on `dt`
+- **`step`** does not mutate its input; it **raises** on non-positive `dt` and on `dt`
   above the CFL stability limit (the explicit analogue of the diffusion engine's
-  stability promise — here *conditional*, so enforced), and on a set `tracer` (below).
+  stability promise — here *conditional*, so enforced). A set **`tracer`** is advected as a
+  **passive** scalar (below); `tracer=None` runs the dry dynamics bit-for-bit.
 
 ### The stable data boundary (ADR 0001)
 
@@ -95,11 +98,13 @@ arrays — never a live solver object.
 ### The GCM-climb seam (extension-ready, ARCHITECTURE.md §8 / Planet §5)
 
 The stacked-field shape is the growth axis: **N vertical layers** is a leading-axis
-extension (rung 3 — baroclinic), and an **advected tracer** (moisture/temperature for
-rungs 1–2) is one more field. The `tracer` slot is **declared on `SWState` but not
-advected in v1** — `step` raises `NotImplementedError` naming rung 1, the same "build the
-seam, not the machinery" idiom as the map's unpainted `vector_overlay`. Adding either is a
-contract *extension* that does not change the per-step array boundary.
+extension (rung 3 — baroclinic), and an **advected tracer** (a temperature/moisture proxy
+for rungs 1–2) is one more field. The **tracer is built (rung 1):** when `state.tracer` is
+set, `step` advects the tracer mass `h·θ` in flux form (conserving `∫hθ` to machine
+precision), strictly **passively** — no back-reaction on `(h, u, v)` (an *active* buoyancy
+tracer feeding `h` would be a different reduced-gravity / two-layer model). **N vertical
+layers** remain a named, unbuilt extension. Adding either is a contract *extension* that does
+not change the per-step array boundary (ADR 0005 — engines are living contracts).
 
 ## Guaranteed invariants (what the test suite enforces — = the contract)
 
@@ -124,6 +129,12 @@ contract *extension* that does not change the per-step array boundary.
    advection genuinely moves PV around): enstrophy holds to a small spatial-discretization
    bound and PV grows no spurious extrema (PV is materially conserved). At small amplitude
    this leg would be near-vacuous; the finite-amplitude requirement is what gives it teeth.
+7. **Passive tracer: `∫hθ` machine-precision; `∫½hθ²` bounded** (`test_tracer.py`).
+   Flux-form advection telescopes like mass (the clean anchor); the tracer is strictly passive,
+   so the dry `(h, u, v)` trajectory is **byte-identical** to a `tracer=None` run (the re-seal),
+   and a uniform tracer stays uniform (consistency — no spurious source). Tracer **variance** is
+   a near-invariant held to a small, *spatially*-limited drift (enstrophy-class) — **not**
+   monotone (no flux limiter → over/undershoot on sharp gradients).
 
 ## Validation boundary (what Phase 3 does *not* claim)
 
@@ -135,6 +146,12 @@ contract *extension* that does not change the per-step array boundary.
   to machine precision. Long, fully-turbulent, high-Rossby integrations can cascade enstrophy
   to the grid (the energy-conserving scheme's known behaviour); add hyperviscosity or an
   enstrophy-conserving operator for that regime (named, not built).
+- **The tracer is passive and not monotone.** Advecting `θ` does not feed back on the dynamics
+  (no buoyancy/active-tracer model — that is a reduced-gravity / multi-layer change). The
+  centered scheme has **no flux limiter**, so a sharp tracer front **over/undershoots** (Gibbs);
+  `∫hθ` (machine-exact) and `∫½hθ²` (bounded) are the claims, **not** boundedness/monotonicity of
+  `θ`. A TVD/WENO limiter or hyperdiffusion is the named, unbuilt upgrade (it would break the
+  energy-conserving symmetry — a deliberate non-goal).
 - The *physical constants* (`g, H, f₀, β`, planetary values) are the **consumer's** to supply
   and validate (Planet `circulation.py`, against geostrophic balance + the jet benchmark).
 
@@ -144,11 +161,16 @@ contract *extension* that does not change the per-step array boundary.
 - **v1 scope (named rungs on the §5 staircase, not built):** single layer (dry — no
   thermodynamic variable, *the* fact making Phase-4 coupling one-way); **doubly-periodic
   β-plane** (rigid channel walls in y are a named BC extension); **explicit** (CFL-limited);
-  no vertical structure (multi-layer = rung 3), no moisture/tracer advection (rung 1), no
-  sphere (rung 5 — the pole problem). The `SWState` array boundary is the seam where each is
-  slotted without touching consumers.
+  no vertical structure (multi-layer = rung 3); a **passive** scalar tracer *is* advected
+  (rung 1, built) but there is no **active/moist** thermodynamics (the tracer does not feed
+  back); no sphere (rung 5 — the pole problem). The `SWState` array boundary is the seam where
+  each is slotted without touching consumers.
 
 ## Changelog
 
 - **2026-06-09 — Planet Phase 3.** Initial build & validation (the guaranteed invariants above).
 - **2026-06-10 — doctrine.** Status FROZEN → living, versioned contract (ADR 0005); no API change.
+- **2026-06-10 — rung 1.** Added **passive flux-form tracer advection** (`SWState.tracer`): `step`
+  advects `h·θ` through the same SSP-RK3, with `tracer_mass` / `tracer_variance` diagnostics and
+  `test_tracer.py`. Additive — dry dynamics bit-for-bit unchanged; `step` no longer raises on a set
+  tracer.

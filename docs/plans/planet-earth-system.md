@@ -730,6 +730,28 @@ first compute too heavy for the rung-0 instant remap, §9.2). No engine modified
 unchanged (`{diffusion, fluid}`); full planet gate **140 passed, 1 skipped**. Two-way coupling is rung 1
 (seamed at the engine's `tracer` slot, not built).
 
+**Started — rung 1 (the two-way coupler), step 1: the passive tracer-advection engine extension
+(2026-06-10).** With engines now **living contracts** (ADR 0005 — the freeze ceremony dropped), the
+long-declared `engines/fluid` `tracer` slot is **built**: `SWState.tracer` is advected in flux form
+(`∂(hθ)/∂t = −∇·(hθ u)`) through the same SSP-RK3, strictly **passive** (no back-reaction on `h,u,v`),
+with `tracer_mass` / `tracer_variance` diagnostics and `engines/fluid/tests/test_tracer.py`. Triad:
+`∫hθ` machine-exact (telescopes like mass — the anchor), dry dynamics **bit-for-bit** unchanged (the
+re-seal), uniform-flow translation (analytic), uniform-tracer consistency; variance is **bounded**
+(a build-time honesty correction to the plan-table "dt-convergent" — measured round-off/spatially
+limited, the enstrophy class, *not* dt-truncation limited) and the scheme is **not monotone** (no flux
+limiter → over/undershoot on sharp fronts — the named scope edge). **Step-0 de-risking
+(`outputs/rung1_stability_probe.py`, gitignored):** the existing Phase-4 jet is **barotropically
+unstable** (Rayleigh–Kuo met; a v-perturbation grows ~200× then saturates), so a passive tracer on the
+meandering flow gets an **emergent** `⟨v'θ'⟩` flux — no imposed stationary wave needed. **Anchor
+reframe (for step 2):** the rung-1 anchor is **reduction-to-EBM** (resolved flux → `D_eff`; down-gradient
+limit recovers the rung-0 diffusive EBM), **not** the plan-table "~5–6 PW" (an eddy/baroclinic = rung-3
+number; here magnitude is window/forcing-tuned). **Next (step 2):** the two-way coupler — advect θ
+toward the EBM target on the unstable jet, diagnose `D_eff`, close the budget back to the EBM; then
+**step 3** circulation-informed precip. Editing the shared engine triggered the **full-repo gate**
+(bare `pytest`, ADR 0003) — green (168 fast + the slow engine seals + slow planet; the live-climlab
+and notebook smoke-tests skip, as in CI). (The import-drift guard is a monorepo-only mechanism — see
+ADR 0003's standalone-repo extraction note.)
+
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
 1969 / North 1975 / climlab defaults). Phase 2 pins **`[[whittaker-biome-source]]`** +

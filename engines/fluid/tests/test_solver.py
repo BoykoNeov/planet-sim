@@ -3,8 +3,8 @@
 Not physics (the wave / geostrophy / conservation files carry the triad) but the API
 promises: construction validation, the no-mutation step contract, the CFL stability guard
 (the explicit analogue of the diffusion engine's unconditional-stability promise — here
-*conditional*, so enforced), and the **declared-but-unbuilt tracer slot** (rung-1 of the
-GCM climb: carrying it is a contract extension; stepping it raises, naming the deferral).
+*conditional*, so enforced), and the **passively-advected tracer slot** (the rung-1 extension,
+ADR 0005 — stepping it advects the tracer; the full triad is `test_tracer.py`).
 """
 import numpy as np
 import pytest
@@ -105,13 +105,15 @@ def test_recommended_step_is_well_under_the_cfl_limit():
     sw.step(s, sw.max_dt(s))                                  # the recommended step never trips the guard
 
 
-def test_tracer_slot_declared_but_not_advected():
+def test_tracer_slot_is_advected():
+    """The rung-1 extension (ADR 0005): a set tracer is advected (no longer raises). The full
+    passive-tracer triad — ∫hθ conservation, consistency, bit-for-bit passivity — is test_tracer.py."""
     g = uniform_grid(1e6, 1e6, 16, 16)
-    sw = ShallowWater(g, 9.81, 1000.0)
+    sw = ShallowWater(g, 9.81, 1000.0, f0=1e-4)
     s = _simple_state(g, sw)
     with_tracer = SWState(h=s.h, u=s.u, v=s.v, tracer=np.ones((g.ny, g.nx)))
-    with pytest.raises(NotImplementedError, match="rung-1"):
-        sw.step(with_tracer, sw.max_dt(s))
+    stepped = sw.step(with_tracer, sw.max_dt(s))                # advects the tracer; does not raise
+    assert stepped.tracer is not None and stepped.tracer.shape == (g.ny, g.nx)
 
 
 def test_solve_marches_to_t_end():
