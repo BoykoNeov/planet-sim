@@ -332,12 +332,14 @@ class ShallowWater:
         return float(np.sum(state.h * state.tracer) * self.grid.cell_area)
 
     def tracer_variance(self, state: SWState) -> float:
-        """Tracer 'energy' / variance ``∫ ½ h θ² dA`` (cell centers) — bounded, dt→0 convergent drift.
+        """Tracer 'energy' / variance ``∫ ½ h θ² dA`` (cell centers) — bounded (not machine-exact).
 
-        A Casimir of the continuous advection (materially conserved), but the centered,
-        non-limited scheme conserves it only to a small, dt-convergent drift — the same honesty
-        class as :meth:`energy` (and the reason no monotonicity / boundedness of θ is claimed:
-        sharp gradients over/undershoot). Raises if no tracer is set.
+        A Casimir of the continuous advection (materially conserved). The centered, non-limited
+        scheme holds it to a small, **bounded** drift — the honesty class of :meth:`potential_enstrophy`
+        (a near-invariant), **not** machine-exact like :meth:`mass`/:meth:`tracer_mass` and **not**
+        dt-convergent like :meth:`energy` (smooth fields drift at round-off; strongly filamented runs
+        cascade variance toward the grid). It is **not** monotone — no flux limiter, so sharp gradients
+        over/undershoot (no boundedness of θ is claimed). Raises if no tracer is set.
         """
         if state.tracer is None:
             raise ValueError("state carries no tracer (state.tracer is None)")

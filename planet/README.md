@@ -1,7 +1,7 @@
 # `planet` — the Earth-system / Planet simulator (the capstone)
 
 *Planetary knobs in, climate & habitability out.* Project #3 of the program and its **capstone** —
-the first project to reuse the frozen diffusion/heat spine (`engines/diffusion`) a **third** time
+the first project to reuse the diffusion/heat spine (`engines/diffusion`) a **third** time
 (as a sphere's latitudinal heat transport) and, in later phases, to build the program's one
 remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
 [`docs/plans/planet-earth-system.md`](../../docs/plans/planet-earth-system.md).
@@ -11,11 +11,11 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
 > **°C** (T, the freeze isotherm Tf — the climlab convention `A+B·T` and `Tf` assume °C), and the
 > dimensionless **area coordinate `x = sin φ`** on `[0, 1]` (equator → pole; equal Δx = equal area on
 > the sphere, so the global mean is a plain `∫₀¹ T dx`). Latitudes are reported in **degrees**. The
-> frozen engine is fed the latitudinal transport in these units directly.
+> engine is fed the latitudinal transport in these units directly.
 
 ## Load pointer (per-session working set, ARCHITECTURE.md §11)
 
-- **To work on the EBM machinery (Phase 1):** `ebm.py` + `tests/test_ebm.py`. It loads the frozen
+- **To work on the EBM machinery (Phase 1):** `ebm.py` + `tests/test_ebm.py`. It loads
   `engines/diffusion/CONTRACT.md` (**heat mode**: array diffusivity `D_eng(x) = (D/C)(1−x²)`,
   insulated Neumann(0) at both ends) and **Strang-splits the radiation around it** — the
   **Jominy-2a idiom reused** (`projects/steel/jominy.py`): the linear `−B·T` relaxation is an exact
@@ -27,7 +27,7 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   Phase-1 review, useful for accuracy/speed *and* as a mutual cross-check web:
   - `face=` on the model — `"harmonic"` (plain `(1−x²)`; the engine's harmonic-mean faces, a named
     ~0.1 °C polar bias) vs `"exact"` (cell values **pre-distorted** so the harmonic mean reproduces
-    the true face coefficient, no bias). *The frozen engine is never modified either way.*
+    the true face coefficient, no bias). *The engine is never modified either way.*
   - `method=` on `EnergyBalanceModel.equilibrium` — `"relax"` (the Strang-split relaxation, the
     general / **only** nonlinear-capable path, used by the Snowball sweep) vs `"direct"` (a dt-free
     linear solve, the splitting-error-free **reference** for the constant-albedo North check; it
@@ -108,7 +108,7 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   `plots.obliquity_figure` (`[viz]`) → `docs/figures/planet-obliquity.png` (the `s₂(ε)` curve + the
   relaxed `T(φ)` flattening with tilt). The module docstring is its contract.
 - **To work on the circulation / shallow-water engine (Phase 3):** `circulation.py` +
-  `tests/test_circulation.py`. It loads the newly-frozen `engines/fluid/CONTRACT.md` (the program's
+  `tests/test_circulation.py`. It loads `engines/fluid/CONTRACT.md` (the program's
   **second shared engine** — a rotating shallow-water solver, hyperbolic/explicit, sharing no
   machinery with the parabolic-implicit diffusion spine) and pins the **planetary** numbers the
   engine leaves to its consumer: Earth's `f₀ = 2Ω sinφ`, `β = 2Ω cosφ/a`, and an equivalent depth
@@ -122,7 +122,7 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   `rossby_wave` → `docs/figures/planet-shallowwater.png`: the adjustment (bump → balanced vortex over
   `L_R`, with the conservation diagnostics holding flat) beside a **westward** Rossby wave.
 - **To work on the one-way coupler (Phase 4 — the capstone payoff):** `coupler.py` +
-  `tests/test_coupler.py`. It **couples the two frozen engines**: the EBM's meridional temperature
+  `tests/test_coupler.py`. It **couples the two engines**: the EBM's meridional temperature
   gradient (a `ClimateState`) is mapped to a doubly-periodic, zero-mean **height target**
   (`height_target` — windowed for the wall-less engine), and the flow is forced toward it by
   **operator splitting around the bare engine** (`couple_jet`: exact-exponential thermal relaxation +
@@ -139,9 +139,10 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   globe** `docs/figures/planet-coupler-map.html` — the jet drawn as a `circulation` `vector_overlay`
   (Plotly cones) over the temperature field (`planetmap.circulation_layer` / `_vector_overlay_trace`,
   `build_view(jet=…)`; computed-then-viewed, not in the live-slider loop).
-- **To use the shallow-water engine directly:** load `engines/fluid/CONTRACT.md` only — the frozen
-  one-page API (`ShallowWater`, `SWState`, `uniform_grid`; mass machine-exact, energy/PV bounded;
-  the `tracer` slot declared-but-unbuilt = rung 1). Never the engine internals.
+- **To use the shallow-water engine directly:** load `engines/fluid/CONTRACT.md` only — the
+  one-page API contract (`ShallowWater`, `SWState`, `uniform_grid`; mass + tracer-mass machine-exact,
+  energy/PV/variance bounded; the `tracer` slot is now advected as a **passive** scalar — rung 1
+  built, ADR 0005). Never the engine internals.
 - **To use the diffusion/heat spine:** load `engines/diffusion/CONTRACT.md` only — never Steel's or
   Chip's internals. Planet instantiates the same contract in **heat mode**, with the radiation
   composed around it by operator splitting (the Jominy precedent).
@@ -149,13 +150,13 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
 ## Status
 
 - **Phase 1 — the latitudinal EBM & the Snowball bifurcation: BUILT** (2026-06-09). `ebm.py` (the
-  frozen-engine transport + Strang-split radiation, the three interchangeable A/B/C modes) +
+  engine transport + Strang-split radiation, the three interchangeable A/B/C modes) +
   `albedo.py` (ice-albedo feedback + the continuation-sweep hysteresis) + the banked Snowball demo
   (`docs/figures/planet-snowball.png`). **Validation web:** the **North two-mode** analytic profile
   reproduced to ~1e-4 °C by the exact-face direct solve (the harmonic floor named at ~0.1 °C), the
   Strang relaxation shown to **converge** to it as dt→0, the **0-D mean** matching the discrete
   energy balance (net-TOA machine-exact) and the continuous `T̄` to the grid's O(1/n²) limit, and the
-  direct operator **pinned to the frozen engine**. **Banked numbers:** present-day global mean
+  direct operator **pinned to the engine**. **Banked numbers:** present-day global mean
   ≈ 14.7 °C / ice line ≈ 73° (the finite-cap branch — Earth's, in the bistable zone); the planet
   **freezes over** (Snowball) when the sun dims ~8 % and **re-melts only ~580 W/m² brighter** (a wide
   hysteresis loop). 26-test triad green (+1 skipped live-climlab cross-check).
@@ -182,10 +183,10 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   one genuine correctness property, vs the render's smoke-tests). Banked globe:
   `docs/figures/planet-map.html`. 31-test pair added (the Plotly render smoke-tests `importorskip` on
   the `[webviz]` extra — fast, not `slow`). **No new engine / no gate-manifest change.**
-- **Phase 3 — the shallow-water engine (`engines/fluid`): BUILT & FROZEN** (2026-06-09). The program's
+- **Phase 3 — the shallow-water engine (`engines/fluid`): BUILT** (2026-06-09). The program's
   **second shared engine** — a rotating shallow-water solver on a doubly-periodic β-plane (Arakawa
-  C-grid, vector-invariant, explicit SSP-RK3), built standalone and sealed behind
-  `engines/fluid/CONTRACT.md` before any coupling. **Validation triad:** gravity-wave `√(gH)` &
+  C-grid, vector-invariant, explicit SSP-RK3), built standalone and sealed behind its suite
+  (`engines/fluid/CONTRACT.md`) before any coupling. **Validation triad:** gravity-wave `√(gH)` &
   **Poincaré dispersion `ω²=f₀²+gHk²`** to ~1e-3 (the rotation check), **Rossby waves** westward &
   dispersive (loose, converging to analytic with resolution), **geostrophic balance steady** +
   **geostrophic adjustment** to the analytic Helmholtz state over `L_R` (~1%), **mass conserved to
@@ -253,6 +254,18 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   intermediate, the collapsible = expert: derivations, the Strang-split / C-grid / energy-not-enstrophy
   machinery, and the named scope edges). Markdown-only, grounded in the cited module docstrings; banked
   code-cell outputs byte-identical, smoke test still green.
+- **Engines un-frozen — ADR 0005: DONE** (2026-06-10). The freeze-before-reuse ceremony is dropped;
+  `engines/*` are now *living, versioned* contracts (extend directly + test + Changelog; the suite +
+  the full-repo gate on an engine edit are the guardrails). Both `CONTRACT.md` status headers flipped.
+- **Rung 1 (the two-way coupler) — STARTED, step 1 BUILT** (2026-06-10). `engines/fluid` now advects
+  its long-declared `tracer` slot: a scalar `θ` carried in **flux form** through the same SSP-RK3,
+  **strictly passive** (no back-reaction on `h,u,v` → dry dynamics bit-for-bit unchanged). New
+  `tracer_mass` (`∫hθ`, machine-exact — the anchor) + `tracer_variance` (`∫½hθ²`, bounded) diagnostics
+  and `engines/fluid/tests/test_tracer.py` (translation analytic limit, conservation, consistency, the
+  not-monotone scope edge). **Step-0 finding:** the Phase-4 jet is *barotropically unstable* (so a
+  passive tracer gets an emergent `⟨v'θ'⟩` flux — no imposed wave needed). **Anchor (for step 2):**
+  reduction-to-EBM (`D_eff`), not a tuned PW number. **Next:** step 2 the two-way coupler, step 3
+  circulation-informed precip.
 
 ## Test runner (tiered gate, ADR 0003 — the per-project successor)
 

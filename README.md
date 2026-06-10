@@ -10,19 +10,20 @@ planet size, obliquity), and an interactive Plotly globe — each leg validated 
 climate references.
 
 It is the program's capstone: the **only simulator built on two** separately-validated solver
-engines — the frozen 1-D diffusion/heat solver (`engines/diffusion`, the meridional heat
-transport) and a rotating shallow-water solver (`engines/fluid`, the circulation). Each engine
-carries its own contract and test suite.
+engines — the 1-D diffusion/heat solver (`engines/diffusion`, the meridional heat transport) and
+a rotating shallow-water solver (`engines/fluid`, the circulation). Each engine is a *living,
+versioned* contract ([ADR 0005](docs/decisions/0005-engines-are-living-contracts.md)) with its own
+`CONTRACT.md` and test suite — extended directly as the simulator grows, the suite as the guardrail.
 
 ## Layout
 
 ```
-engines/diffusion/   # the frozen 1-D diffusion/heat solver (+ its own tests)
+engines/diffusion/   # the 1-D diffusion/heat solver (+ its own tests)
 engines/fluid/       # the rotating shallow-water solver (C-grid / SSP-RK3) (+ its own tests)
 planet/              # the simulator: ebm, albedo, climate_reference, biomes, precip,
                      #   circulation, coupler, exoplanet, obliquity, planetmap + planet_spec,
                      #   plots, demos, planet.ipynb
-docs/decisions/      # ADRs 0001–0004 (incl. 0004 interactive maps + state interchange)
+docs/decisions/      # ADRs 0001–0005 (incl. 0004 interactive maps, 0005 engines are living contracts)
 docs/plans/          # planet-earth-system.md — the full build plan
 docs/figures/        # banked figures (planet-*.png) + two interactive globes
                      #   (planet-map.html, planet-coupler-map.html)
@@ -55,7 +56,7 @@ checkout skips rather than errors.
 
 planet-sim was developed inside the **BigSim** monorepo — an educational program of three
 simulators (steel, microchip, planet) sharing two separately-validated solver engines — then
-extracted into a standalone repo with its history. The diffusion/heat engine was first frozen by
-the steel simulator; planet added the shallow-water engine and is the capstone that couples the
-two. The sibling simulators live in their own repos. The archive:
+extracted into a standalone repo with its history. The diffusion/heat engine was first built &
+validated by the steel simulator; planet added the shallow-water engine and is the capstone that
+couples the two. The sibling simulators live in their own repos. The archive:
 [github.com/BoykoNeov/BigSim](https://github.com/BoykoNeov/BigSim).

@@ -133,8 +133,9 @@ not change the per-step array boundary (ADR 0005 — engines are living contract
    Flux-form advection telescopes like mass (the clean anchor); the tracer is strictly passive,
    so the dry `(h, u, v)` trajectory is **byte-identical** to a `tracer=None` run (the re-seal),
    and a uniform tracer stays uniform (consistency — no spurious source). Tracer **variance** is
-   a near-invariant held to a small, *spatially*-limited drift (enstrophy-class) — **not**
-   monotone (no flux limiter → over/undershoot on sharp gradients).
+   a near-invariant held to a small, **bounded** drift (the enstrophy honesty class — round-off for
+   smooth fields, cascading toward the grid only under strong filamentation) — **not** monotone
+   (no flux limiter → over/undershoot on sharp gradients).
 
 ## Validation boundary (what Phase 3 does *not* claim)
 

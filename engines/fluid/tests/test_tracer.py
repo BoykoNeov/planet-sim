@@ -19,7 +19,7 @@ suite guarantees (the honesty class mirrors the engine's mass / energy / enstrop
   (the centered scheme's dispersive phase error — loose, named).
 * **Tracer variance ``∫½hθ²`` — bounded** (NOT machine-exact like mass, NOT dt-convergent
   like energy): like potential enstrophy it is a near-invariant the centered scheme holds to a
-  small, *spatially*-limited drift. **NOT monotone** — there is no flux limiter, so the scheme
+  small, **bounded** drift. **NOT monotone** — there is no flux limiter, so the scheme
   **over/undershoots** on sharp tracer gradients (Gibbs ripples). That is the named scope edge
   (a TVD/WENO limiter or hyperdiffusion is the unbuilt upgrade); we *assert the overshoot
   exists* rather than claim boundedness of ``θ``.
@@ -158,19 +158,21 @@ def test_uniform_flow_translates_a_smooth_blob():
 # Tracer variance — bounded; and the named not-monotone scope edge
 # --------------------------------------------------------------------------- #
 def test_tracer_variance_bounded():
-    """∫½hθ² is a near-invariant the centered scheme holds to a small, spatially-limited drift —
-    bounded (NOT machine-exact like mass, NOT dt-convergent like energy). Asserted loose."""
+    """∫½hθ² is a near-invariant the centered scheme holds to a small, bounded drift —
+    bounded (NOT machine-exact like mass, NOT dt-convergent like energy). The tracer is
+    *zero-mean* here so the variance is dominated by the varying component the bound is about
+    (not a large constant offset), and the front filaments in the vortex. Asserted loose."""
     g = uniform_grid(4e6, 4e6, 48, 48)
     sw = ShallowWater(g, 9.81, 1000.0, f0=1e-4, beta=1.6e-11)
     X, Y = g.center_mesh()
     cx = g.Lx / 2
-    theta = 3.0 + np.tanh((X - cx) / 3e5)            # a front the vortex filaments
+    theta = np.tanh((X - cx) / 3e5)                  # zero-mean front (±1) the vortex filaments
     s = balanced_vortex(g, sw, amp_eta=40.0, sigma=4e5, tracer=theta)
     V0 = sw.tracer_variance(s)
     dt = sw.max_dt(s)
     for _ in range(int(3 * 2 * np.pi / sw.f0 / dt)):
         s = sw.step(s, dt)
-    assert abs(sw.tracer_variance(s) - V0) / V0 < 1e-3
+    assert abs(sw.tracer_variance(s) - V0) / V0 < 1e-2
 
 
 def test_sharp_gradient_overshoots_not_monotone():

@@ -1,14 +1,14 @@
 # `engines/diffusion` — the diffusion/heat spine
 
 The first and most-reused engine in the program (ARCHITECTURE.md §5): a
-conservative 1-D parabolic (diffusion / heat) solver. **Frozen** at Steel
-Phase 1a behind its validation suite, then inherited unchanged by Microchip
-(dopant profiles) and Planet (EBM heat transport).
+conservative 1-D parabolic (diffusion / heat) solver. **Built & validated** at Steel
+Phase 1a behind its suite — a *living, versioned* contract (ADR 0005), extended directly
+as needs grow — then reused by Microchip (dopant profiles) and Planet (EBM heat transport).
 
 ## Load pointer (per-session working set, §11)
 
 - **To *use* this engine** (from Steel/Chip/Planet): load **`CONTRACT.md`** only
-  — the frozen one-page API. You do not need this folder's internals.
+  — the one-page API contract. You do not need this folder's internals.
 - **To *modify* this engine:** `CONTRACT.md` + `diffusion1d.py` + `tests/`. The
   tests are the seal — they must stay green, and they *are* the externalized
   memory of every contract downstream relies on (§6).
@@ -17,7 +17,7 @@ Phase 1a behind its validation suite, then inherited unchanged by Microchip
 
 | File | What |
 |---|---|
-| `CONTRACT.md` | **The frozen API.** Start here. PDE, modes, API, sign conventions, the frozen invariants, the validation boundary. |
+| `CONTRACT.md` | **The API contract.** Start here. PDE, modes, API, sign conventions, the guaranteed invariants, the validation boundary. |
 | `diffusion1d.py` | The solver: `Diffusion1D`, `Grid`/`uniform_grid`/`grid_from_edges`, `Dirichlet`/`Neumann`/`Robin`. Cell-centered finite volume + θ-method implicit stepping. |
 | `tests/` | The seal (18 tests): `test_erfc` (analytical limit + 2nd-order spatial convergence), `test_conservation` (exact no-flux mass balance), `test_stability` (unconditional stability, per method), `test_source` (source-augmented conservation), `test_variable_d` (callable `D(t)` + array `D(x)`/harmonic mean), `test_time_order` (BE 1st- / CN 2nd-order in time), `test_robin_heat` (heat-mode Robin + flux bookkeeping). |
 
@@ -39,7 +39,7 @@ Phase 1a behind its validation suite, then inherited unchanged by Microchip
   accuracy but can oscillate at large dt — see `CONTRACT.md`.
 - **The engine carries no material constants.** Arrhenius `D₀,Q`, `α`, `h` are
   the consumer's; the engine consumes a generic `D` and BCs. This keeps the
-  frozen surface minimal and the validation boundary honest.
+  public surface minimal and the validation boundary honest.
 - **The `state` array is the whole data contract** (ADR 0001): the seam for a
   future compiled core or a deferred heavy regime, and what the viz layer
   (ADR 0002) consumes.
