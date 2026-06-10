@@ -348,8 +348,8 @@ def delta_view(spec_a: PlanetSpec, spec_b: PlanetSpec, active: str = "biome") ->
                 else np.zeros_like(np.asarray(a_layer.data), dtype=bool)).astype(int)
         layer = Layer(f"{active} changed", LayerKind.SCALAR_FIELD, mask, "changed",
                       style={"categorical": True, "colorbar_title": "biome Δ",
-                             "colors": {"0": "#d9d9d9", "1": "#d62728"},
-                             "names": {"0": "unchanged", "1": "changed"}}, z_order=0)
+                             "colors": {"0": "#e8e8e8", "1": "#6a3d9a"},     # purple ≠ the red ice line
+                             "names": {"0": "same biome", "1": "biome changed"}}, z_order=0)
     else:
         delta = (np.asarray(fd.delta, dtype=float) if fd is not None
                  else np.zeros(np.asarray(a_layer.data).shape, dtype=float))

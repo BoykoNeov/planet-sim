@@ -264,9 +264,11 @@ def test_render_builds_the_biome_globe():
     # without error, so assert it explicitly). z = sin(lat): the first column tracks the grid latitudes.
     surface = next(t for t in fig.data if type(t).__name__ == "Surface")
     z = np.asarray(surface.z)
-    assert z.shape == view.layer("biome").data.shape
-    assert np.allclose(z[:, 0], np.sin(np.radians(view.grid.lat)))
-    assert z[-1, 0] > 0.9 and z[0, 0] < -0.9         # north pole up, south pole down
+    # the sphere is closed at the poles: the cell-centred grid is padded out to ±90° (so no polar hole),
+    # giving two extra rows that reach the poles exactly.
+    assert z.shape == (view.grid.lat.size + 2, view.grid.lon.size)
+    assert np.isclose(z[0, 0], -1.0) and np.isclose(z[-1, 0], 1.0)        # south pole down, north pole up — closed
+    assert np.allclose(z[1:-1, 0], np.sin(np.radians(view.grid.lat)))     # the interior rows are the grid latitudes
 
 
 @pytest.mark.parametrize("active", ["temperature", "precipitation", "biome", "elevation"])
@@ -340,9 +342,11 @@ def test_render_comparison_builds_three_globes(active):
     fig = pm.render_comparison(a.view(), b.view(), dv, active=active, labels=("Earth", "exo"))
     surfaces = [t for t in fig.data if type(t).__name__ == "Surface"]
     assert len(surfaces) == 3                                  # world A · world B · the Δ globe
-    assert fig.layout.scene is not None and fig.layout.scene3 is not None   # a 1×3 scene subplot
-    # the three colorbars must not all stack on top of each other (advisor #1: A shares B's scale)
+    assert fig.layout.scene is not None and fig.layout.scene3 is not None   # three 3-D scenes
+    # the three colorbars must not all stack on top of each other (A shares B's scale)
     assert sum(1 for s in surfaces if s.showscale) <= 2
+    # the Δ globe sits BELOW A and B (the 2-row layout that keeps the colorbars off it)
+    assert fig.layout.scene3.domain.y[1] <= fig.layout.scene.domain.y[0] + 1e-6
 
 
 def test_save_comparison_html_writes_a_standalone_triptych(tmp_path):

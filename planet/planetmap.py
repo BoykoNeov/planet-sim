@@ -461,18 +461,37 @@ def _vector_overlay_trace(go, grid: Grid, layer: Layer):
     )
 
 
-def _scalar_surface(go, grid: Grid, layer: Layer, *, showscale: bool = True, colorbar_x=None):
+def _polecapped(lat_deg: np.ndarray, *fields: np.ndarray):
+    """Extend a cell-centred lat grid (and its per-cell fields) out to the ±90° poles.
+
+    The EBM grid is **cell-centred** — its polar-most row sits short of ±90° — so a bare ``go.Surface``
+    over it leaves a **hole at each pole**. Padding the latitude axis with ±90° and repeating the
+    polar-most band's values there closes the sphere (the pole cap takes the colour of the nearest band).
+    Returns the padded ``(lat, *fields)``; a no-op if the grid already spans the poles.
+    """
+    lat = np.asarray(lat_deg, dtype=float)
+    if lat[0] <= -90.0 + 1e-6 and lat[-1] >= 90.0 - 1e-6:
+        return (lat, *fields)
+    lat_ext = np.concatenate([[-90.0], lat, [90.0]])
+    capped = tuple(np.vstack([np.asarray(f)[:1], np.asarray(f), np.asarray(f)[-1:]]) for f in fields)
+    return (lat_ext, *capped)
+
+
+def _scalar_surface(go, grid: Grid, layer: Layer, *, showscale: bool = True,
+                    colorbar_x=None, colorbar_y=None, colorbar_len=None):
     """A ``go.Surface`` painting one ``SCALAR_FIELD`` layer on the unit sphere (the surface-building core).
 
     Shared by :func:`render` (one globe) and :func:`render_comparison` (three): a discrete colorscale for a
     categorical layer (the biome codes), else a continuous one — honoring an optional ``cmid`` **style
-    hint** so a diverging Δ field can be centred at zero (the two-world Δ globe). ``showscale`` /
-    ``colorbar_x`` let a caller place or hide the colorbar (three side-by-side globes would otherwise stack
-    three bars over each other); ``render`` leaves them at the single-globe defaults.
+    hint** so a diverging Δ field can be centred at zero (the two-world Δ globe). The sphere is **closed at
+    the poles** (:func:`_polecapped`) so the cell-centred grid does not leave a polar hole.
+    ``showscale`` / ``colorbar_x`` / ``colorbar_y`` / ``colorbar_len`` let a caller place or hide the
+    colorbar (side-by-side globes would otherwise stack their bars over each other); :func:`render` leaves
+    them at the single-globe defaults.
     """
-    LON, LAT = np.meshgrid(grid.lon, grid.lat)       # both (n_lat, n_lon); rows = lat, cols = lon
+    lat, surfacecolor, hover = _polecapped(grid.lat, layer.data, _hovertext(grid, layer))
+    LON, LAT = np.meshgrid(grid.lon, lat)            # both (n_lat, n_lon); rows = lat, cols = lon
     X, Y, Z = _sphere_xyz(LAT, LON)
-    hover = _hovertext(grid, layer)
     if layer.style.get("categorical"):
         scale, cmin, cmax, ticks = _discrete_colorscale(layer)
         colorbar = dict(tickvals=[t[0] for t in ticks], ticktext=[t[1] for t in ticks],
@@ -483,9 +502,13 @@ def _scalar_surface(go, grid: Grid, layer: Layer, *, showscale: bool = True, col
         surf_kw = dict(colorscale=layer.style.get("colorscale", "Viridis"), colorbar=colorbar)
         if "cmid" in layer.style:
             surf_kw["cmid"] = layer.style["cmid"]                 # centre a diverging Δ scale at 0
-    if colorbar_x is not None:
-        surf_kw["colorbar"] = {**surf_kw["colorbar"], "x": colorbar_x, "len": 0.5}
-    return go.Surface(x=X, y=Y, z=Z, surfacecolor=layer.data,
+    cb_over = {}
+    if colorbar_x is not None: cb_over["x"] = colorbar_x
+    if colorbar_y is not None: cb_over["y"] = colorbar_y
+    if cb_over or colorbar_len is not None:
+        cb_over["len"] = colorbar_len if colorbar_len is not None else 0.45
+        surf_kw["colorbar"] = {**surf_kw["colorbar"], **cb_over}
+    return go.Surface(x=X, y=Y, z=Z, surfacecolor=surfacecolor,
                       text=hover, hoverinfo="text", showscale=showscale, **surf_kw)
 
 
@@ -574,25 +597,34 @@ def render_comparison(view_a: PlanetView, view_b: PlanetView, view_delta: Planet
     from plotly.subplots import make_subplots
 
     delta_layer = view_delta.scalar_fields(include_inert=True)[0]      # the single Δ layer delta_view built
-    titles = (f"{labels[0]} — {active}", f"{labels[1]} — {active}", delta_layer.name)
-    fig = make_subplots(rows=1, cols=3, specs=[[{"type": "scene"}] * 3],
-                        subplot_titles=titles, horizontal_spacing=0.02)
+    # A and B share the top row; the **Δ globe sits centred below them** (a ``colspan`` cell) so neither
+    # the shared field colorbar (top-right) nor the Δ's own (bottom-right) crowds it — the side-by-side
+    # 1×3 form pinned a colorbar over the Δ panel.
+    fig = make_subplots(rows=2, cols=2,
+                        specs=[[{"type": "scene"}, {"type": "scene"}],
+                               [{"type": "scene", "colspan": 2}, None]],
+                        subplot_titles=(f"{labels[0]} — {active}", f"{labels[1]} — {active}", delta_layer.name),
+                        vertical_spacing=0.06)
 
-    # A shares B's scale (hide A's bar); B carries the field colorbar; Δ carries its own — positioned so the
-    # three bars do not stack over each other (the 1×3 footgun a build-only smoke test cannot catch).
-    panels = [(view_a, view_a.layer(active), False, None),
-              (view_b, view_b.layer(active), True, 0.62),
-              (view_delta, delta_layer, True, 1.0)]
-    for col, (view, layer, showscale, cbx) in enumerate(panels, start=1):
-        fig.add_trace(_scalar_surface(go, view.grid, layer, showscale=showscale, colorbar_x=cbx), row=1, col=col)
+    # A hides its bar (shares B's scale); B's field colorbar sits top-right, the Δ's own bottom-right — a
+    # different row each, so they never stack. Each world's ice line is relabelled by world (the bare
+    # "ice line" legend, doubled and red like the Δ "changed" swatch, read as ambiguous).
+    panels = [(1, 1, view_a, view_a.layer(active), labels[0], False, None, None),
+              (1, 2, view_b, view_b.layer(active), labels[1], True, 1.0, 0.79),
+              (2, 1, view_delta, delta_layer, None, True, 1.0, 0.21)]
+    for row, col, view, layer, world, showscale, cbx, cby in panels:
+        fig.add_trace(_scalar_surface(go, view.grid, layer, showscale=showscale, colorbar_x=cbx, colorbar_y=cby),
+                      row=row, col=col)
         for tr in _overlay_traces(go, view.grid, view):
-            fig.add_trace(tr, row=1, col=col)
+            if world and getattr(tr, "name", None):
+                tr.name = f"{world}: {tr.name}"               # "Earth: ice line (T = T_freeze)" — which globe
+            fig.add_trace(tr, row=row, col=col)
 
     no_axis = dict(showbackground=False, showticklabels=False, showgrid=False, zeroline=False, visible=False)
     scene = dict(xaxis=no_axis, yaxis=no_axis, zaxis=no_axis, aspectmode="data",
                  camera=dict(eye=dict(x=1.5, y=1.5, z=0.9)))
     fig.update_layout(title=f"Two worlds compared — {labels[0]} · {labels[1]} · Δ",
-                      width=1320, height=560, margin=dict(l=0, r=0, t=60, b=0),
+                      width=1000, height=900, margin=dict(l=0, r=0, t=60, b=0),
                       scene=scene, scene2=scene, scene3=scene)
     return fig
 
