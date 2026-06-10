@@ -347,6 +347,13 @@ def test_render_comparison_builds_three_globes(active):
     assert sum(1 for s in surfaces if s.showscale) <= 2
     # the Δ globe sits BELOW A and B (the 2-row layout that keeps the colorbars off it)
     assert fig.layout.scene3.domain.y[1] <= fig.layout.scene.domain.y[0] + 1e-6
+    # no hover-highlight contour circles drawn on the globe surface under the cursor
+    assert all(s.contours.x.highlight is False and s.contours.z.highlight is False for s in surfaces)
+    # the ice line is KEPT (it marks where each world freezes), relabelled per world, and its legend is
+    # moved to the left — off the right-side colorbars it used to clash with.
+    ice = [t for t in fig.data if type(t).__name__ == "Scatter3d"]
+    assert len(ice) == 2 and {t.name for t in ice} == {"Earth ice line", "exo ice line"}
+    assert fig.layout.legend.x == 0.0 and fig.layout.legend.xanchor == "left"
 
 
 def test_save_comparison_html_writes_a_standalone_triptych(tmp_path):
@@ -356,3 +363,7 @@ def test_save_comparison_html_writes_a_standalone_triptych(tmp_path):
     out = pm.save_comparison_html(a.view(), b.view(), dv, tmp_path / "cmp.html",
                                   active="temperature", labels=("Earth", "exo"))
     assert out.exists() and out.stat().st_size > 1000
+    # the corner hover-readout wiring is injected (the runtime behaviour can't be unit-tested, but the
+    # script + its hover/unhover handlers must be present in the artifact)
+    html = out.read_text(encoding="utf-8")
+    assert "plotly_hover" in html and "plotly_unhover" in html

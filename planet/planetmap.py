@@ -509,7 +509,12 @@ def _scalar_surface(go, grid: Grid, layer: Layer, *, showscale: bool = True,
         cb_over["len"] = colorbar_len if colorbar_len is not None else 0.45
         surf_kw["colorbar"] = {**surf_kw["colorbar"], **cb_over}
     return go.Surface(x=X, y=Y, z=Z, surfacecolor=surfacecolor,
-                      text=hover, hoverinfo="text", showscale=showscale, **surf_kw)
+                      text=hover, hoverinfo="text", showscale=showscale,
+                      # no hover-highlight contour lines — they draw "interlocking circles" on the globe
+                      # under the cursor (the axes are already hidden, so nothing else needs them)
+                      contours=dict(x=dict(highlight=False), y=dict(highlight=False),
+                                    z=dict(highlight=False)),
+                      **surf_kw)
 
 
 def _overlay_traces(go, grid: Grid, view: PlanetView) -> list:
@@ -608,7 +613,7 @@ def render_comparison(view_a: PlanetView, view_b: PlanetView, view_delta: Planet
 
     # A hides its bar (shares B's scale); B's field colorbar sits top-right, the Δ's own bottom-right — a
     # different row each, so they never stack. Each world's ice line is relabelled by world (the bare
-    # "ice line" legend, doubled and red like the Δ "changed" swatch, read as ambiguous).
+    # "ice line" legend, doubled, read as ambiguous).
     panels = [(1, 1, view_a, view_a.layer(active), labels[0], False, None, None),
               (1, 2, view_b, view_b.layer(active), labels[1], True, 1.0, 0.79),
               (2, 1, view_delta, delta_layer, None, True, 1.0, 0.21)]
@@ -616,8 +621,8 @@ def render_comparison(view_a: PlanetView, view_b: PlanetView, view_delta: Planet
         fig.add_trace(_scalar_surface(go, view.grid, layer, showscale=showscale, colorbar_x=cbx, colorbar_y=cby),
                       row=row, col=col)
         for tr in _overlay_traces(go, view.grid, view):
-            if world and getattr(tr, "name", None):
-                tr.name = f"{world}: {tr.name}"               # "Earth: ice line (T = T_freeze)" — which globe
+            if world and type(tr).__name__ == "Scatter3d":
+                tr.name = f"{world} ice line"                 # which globe the line marks
             fig.add_trace(tr, row=row, col=col)
 
     no_axis = dict(showbackground=False, showticklabels=False, showgrid=False, zeroline=False, visible=False)
@@ -625,18 +630,50 @@ def render_comparison(view_a: PlanetView, view_b: PlanetView, view_delta: Planet
                  camera=dict(eye=dict(x=1.5, y=1.5, z=0.9)))
     fig.update_layout(title=f"Two worlds compared — {labels[0]} · {labels[1]} · Δ",
                       width=1000, height=900, margin=dict(l=0, r=0, t=60, b=0),
+                      # the ice-line legend in the empty bottom-left corner — off the right-side colorbars
+                      # it used to overlap (the Δ globe is centred, so the corner is free).
+                      legend=dict(x=0.0, y=0.46, xanchor="left", yanchor="top",
+                                  bgcolor="rgba(255,255,255,0.65)", font=dict(size=11)),
                       scene=scene, scene2=scene, scene3=scene)
     return fig
+
+
+# Injected into the comparison HTML only (a static artifact): mirror the hovered cell's text into a fixed
+# corner readout instead of a tooltip floating over the globe. `plotly_hover` still fires under
+# `hoverinfo="none"` (only `"skip"` suppresses the event); the cell text rides in both `text` and
+# `customdata` so the readout works whichever the event carries. Confined here, NOT in render_comparison —
+# the figure-builder stays a clean, tested array→figure function (the renderer is reach).
+_HOVER_READOUT_JS = (
+    "var gd = document.getElementById('{plot_id}');"
+    "var rd = document.createElement('div');"
+    "rd.style.cssText = 'position:fixed;left:14px;bottom:14px;max-width:340px;padding:7px 11px;"
+    "background:rgba(35,35,35,0.9);color:#fff;font:13px/1.4 sans-serif;border-radius:5px;"
+    "z-index:1000;display:none;pointer-events:none;';"
+    "document.body.appendChild(rd);"
+    "gd.on('plotly_hover', function(d){ var p=d.points[0]; var t=(p.customdata!=null)?p.customdata:p.text;"
+    " if(t!=null){ rd.innerHTML=t; rd.style.display='block'; } });"
+    "gd.on('plotly_unhover', function(){ rd.style.display='none'; });"
+)
 
 
 def save_comparison_html(view_a: PlanetView, view_b: PlanetView, view_delta: PlanetView, path,
                          active: str = "biome", labels=("world A", "world B")) -> Path:
     """Render the A · B · Δ comparison and write it as a standalone HTML triptych (the :func:`save_html`
-    analogue for :func:`render_comparison`). Returns the written path (Plotly only)."""
+    analogue for :func:`render_comparison`). Returns the written path (Plotly only).
+
+    The hovered cell's lat/lon/value is shown in a **fixed corner readout** rather than a tooltip floating
+    over the globe: the surface tooltips are suppressed (``hoverinfo="none"``) and a small script
+    (:data:`_HOVER_READOUT_JS`) mirrors the cell text into a corner ``div`` (the text is mirrored into
+    ``customdata`` so the script reads it whichever channel the event carries). This lives in the HTML
+    artifact only — :func:`render_comparison`'s figure keeps Plotly's normal tooltip.
+    """
     fig = render_comparison(view_a, view_b, view_delta, active=active, labels=labels)
+    for tr in fig.data:
+        if tr.type == "surface":
+            tr.update(hoverinfo="none", customdata=tr.text)    # tooltip off → the corner readout instead
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.write_html(str(path), include_plotlyjs="cdn")
+    fig.write_html(str(path), include_plotlyjs="cdn", post_script=_HOVER_READOUT_JS)
     return path
 
 
