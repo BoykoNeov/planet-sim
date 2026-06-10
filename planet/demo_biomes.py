@@ -33,7 +33,7 @@ CO2_WARMING_DELTA_A = 8.0      # W m⁻² — drop in the OLR offset A standing 
                                #   doubling is ~4 W m⁻² of forcing, so ~8 ≈ a strong (multi-doubling /
                                #   high-emissions) scenario → a visible-but-credible ~+4–5 °C warming.
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "planet-biomes.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "planet-biomes.png"
 

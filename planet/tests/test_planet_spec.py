@@ -23,7 +23,7 @@ from planet import planet_spec as ps
 from planet import planetmap as pm
 from planet.albedo import EBMParams
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 COARSE = dict(n_cells=40, n_tau=0.25)
 

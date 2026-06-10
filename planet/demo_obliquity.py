@@ -34,7 +34,7 @@ CLIMATE_TILTS = (0.0, 10.0, ob.OBLIQUITY_EARTH, 40.0)   # ° — the relaxed-cli
 CLIMATE_N_TAU = 0.02           # relaxation step for the T(φ) profiles (fine enough for a steady climate)
 CURVE_N = 46                   # samples of the s₂(ε) curve over 0–90° (every 2°)
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "planet-obliquity.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "planet-obliquity.png"
 

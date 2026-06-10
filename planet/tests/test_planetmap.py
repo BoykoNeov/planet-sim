@@ -30,7 +30,7 @@ from planet import demo_biomes
 from planet.albedo import EBMParams
 from planet.biomes import Biome, biome_area_fractions
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Coarse settings keep the always-green recompute tests fast; the equilibrium's structure (band
 # ordering, hemispheric symmetry) is resolution-robust. The present-day benchmark uses the default.

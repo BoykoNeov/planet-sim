@@ -35,7 +35,7 @@ from .albedo import present_day_climate
 from .coupler import CoupledJet, couple_jet
 from .ebm import ClimateState
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "planet-coupler.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "planet-coupler.png"
 DOCS_GLOBE = _REPO_ROOT / "docs" / "figures" / "planet-coupler-map.html"

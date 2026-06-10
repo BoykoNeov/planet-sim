@@ -39,7 +39,7 @@ SWEEP_STEPS = 60              # continuation points per branch
 SWEEP_N_TAU = 0.05           # relaxation step (× τ_rad) — gentle, tracks the ice line smoothly
 PRESENT_N_TAU = 0.01         # finer step for the headline present-day equilibrium
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "planet-snowball.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "planet-snowball.png"
 

@@ -28,7 +28,7 @@ import numpy as np
 
 from .circulation import AdjustmentRun, RossbyRun, geostrophic_adjustment, rossby_wave
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "planet-shallowwater.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "planet-shallowwater.png"
 

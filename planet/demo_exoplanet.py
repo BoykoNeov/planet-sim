@@ -32,7 +32,7 @@ MDWARF_TEFF = 3050.0           # K — a cool M-dwarf (≈ M5V; Pecaut & Mamajek
 SIZES = (0.5, 1.0, 2.0)        # Earth radii — a small world, Earth, a super-Earth (transport-only effect)
 SIZE_N_TAU = 0.02              # relaxation step for the size profiles (fine enough for a steady T(φ))
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_FIGURE = _REPO_ROOT / "docs" / "figures" / "planet-exoplanet.png"
 OUTPUT_FIGURE = _REPO_ROOT / "outputs" / "planet-exoplanet.png"
 

@@ -103,7 +103,7 @@ import numpy as np
 # --- run-as-script bootstrap: put the repo root on sys.path BEFORE the absolute imports below,
 #     so `python -m planet.planetmap` (the HTML-artifact demo) and a notebook `%run`
 #     both resolve `planet.*`. A no-op under pytest / `python -m`, where it is already there.
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
