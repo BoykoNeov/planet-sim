@@ -95,6 +95,18 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   (`slow`) and `plots.exoplanet_figure` (`[viz]`). The demo traces a Sun-vs-M-dwarf Snowball loop pair
   + size-scaled `T(φ)` profiles → `docs/figures/planet-exoplanet.png` (a redder star → a narrower loop;
   a bigger planet → a steeper gradient).
+- **To work on the obliquity knob (§9.1 — axial tilt → the insolation gradient):** `obliquity.py` +
+  `tests/test_obliquity.py`. A third **parameter-deriving** knob (no engine, no new EBM physics): the
+  axial tilt `ε` sets the insolation P₂ coefficient `s₂` the EBM already accepts. `s₂(ε)` is **computed**
+  by integrating the pinned daily-mean-insolation formula over a circular-orbit year and projecting onto
+  P₂ (`insolation_p2_coefficient` — *not* a memorized coefficient), then applied as the *ratio* to the
+  Earth value (`insolation_s2`) so Earth's tilt recovers the climlab `s₂ = −0.48` exactly. Validated by
+  the **exact `s₂(0) = −5/8`** analytic limit + the independent `≈−0.48`-at-23.44° climlab cross-check
+  ([[obliquity-insolation-source]]); scope edge = the single-P₂-mode truncation degrades at high tilt
+  (the ≈55° sign reversal is real but surfaced as a loose bracket). `obliquity_params(ε, base)` composes
+  it onto an `EBMParams`. Banked: `demo_obliquity.py` + `tests/test_demo_obliquity.py` (`slow`) +
+  `plots.obliquity_figure` (`[viz]`) → `docs/figures/planet-obliquity.png` (the `s₂(ε)` curve + the
+  relaxed `T(φ)` flattening with tilt). The module docstring is its contract.
 - **To work on the circulation / shallow-water engine (Phase 3):** `circulation.py` +
   `tests/test_circulation.py`. It loads the newly-frozen `engines/fluid/CONTRACT.md` (the program's
   **second shared engine** — a rotating shallow-water solver, hyperbolic/explicit, sharing no
@@ -163,9 +175,9 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   ADR 0004). The interactive map's **first version is the biome map**: a Plotly 3-D globe painted from a
   **layer registry** (temperature / precipitation / biome scalar fields + the ice-line annotation +
   an inert elevation seam), with **S₀ / CO₂→A / D** knob-sliders driving an instant recompute-and-remap
-  (the rung-0 live loop; **obliquity** is a *named, deferred* slider awaiting its pinned `s₂(obliquity)`
-  source). Pure consumer of `demo_biomes.compute` — no new physics. *(The two §9.1 exoplanet knobs —
-  star `T_star` / planet `size` — were since wired in; see the §9.1 status entry below.)* The **planet-spec** schema
+  (the rung-0 live loop). Pure consumer of `demo_biomes.compute` — no new physics. *(The §9.1 exoplanet
+  knobs — star `T_star` / planet `size` — and the **obliquity** knob were since wired in; see the §9.1
+  status entries below.)* The **planet-spec** schema
   exports/imports the registry (JSON + `.npz`) with a **real round-trip-identity test** (the deep end's
   one genuine correctness property, vs the render's smoke-tests). Banked globe:
   `docs/figures/planet-map.html`. 31-test pair added (the Plotly render smoke-tests `importorskip` on
@@ -207,10 +219,24 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   0.5→1→2 R⊕), the 0-D mean size-invariant (the relaxed mean drifts only via the ice feedback — named).
   Both wired into the interactive map (`climate_view` / `interactive_map` sliders) — defaults (Sun,
   Earth-size) recover the present-day map **bit-for-bit**. Banked `docs/figures/planet-exoplanet.png`;
-  **no new engine, no gate-manifest change** (numpy-only, planet-local). **Obliquity** remains the lone
-  deferred knob (its `s₂(obliquity)` source still unpinned). Scope edge: only the bright-ice albedo
-  responds to the star (ocean/land left unchanged); size is transport-only (rotation effects route
+  **no new engine, no gate-manifest change** (numpy-only, planet-local). Scope edge: only the bright-ice
+  albedo responds to the star (ocean/land left unchanged); size is transport-only (rotation effects route
   through the fluid engine — a different rung).
+- **§9.1 — the obliquity knob (axial tilt → the insolation gradient): BUILT** (2026-06-10, the
+  growth-axis batch's final knob — *obliquity was the lone deferred slider, now wired*). `obliquity.py`
+  adds a third **parameter-deriving** knob (no engine, no new EBM physics): the axial tilt `ε` sets the
+  insolation P₂ coefficient `s₂`. `s₂(ε)` is **computed** by integrating the pinned daily-mean-insolation
+  formula over a circular-orbit year and projecting onto P₂ ([[obliquity-insolation-source]] — *not* a
+  memorized coefficient), then applied as the *ratio* to the Earth value so Earth's tilt recovers the
+  climlab `s₂ = −0.48` **bit-for-bit**. Validated by the **exact `s₂(0) = −5/8`** analytic limit + the
+  independent `≈−0.48`-at-23.44° climlab cross-check (the numerical projection also reproduces the known
+  closed form `−(5/8)(1−1.5·sin²ε)` across the range). More tilt spreads sunlight poleward → a flatter
+  planet, the ice cap retreats (ice line 60°→71°→ice-free over 0°→23.44°→40°); past ≈55° the gradient
+  reverses (poles warmer — surfaced as a loose bracket). Wired into the interactive map (the obliquity
+  slider, formerly disabled, is now live). Banked `docs/figures/planet-obliquity.png`; **no new engine,
+  no gate-manifest change**. Scope edge: the single-P₂-mode insolation truncates at high tilt (the real
+  annual-mean grows `s₄`), and the model is annual-mean (no seasonal extremes); eccentricity/precession
+  are a separate deferred Milankovitch axis.
 
 ## Test runner (tiered gate, ADR 0003 — the per-project successor)
 

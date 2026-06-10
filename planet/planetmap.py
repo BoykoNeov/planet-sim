@@ -72,10 +72,10 @@ the OLR offset ``A`` — :mod:`projects.planet.demo_biomes`'s warming knob), and
 ``D``** — plus the two **exoplanet** knobs (:mod:`projects.planet.exoplanet`, now that each one's
 source is pinned): the host **star's effective temperature ``T_star``** (a redder star lowers the ice
 albedo → harder to snowball) and the **planet ``size``** in Earth radii (bigger → weaker transport → a
-sharper gradient). All are already-validated parameter knobs, so the default (Sun, Earth-size) recovers
-the present-day map exactly. **Obliquity** remains a *named, deferred* slider — a *separate* growth-axis
-knob still awaiting its annual-mean-insolation-vs-obliquity relation (``s₂(obliquity)``) pinned to a
-source (the same ``[[…-source]]`` discipline) — surfaced disabled so the growth axis is visible, not faked.
+sharper gradient); and the **obliquity** (axial tilt → the insolation P₂ coefficient ``s₂`` —
+:mod:`projects.planet.obliquity`, now that its ``s₂(obliquity)`` relation is pinned and wired). All are
+already-validated parameter knobs, so the default (Sun, Earth-size, Earth-tilt) recovers the present-day
+map exactly.
 
 The geography seam — preplanned, carried inert (ADR 0004 #4 / plan §9.3)
 -----------------------------------------------------------------------
@@ -107,11 +107,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from projects.planet import demo_biomes, exoplanet
+from projects.planet import demo_biomes, exoplanet, obliquity
 from projects.planet.albedo import EBMParams
 from projects.planet.biomes import Biome, BIOME_COLORS, BIOME_NAMES
 from projects.planet.ebm import A_OLR, D_TRANSPORT, S0_EARTH
 from projects.planet.exoplanet import T_SUN, exoplanet_params
+from projects.planet.obliquity import OBLIQUITY_EARTH, insolation_s2
 
 N_LON = 73                     # default longitude samples (−180…180 inclusive) — bands, so coarse is fine
 LIVE_N_TAU = 0.01              # relaxation step for a live recompute; matches demo_biomes' fine present-day
@@ -336,7 +337,7 @@ def build_view(result, n_lon: int = N_LON, elevation: np.ndarray | None = None, 
 
 
 def climate_view(S0: float = S0_EARTH, A: float = A_OLR, D: float = D_TRANSPORT, *,
-                 T_star: float = T_SUN, size: float = 1.0,
+                 T_star: float = T_SUN, size: float = 1.0, obliquity_deg: float = OBLIQUITY_EARTH,
                  n_cells: int = 180, n_tau: float = LIVE_N_TAU, n_lon: int = N_LON,
                  elevation: np.ndarray | None = None) -> PlanetView:
     """The live recompute: knob values → a fresh equilibrium climate → the biome-map :class:`PlanetView`.
@@ -345,16 +346,19 @@ def climate_view(S0: float = S0_EARTH, A: float = A_OLR, D: float = D_TRANSPORT,
     setting — the rung-0 instant-remap trigger (ADR 0004 #2). The wired knobs are all **already
     validated**: the climate levers ``S₀`` (the Snowball lever), the OLR offset ``A`` (a drop ≈ a CO₂
     increase — :mod:`~projects.planet.demo_biomes`'s warming knob), and the meridional transport ``D``;
-    plus the two **exoplanet** knobs (:mod:`projects.planet.exoplanet`, §9.1) — the host **star's
-    effective temperature ``T_star``** (a redder star lowers the ice albedo → harder to snowball) and
-    the **planet ``size``** in Earth radii (bigger → weaker transport → a sharper gradient). Defaults
-    (``T_star=T_SUN``, ``size=1``) recover the Earth model exactly, so the present-day map is unchanged.
-    Each call relaxes to equilibrium from the Earth-like initial condition
+    the **obliquity** ``obliquity_deg`` (axial tilt → the insolation P₂ coefficient ``s₂`` —
+    :mod:`projects.planet.obliquity`, now that its source is pinned; more tilt spreads sunlight poleward
+    → a flatter planet, the ice cap retreats); plus the two **exoplanet** knobs
+    (:mod:`projects.planet.exoplanet`, §9.1) — the host **star's effective temperature ``T_star``** (a
+    redder star lowers the ice albedo → harder to snowball) and the **planet ``size``** in Earth radii
+    (bigger → weaker transport → a sharper gradient). Defaults (``T_star=T_SUN``, ``size=1``,
+    ``obliquity_deg=OBLIQUITY_EARTH``) recover the Earth model exactly, so the present-day map is
+    unchanged. Each call relaxes to equilibrium from the Earth-like initial condition
     (:func:`~projects.planet.albedo.present_day_climate`'s finite-cap start), so it shows the *climate
     at these knobs* — **not** the hysteresis branch-tracking, which is the Snowball demo's continuation
     sweep (a different, path-dependent question).
     """
-    base = EBMParams(S0=S0, A=A, D=D, n_cells=n_cells)
+    base = EBMParams(S0=S0, A=A, D=D, s2=insolation_s2(obliquity_deg), n_cells=n_cells)
     params = exoplanet_params(T_star=T_star, size=size, base=base)
     result = demo_biomes.compute(params, n_tau=n_tau)
     return build_view(result, n_lon=n_lon, elevation=elevation)
@@ -522,9 +526,9 @@ def interactive_map(n_tau: float = LIVE_N_TAU):
     kept paper-thin — every value comes from the tested :func:`climate_view` / :func:`render` above, so
     the only statements that can raise are widget/Plotly calls. Not unit-tested (the live UI is reach,
     ADR 0002). Sliders: the climate levers ``S₀`` / CO₂ (→ ``A``) / transport ``D``, the two **exoplanet**
-    knobs **star ``T_star``** & **planet ``size``** (§9.1 — now pinned and wired), and a layer selector;
-    **obliquity** is shown *disabled* — a *separate* named growth-axis knob still awaiting its pinned
-    ``s₂(obliquity)`` source (§9.1). Requires the ``[webviz]`` extra (Plotly + ipywidgets).
+    knobs **star ``T_star``** & **planet ``size``** (§9.1 — now pinned and wired), the **obliquity**
+    (axial tilt → ``s₂`` — :mod:`projects.planet.obliquity`, now pinned and wired too), and a layer
+    selector. Requires the ``[webviz]`` extra (Plotly + ipywidgets).
     """
     import ipywidgets as widgets
     import plotly.graph_objects as go
@@ -542,9 +546,9 @@ def interactive_map(n_tau: float = LIVE_N_TAU):
     size = widgets.FloatSlider(value=1.0, min=exoplanet.SIZE_MIN, max=2.0, step=0.05,
                                description="size (R⊕)", continuous_update=False, readout_format=".2f",
                                tooltip="planet size → transport only (bigger = sharper gradient; §9.1)")
-    obliquity = widgets.FloatSlider(value=23.45, min=0.0, max=45.0, step=0.5, disabled=True,
-                                    description="obliquity (°)",
-                                    tooltip="deferred — awaits a pinned s₂(obliquity) source (plan §9.1)")
+    obliquity = widgets.FloatSlider(value=OBLIQUITY_EARTH, min=0.0, max=45.0, step=0.5,
+                                    description="obliquity (°)", continuous_update=False, readout_format=".1f",
+                                    tooltip="axial tilt → insolation gradient (more tilt = flatter, ice retreats; §9.1)")
     layer = widgets.Dropdown(options=["biome", "temperature", "precipitation", "elevation"],
                              value="biome", description="layer")
 
@@ -552,14 +556,15 @@ def interactive_map(n_tau: float = LIVE_N_TAU):
 
     def update(_=None):
         new = render(climate_view(S0=s0.value, A=a.value, D=d.value, T_star=t_star.value,
-                                  size=size.value, n_tau=n_tau), active=layer.value)
+                                  size=size.value, obliquity_deg=obliquity.value, n_tau=n_tau),
+                     active=layer.value)
         with fig.batch_update():
             fig.data = ()                                     # drop the old traces
             for tr in new.data:
                 fig.add_trace(tr)
             fig.layout.title = new.layout.title
 
-    for w in (s0, a, d, t_star, size, layer):
+    for w in (s0, a, d, t_star, size, obliquity, layer):
         w.observe(update, names="value")
 
     controls = widgets.VBox([s0, a, d, t_star, size, obliquity, layer])

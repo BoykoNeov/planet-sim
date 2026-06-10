@@ -653,7 +653,11 @@ recompute-and-remap (rung-0 live loop, a pure consumer of `demo_biomes.compute` 
 seam is **written but inert** (the elevation layer is carried/round-tripped, not consumed) per §9.3.
 Two non-obvious calls, advisor-blessed: **obliquity is a named, deferred slider** (wiring it needs the
 `s₂(obliquity)` annual-mean-insolation relation pinned to a source — the same `[[…-source]]` discipline
-as the exoplanet knobs), and **`vector_overlay` is a declared-but-unpainted `LayerKind`** (the renderer
+as the exoplanet knobs) — **SINCE BUILT (2026-06-10): `obliquity.py` computes `s₂(ε)` from the pinned
+daily-mean-insolation geometry (projected onto P₂, ratio-anchored so Earth recovers `−0.48` exactly;
+validated by the exact `s₂(0)=−5/8` limit + the `≈−0.48` climlab cross-check, `[[obliquity-insolation-source]]`),
+the slider is now live, banked `docs/figures/planet-obliquity.png`; obliquity is no longer deferred** —
+and **`vector_overlay` is a declared-but-unpainted `LayerKind`** (the renderer
 raises `NotImplementedError` naming Phase 4 — build the seam, not the machinery; the extensibility proof
 is the inert elevation scalar the existing renderer paints for free). No new engine, **no gate-manifest
 change**; opt-in behind a new `[webviz]` extra (Plotly + ipywidgets). 31-test pair added (round-trip +
@@ -722,6 +726,8 @@ unchanged (`{diffusion, fluid}`); full planet gate **140 passed, 1 skipped**. Tw
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
 1969 / North 1975 / climlab defaults). Phase 2 pins **`[[whittaker-biome-source]]`** +
 **`[[precip-parameterization-source]]`**; Phase 3 pins **`[[shallow-water-source]]`**.
-The exoplanet knobs (§9.1) pin their own when built: a **stellar-spectrum/ice-albedo**
-source for the spectrum-as-albedo-modifier knob, and (rung 4) a radiative-transfer source
-if spectral radiation is ever computed rather than parameterized.
+The §9.1 knobs pin their own when built: a **`[[stellar-spectrum-ice-albedo-source]]`** for the
+spectrum-as-albedo-modifier knob, a **`[[obliquity-insolation-source]]`** for the obliquity knob (the
+daily-mean-insolation formula — Hartmann *GPC* §2.7 / Berger 1978 / Rose's climlab notes — and the
+mean-annual Legendre context, Nadeau & McGehee 2017 / North 1975), and (rung 4) a radiative-transfer
+source if spectral radiation is ever computed rather than parameterized.

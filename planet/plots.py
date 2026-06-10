@@ -539,3 +539,81 @@ def exoplanet_figure(sun_loop: HysteresisLoop, mdwarf_loop: HysteresisLoop, mdwa
     size_profiles_axes(axd["size"], size_states, sizes)
     fig.suptitle("Planet §9.1 — the exoplanet knobs: stellar spectrum & planet size", fontsize=13)
     return fig
+
+
+# --------------------------------------------------------------------------- #
+# §9.1 obliquity knob — axial tilt → the annual-mean-insolation P₂ coefficient s₂
+# --------------------------------------------------------------------------- #
+from .obliquity import OBLIQUITY_EARTH                         # noqa: E402 (grouped with its figure)
+
+S2_CURVE_COLOR = "#6a4c93"      # the geometric s₂(ε) curve
+ANCHOR_COLOR = "#c0392b"        # the exact analytic anchors (−5/8, Earth)
+
+
+def obliquity_s2_axes(ax, eps_grid, s2_grid, s2_earth) -> None:
+    """Plot the geometric s₂(ε) curve — how axial tilt grades the annual-mean insolation equator→pole.
+
+    ``s₂`` rises from **exactly −5/8** at zero tilt (sun pinned at the equator) toward zero and then
+    **positive** past the ≈55° critical obliquity, where the poles receive more annual sun than the
+    equator (shaded). Earth's tilt is marked at ``s₂ ≈ −0.48`` (the independent climlab cross-check), and
+    the 0–45° band the live slider drives is shaded — beyond it the EBM's single-P₂-mode insolation only
+    approximates the strongly-flattened profile (the named scope edge).
+    """
+    ax.axhline(0.0, color="#cccccc", lw=0.8, zorder=0)
+    ax.axvspan(0.0, 45.0, color="#f0ecf7", zorder=0, label="wired slider range (0–45°)")
+    cross = float(np.interp(0.0, s2_grid, eps_grid))          # where the gradient reverses (s₂ = 0)
+    ax.axvspan(cross, eps_grid[-1], color="#fdebd0", zorder=0, label="poles warmer than equator (s₂ > 0)")
+    ax.plot(eps_grid, s2_grid, "-", color=S2_CURVE_COLOR, lw=2.2, label="s₂(ε)  (annual-mean insolation)")
+    # the exact analytic anchor at ε = 0 (−5/8) and the Earth cross-check point
+    ax.plot(0.0, -0.625, "o", color=ANCHOR_COLOR, ms=7, zorder=5)
+    ax.annotate("−5/8 exactly\n(no tilt)", (0.0, -0.625), textcoords="offset points",
+                xytext=(10, 4), fontsize=8, color=ANCHOR_COLOR)
+    ax.plot(OBLIQUITY_EARTH, s2_earth, "s", color=ANCHOR_COLOR, ms=7, zorder=5)
+    ax.annotate(f"Earth {OBLIQUITY_EARTH:.2f}°\ns₂ ≈ {s2_earth:.2f}  (≈ climlab −0.48)",
+                (OBLIQUITY_EARTH, s2_earth), textcoords="offset points", xytext=(10, -28), fontsize=8,
+                color=ANCHOR_COLOR)
+    ax.annotate(f"gradient reverses ≈ {cross:.0f}°", (cross, 0.0), textcoords="offset points",
+                xytext=(-4, 10), fontsize=8, color="#a6611a", ha="right")
+    ax.set_xlabel("obliquity  ε  (°)")
+    ax.set_ylabel("insolation P₂ coefficient  s₂")
+    ax.set_xlim(0, 90)
+    ax.set_title("Axial tilt sets the insolation gradient\n(exact −5/8 at 0°; reverses past ≈55°)", fontsize=10)
+    ax.legend(fontsize=7, loc="lower right")
+
+
+def obliquity_climate_axes(ax, climate_states, tilts) -> None:
+    """Overlay the relaxed T(φ) for several obliquities — more tilt flattens the planet, the ice retreats.
+
+    Less tilt → a steeper gradient and a colder pole (a larger ice cap); more tilt spreads the sunlight
+    poleward, warming the pole until the cap is gone. Each label carries the tilt, the global mean T̄ and
+    the ice-line latitude (Earth's 23.44° at ~70°, the climlab benchmark).
+    """
+    colors = plt.cm.cividis(np.linspace(0.1, 0.85, len(tilts)))
+    for st, tilt, c in zip(climate_states, tilts, colors):
+        lat = st.latitude_deg()
+        label = f"ε {tilt:g}°  (T̄ {st.global_mean_T:.1f}°C, ice {st.ice_line_lat:.0f}°)"
+        ax.plot(lat, st.T, "-", color=c, lw=2.0, label=label)
+        if 0.0 < st.ice_line_lat < 90.0:
+            ax.axvline(st.ice_line_lat, ls=":", color=c, lw=1.0, alpha=0.7)
+    ax.axhline(T_FREEZE, ls="--", color=FREEZE_COLOR, lw=1.0, label=f"freeze isotherm ({T_FREEZE:.0f} °C)")
+    ax.set_xlabel("latitude  φ  (°)")
+    ax.set_ylabel("temperature  T  (°C)")
+    ax.set_xlim(0, 90)
+    ax.set_title("More tilt flattens the planet\n(the pole warms, the ice cap retreats)", fontsize=10)
+    ax.legend(fontsize=7, loc="lower left")
+
+
+def obliquity_figure(eps_grid, s2_grid, s2_earth, climate_states, tilts):
+    """The banked §9.1 artifact: the obliquity knob — axial tilt → the insolation gradient → the climate.
+
+    Left: the geometric ``s₂(ε)`` curve (the mechanism — exact −5/8 at no tilt, the Earth cross-check,
+    the ≈55° gradient reversal). Right: the relaxed ``T(φ)`` at a range of obliquities (the consequence —
+    more tilt warms the pole and retreats the ice cap). *Axial tilt in, climate gradient out.*
+    """
+    fig, axd = plt.subplot_mosaic(
+        [["s2", "climate"]], figsize=(14, 5.5), constrained_layout=True,
+    )
+    obliquity_s2_axes(axd["s2"], eps_grid, s2_grid, s2_earth)
+    obliquity_climate_axes(axd["climate"], climate_states, tilts)
+    fig.suptitle("Planet §9.1 — the obliquity knob: axial tilt sets the annual-mean-insolation gradient", fontsize=13)
+    return fig
