@@ -218,3 +218,27 @@ def test_invalid_inputs_raise():
     with pytest.raises(ValueError):
         # the ice feedback (state-dependent absorbed) cannot go through the direct linear solve
         m.steady_linear(lambda x, T: ebm.insolation(x, S0) * (1.0 - np.where(np.asarray(T) < -10.0, 0.6, 0.3)))
+
+
+# --------------------------------------------------------------------------- #
+# Variable transport coefficient D(x): refactor hygiene for the rung-1 two-way feedback
+# --------------------------------------------------------------------------- #
+def test_callable_constant_D_matches_scalar_D_hygiene():
+    """REFACTOR HYGIENE (not the rung-1 anchor): a *callable* constant D(x) reproduces the scalar-D
+    climate bit-for-bit. The array-D generalization (so rung-1's flow-diagnosed D_eff(x) can vary
+    with latitude — :mod:`planet.transport`) leaves the rung-0 scalar path untouched; the engine is
+    built from the same cell array either way. The actual two-way *anchor* lives in test_transport."""
+    absorbed = const_absorbed()
+    for face in ("harmonic", "exact"):
+        scalar = ebm.EnergyBalanceModel(D=0.555, n_cells=80, face=face)
+        callab = ebm.EnergyBalanceModel(D=lambda x: np.full(np.shape(x), 0.555), n_cells=80, face=face)
+        assert np.array_equal(scalar._Dcells, callab._Dcells)            # same engine input array
+        assert np.array_equal(scalar.equilibrium(absorbed, method="direct").T,
+                              callab.equilibrium(absorbed, method="direct").T)
+
+
+def test_negative_D_raises_scalar_and_callable():
+    with pytest.raises(ValueError):
+        ebm.EnergyBalanceModel(D=-0.1)                                   # scalar (existing guard)
+    with pytest.raises(ValueError):
+        ebm.EnergyBalanceModel(D=lambda x: -1.0 + 0.0 * np.asarray(x, dtype=float))  # callable

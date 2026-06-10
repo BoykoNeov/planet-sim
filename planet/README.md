@@ -264,8 +264,19 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   and `engines/fluid/tests/test_tracer.py` (translation analytic limit, conservation, consistency, the
   not-monotone scope edge). **Step-0 finding:** the Phase-4 jet is *barotropically unstable* (so a
   passive tracer gets an emergent `⟨v'θ'⟩` flux — no imposed wave needed). **Anchor (for step 2):**
-  reduction-to-EBM (`D_eff`), not a tuned PW number. **Next:** step 2 the two-way coupler, step 3
-  circulation-informed precip.
+  reduction-to-EBM (`D_eff`), not a tuned PW number.
+- **Rung 1 — step 2, Phase A BUILT** (the two-way feedback *machinery*; `planet/transport.py`). Given a
+  meridional eddy heat flux `⟨v'θ'⟩(φ)`, the **κ→D bridge** (`D = C_atm·κ/a²`, physical/citable;
+  rung-0 `D=0.555` ⟺ `κ≈2.2×10⁶ m²/s`, the observed eddy-diffusivity order) maps the diagnosed
+  band-bulk down-gradient diffusivity to an EBM transport coefficient, which **re-equilibrates** the
+  EBM. **THE anchor — reduction-to-EBM:** the closure `⟨v'θ'⟩=−D_eff·∂θ̄/∂y` has the same *form* as the
+  EBM transport term, so the two-way model with a constant flow-diagnosed `D_eff` *is* a rung-0
+  diffusive EBM with that `D` (and rung-0 is a fixed point of the map). Phase A drives the machinery
+  with a **synthetic** down-gradient flux (the Phase-4 synthetic-gradient playbook) so it lands
+  independent of the eddy sim; `EnergyBalanceModel` now takes a callable `D(x)` for the band-limited
+  diagnostic. `tests/test_transport.py` (reduction, bridge, right-signed response, diagnosis sign).
+  **Next — step 2, Phase B:** the *emergent* eddy flux (advect θ on the unstable jet, diagnose
+  `⟨v'θ'⟩` post-saturation, magnitude named tuned); then **step 3** circulation-informed precip.
 
 ## Test runner (tiered gate, ADR 0003)
 

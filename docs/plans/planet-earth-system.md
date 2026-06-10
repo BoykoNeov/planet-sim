@@ -745,12 +745,30 @@ unstable** (Rayleigh–Kuo met; a v-perturbation grows ~200× then saturates), s
 meandering flow gets an **emergent** `⟨v'θ'⟩` flux — no imposed stationary wave needed. **Anchor
 reframe (for step 2):** the rung-1 anchor is **reduction-to-EBM** (resolved flux → `D_eff`; down-gradient
 limit recovers the rung-0 diffusive EBM), **not** the plan-table "~5–6 PW" (an eddy/baroclinic = rung-3
-number; here magnitude is window/forcing-tuned). **Next (step 2):** the two-way coupler — advect θ
-toward the EBM target on the unstable jet, diagnose `D_eff`, close the budget back to the EBM; then
-**step 3** circulation-informed precip. Editing the shared engine triggered the **full-repo gate**
-(bare `pytest`, ADR 0003) — green (168 fast + the slow engine seals + slow planet; the live-climlab
-and notebook smoke-tests skip, as in CI). (The import-drift guard is a monorepo-only mechanism — see
-ADR 0003's standalone-repo extraction note.)
+number; here magnitude is window/forcing-tuned). Editing the shared engine triggered the
+**full-repo gate** (bare `pytest`, ADR 0003) — green (168 fast + the slow engine seals + slow planet;
+the live-climlab and notebook smoke-tests skip, as in CI). (The import-drift guard is a monorepo-only
+mechanism — see ADR 0003's standalone-repo extraction note.)
+
+**Rung 1, step 2 — Phase A BUILT (the two-way feedback *machinery*; 2026-06-10).** `planet/transport.py`
+closes the loop given *any* meridional eddy heat flux `⟨v'θ'⟩(φ)`: the **κ→D bridge** `D = C_atm·κ/a²`
+(physical/citable — `C_atm = c_p·p_s/g`; rung-0 `D=0.555` ⟺ `κ≈2.2×10⁶ m²/s`, the observed midlatitude
+eddy-diffusivity order) maps the **band-bulk** down-gradient diffusivity (least-squares over the
+window-flat interior) to an EBM transport coefficient, which **re-equilibrates** the EBM (uniform
+`D_eff` is the headline; `EnergyBalanceModel` now also accepts a callable `D(x)` for the band-limited
+diagnostic). **THE anchor — reduction-to-EBM:** the closure `⟨v'θ'⟩=−D_eff·∂θ̄/∂y` has the *same form*
+as the EBM transport term, so the two-way model with a constant flow-diagnosed `D_eff` *is* a rung-0
+diffusive EBM with that `D`; tested by (a) re-equilibrating at an *independently*-chosen κ recovering a
+rung-0 EBM at the bridge-implied `D`, and (b) **rung-0 being a fixed point** of the map (the EBM's own
+diffusive flux → `D_eff=D`, climate unchanged). Plus the bridge round-trip/magnitude and the
+**right-signed response** (stronger flux ⇒ flatter contrast). **De-risked the A/B split** (advisor):
+Phase A drives the machinery with a **synthetic** down-gradient flux (the Phase-4 synthetic-gradient
+playbook), so it lands *independent* of the (tuned) eddy sim; the `flux_fn` argument is the seam Phase B
+plugs into. Planet gate **151 passed, 1 skip** (no shared-engine edit → planet gate, not full-repo).
+**Next (step 2, Phase B):** the *emergent* eddy flux — advect θ (relaxed to the EBM target) on the
+barotropically-unstable jet, diagnose `⟨v'θ'⟩` **post-saturation** via a life-cycle integral (release
+mode), magnitude named tuned; the loop-closes claim scoped to **one feedback pass** (a converged
+fixed-point is a `slow` demo if it converges cleanly). Then **step 3** circulation-informed precip.
 
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko

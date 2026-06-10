@@ -121,6 +121,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Callable
 
 import numpy as np
 from scipy.linalg import solve_banded
@@ -295,7 +296,13 @@ class EnergyBalanceModel:
     (for the diagnostic), and the heat capacity ``C`` (from ``water_depth``). Builds the
     :class:`~engines.diffusion.Diffusion1D` **once** in heat mode — array diffusivity
     ``D_eng(x) = (D/C)(1−x²)``, insulated (Neumann 0) at both ends — and reuses it across a
-    whole continuation sweep (only the radiation forcing changes with S₀). The radiation is
+    whole continuation sweep (only the radiation forcing changes with S₀). ``D`` may be a
+    **uniform scalar** (rung 0) *or* a **callable ``D(x)`` over ``x = sin φ``** — the rung-1
+    two-way feedback's flow-diagnosed *effective* diffusivity profile, where resolved eddies
+    set a latitude-varying transport (:mod:`planet.transport`); a scalar is just the constant
+    callable, and the engine is built once with the resulting cell array either way (it already
+    consumes an array diffusivity, so this is a *consumer* generalization, not an engine change).
+    The radiation is
     **injected** as an ``absorbed(x, T) → W m⁻²`` callable (the absorbed shortwave
     ``S(x)(1−α)``), so this machinery is *forcing-agnostic*: the no-feedback North check feeds
     a constant-albedo callable, the Snowball demo feeds the ice-albedo one
@@ -303,18 +310,28 @@ class EnergyBalanceModel:
     constants in the consumer" boundary.
     """
 
-    def __init__(self, A: float = A_OLR, B: float = B_OLR, D: float = D_TRANSPORT,
+    def __init__(self, A: float = A_OLR, B: float = B_OLR,
+                 D: float | Callable[[np.ndarray], np.ndarray] = D_TRANSPORT,
                  T_freeze: float = T_FREEZE, water_depth: float = WATER_DEPTH,
                  n_cells: int = 180, face: str = "harmonic"):
         if B <= 0.0:
             raise ValueError(f"B (OLR slope) must be positive for a stable relaxation, got {B}")
-        if D < 0.0:
-            raise ValueError(f"D (transport) must be non-negative, got {D}")
         if face not in ("harmonic", "exact"):
             raise ValueError(f"face must be 'harmonic' or 'exact', got {face!r}")
         self.A = float(A)
         self.B = float(B)
-        self.D = float(D)
+        # D is the meridional transport coefficient: a uniform scalar (rung 0) or a callable
+        # D(x) over x = sin φ (rung-1's flow-diagnosed effective-diffusivity profile). A scalar is
+        # wrapped as the constant callable; either way the engine sees only the resulting cell array.
+        if callable(D):
+            self.D = D
+            self._D_of_x = lambda x: np.asarray(D(np.asarray(x, dtype=float)), dtype=float)
+        else:
+            if float(D) < 0.0:
+                raise ValueError(f"D (transport) must be non-negative, got {D}")
+            self.D = float(D)
+            _Dval = self.D
+            self._D_of_x = lambda x: np.full(np.shape(np.asarray(x, dtype=float)), _Dval)
         self.T_freeze = float(T_freeze)
         self.water_depth = float(water_depth)
         self.n_cells = int(n_cells)
@@ -324,16 +341,18 @@ class EnergyBalanceModel:
         # Build the heat-transport solver ONCE: x = sin φ on [0, 1], insulated poles.
         self.grid = uniform_grid(1.0, self.n_cells)
         self.x = self.grid.centers                           # cell-center sin φ
-        # The (scaled) transport coefficient (D/C)(1−x²), vanishing at the pole. In "harmonic"
+        # The (scaled) transport coefficient (D(x)/C)(1−x²), vanishing at the pole. In "harmonic"
         # mode the plain cell-centered values are handed to the engine (harmonic-mean faces, the
         # ~0.1 °C polar bias); in "exact" mode they are pre-distorted so the engine's harmonic
         # mean reproduces the true face coefficient (no polar bias). Either way the *engine* is
         # untouched — only the cell array it is constructed with differs.
-        coeff = lambda x: (self.D / self.C) * (1.0 - np.asarray(x, dtype=float) ** 2)
+        coeff = lambda x: (self._D_of_x(x) / self.C) * (1.0 - np.asarray(x, dtype=float) ** 2)
         if face == "harmonic":
             self._Dcells = coeff(self.x)
         else:
             self._Dcells = cell_diffusivity_for_exact_faces(self.grid, coeff)
+        if np.any(self._Dcells < 0.0):
+            raise ValueError("transport coefficient (D(x)/C)(1−x²) must be non-negative everywhere")
         self.solver = Diffusion1D(self.grid, self._Dcells, Neumann(0.0), Neumann(0.0))
 
     def global_mean(self, T: np.ndarray) -> float:

@@ -9,7 +9,11 @@ the third link in the chain after Steel's *cooling → microstructure* and Chip'
 
 **One-way (v1).** Climate forces circulation; the flow does **not** feed back on the climate.
 Two-way coupling (an advected temperature tracer closing the heat budget back onto the EBM) is
-**rung 1** of the §5 GCM climb — seamed at the engine's ``tracer`` slot, not built (plan §3–4).
+**rung 1** of the §5 GCM climb (plan §3–4): step 1 (the passive ``tracer`` slot, :mod:`engines.fluid`)
+and step 2's feedback *machinery* (:mod:`planet.transport` — the κ→D bridge + reduction-to-EBM,
+Phase A) are **built**; the *emergent* eddy flux that drives them is Phase B. So the
+reduction-to-EBM / poleward-heat-transport anchors this dry one-way coupler cannot support now live
+there, not here.
 
 How the two engines are coupled — forcing split *around* the bare fluid engine
 ---------------------------------------------------------------------------------
