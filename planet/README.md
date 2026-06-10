@@ -4,7 +4,7 @@
 the first project to reuse the diffusion/heat spine (`engines/diffusion`) a **third** time
 (as a sphere's latitudinal heat transport) and, in later phases, to build the program's one
 remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
-[`docs/plans/planet-earth-system.md`](../../docs/plans/planet-earth-system.md).
+[`docs/plans/planet-earth-system.md`](../docs/plans/planet-earth-system.md).
 
 > **Units — SI / climlab-conventional** (the deliberate contrast with Chip's per-module native units):
 > **W m⁻²** (S₀, insolation, the OLR offset A), **W m⁻² K⁻¹** (the OLR slope B, the transport D),
@@ -18,7 +18,7 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
 - **To work on the EBM machinery (Phase 1):** `ebm.py` + `tests/test_ebm.py`. It loads
   `engines/diffusion/CONTRACT.md` (**heat mode**: array diffusivity `D_eng(x) = (D/C)(1−x²)`,
   insulated Neumann(0) at both ends) and **Strang-splits the radiation around it** — the
-  **Jominy-2a idiom reused** (`projects/steel/jominy.py`): the linear `−B·T` relaxation is an exact
+  **Jominy-2a idiom reused** (from the sibling steel simulator): the linear `−B·T` relaxation is an exact
   exponential half-step, the albedo threshold makes the local step nonlinear (what creates the
   bistability). Public API: `EnergyBalanceModel` (the transport + split-radiation solver),
   `equilibrium_temperature_0d` / `two_mode_solution` (the analytic anchors), `insolation`,
@@ -182,7 +182,7 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   exports/imports the registry (JSON + `.npz`) with a **real round-trip-identity test** (the deep end's
   one genuine correctness property, vs the render's smoke-tests). Banked globe:
   `docs/figures/planet-map.html`. 31-test pair added (the Plotly render smoke-tests `importorskip` on
-  the `[webviz]` extra — fast, not `slow`). **No new engine / no gate-manifest change.**
+  the `[webviz]` extra — fast, not `slow`). **No new engine.**
 - **Phase 3 — the shallow-water engine (`engines/fluid`): BUILT** (2026-06-09). The program's
   **second shared engine** — a rotating shallow-water solver on a doubly-periodic β-plane (Arakawa
   C-grid, vector-invariant, explicit SSP-RK3), built standalone and sealed behind its suite
@@ -194,8 +194,8 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   **potential vorticity / enstrophy bounded at FINITE amplitude** (a vortex at Rossby ~0.5). The
   symmetric scheme conserves energy semi-discretely (not enstrophy); claims are stated as measured
   (honest, not aspirational). `circulation.py` pins the planetary numbers (`L_R ≈ 960 km` at 45°) and
-  banks the artifact (`docs/figures/planet-shallowwater.png`). **First multi-engine gate row**
-  (`planet` uses `{engines/diffusion, engines/fluid}`); the import-drift guard is now live.
+  banks the artifact (`docs/figures/planet-shallowwater.png`). **Planet now builds on both shared
+  engines** (`engines/diffusion` + `engines/fluid`); the suite runs both engines' tests.
 - **Phase 4 — the one-way EBM→circulation coupler: BUILT** (2026-06-09 — the capstone complete). The
   EBM's meridional temperature gradient forces the dry shallow-water flow (thermal relaxation + weak
   drag split around the bare engine) and a **geostrophically-balanced westerly jet emerges** (~16.5 m/s
@@ -219,7 +219,7 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   0.5→1→2 R⊕), the 0-D mean size-invariant (the relaxed mean drifts only via the ice feedback — named).
   Both wired into the interactive map (`climate_view` / `interactive_map` sliders) — defaults (Sun,
   Earth-size) recover the present-day map **bit-for-bit**. Banked `docs/figures/planet-exoplanet.png`;
-  **no new engine, no gate-manifest change** (numpy-only, planet-local). Scope edge: only the bright-ice
+  **no new engine** (numpy-only, planet-local). Scope edge: only the bright-ice
   albedo responds to the star (ocean/land left unchanged); size is transport-only (rotation effects route
   through the fluid engine — a different rung).
 - **§9.1 — the obliquity knob (axial tilt → the insolation gradient): BUILT** (2026-06-10, the
@@ -233,8 +233,8 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   closed form `−(5/8)(1−1.5·sin²ε)` across the range). More tilt spreads sunlight poleward → a flatter
   planet, the ice cap retreats (ice line 60°→71°→ice-free over 0°→23.44°→40°); past ≈55° the gradient
   reverses (poles warmer — surfaced as a loose bracket). Wired into the interactive map (the obliquity
-  slider, formerly disabled, is now live). Banked `docs/figures/planet-obliquity.png`; **no new engine,
-  no gate-manifest change**. Scope edge: the single-P₂-mode insolation truncates at high tilt (the real
+  slider, formerly disabled, is now live). Banked `docs/figures/planet-obliquity.png`; **no new engine**.
+  Scope edge: the single-P₂-mode insolation truncates at high tilt (the real
   annual-mean grows `s₄`), and the model is annual-mean (no seasonal extremes); eccentricity/precession
   are a separate deferred Milankovitch axis.
 - **The teaching notebook now covers the full arc (`planet.ipynb`, §4–6 added): BUILT** (2026-06-10).
@@ -248,7 +248,7 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   staircase (rung-1 two-way coupler / editable elevation). The notebook stays matplotlib-only; the
   globe's obliquity/exoplanet sliders run in `planetmap.interactive_map` behind `[webviz]`, described
   not embedded. Executes clean top-to-bottom (the `slow` smoke test green, 29 s); **no module code, no
-  new engine, no gate-manifest change.** **Pedagogy tiered (2026-06-10):** each of §1–§5 gained an
+  new engine.** **Pedagogy tiered (2026-06-10):** each of §1–§5 gained an
   expert **`<details>` "Going deeper"** collapsible — the convention chip & steel already use, the one
   notebook that lacked it — so the three reading depths are explicit (narrative = novice, sliders =
   intermediate, the collapsible = expert: derivations, the Strang-split / C-grid / energy-not-enstrophy
@@ -267,20 +267,19 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   reduction-to-EBM (`D_eff`), not a tuned PW number. **Next:** step 2 the two-way coupler, step 3
   circulation-informed precip.
 
-## Test runner (tiered gate, ADR 0003 — the per-project successor)
+## Test runner (tiered gate, ADR 0003)
 
 ```powershell
-python -m tools.gate planet -m "not slow"   # routine commit gate: planet's tests + the engine's
-python -m tools.gate planet                  # full gate for planet (incl. the slow demo sweep) — EXCEPTIONAL
-./run_tests.ps1 -m "not slow"               # whole-repo fast lane (release / CI / shared-engine edit)
+./run_tests.ps1 -m "not slow"   # routine fast lane: planet's tests + both engines', minus slow
+./run_tests.ps1                  # full suite — adds the slow demo sweep, notebook, and live climlab
+./run_tests.ps1 planet           # planet's own tests only (scopes off the engines)
 ```
 
-`pyproject.toml`'s `testpaths` already carries `projects` and `engines`, so both
-`planet/tests/` and `engines/fluid/tests/` are collected with no config change;
-`pythonpath = ["."]` lets planet import the engines as `engines.diffusion…` / `engines.fluid…`.
-The full-resolution Snowball sweep (`test_demo_snowball`), the shallow-water demos
-(`test_demo_shallowwater`, `test_circulation` integration), the figure renders, and the live climlab
-cross-check are `slow`-marked / extra-gated, so the fast lane deselects them. Planet's gate `uses` is
-now `{engines/diffusion, engines/fluid}` — the manifest's **first genuinely multi-engine row** (a
-`planet` commit runs both engines' seals), kept honest by the import-drift guard in
-`tools/tests/test_gate.py`.
+`pyproject.toml`'s `testpaths` carries `engines` and `planet`, so `planet/tests/`,
+`engines/diffusion/tests/`, and `engines/fluid/tests/` are all collected with no config change;
+`pythonpath = ["."]` lets planet import the engines as `engines.diffusion…` / `engines.fluid…`
+without an install step. The full-resolution Snowball sweep (`test_demo_snowball`), the shallow-water
+demos (`test_demo_shallowwater`, `test_circulation` integration), the figure renders, and the live
+climlab cross-check are `slow`-marked / extra-gated, so the fast lane deselects them. Because planet
+builds on both shared engines, the bare suite runs all three test trees together — an engine edit and
+a planet edit are covered by the same `./run_tests.ps1`.
