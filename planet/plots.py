@@ -404,7 +404,7 @@ def coupler_conservation_axes(ax, jet) -> None:
 
     The honest forced–dissipative story (the reframed conservation leg). During forcing, mass holds at
     machine precision but energy and potential enstrophy are *not* conserved — the forcing–drag balance
-    is what selects the steady jet. When the forcing is switched **off** (shaded), the bare frozen engine
+    is what selects the steady jet. When the forcing is switched **off** (shaded), the bare engine
     conserves mass / energy / enstrophy (its Phase-3 guarantees) — and the jet persists.
     """
     tf = jet.times / 86400.0
@@ -435,7 +435,7 @@ def coupler_figure(jet, state):
     Top-left: the emergent zonal-wind profile on top of the geostrophic estimate (balance made visible).
     Top-right: the forcing chain (warm EBM → high target height). Bottom-left: the 2-D jet on the
     channel. Bottom-right: the conservation diagnostics — mass forced-exact, then the release test
-    re-confirming the frozen engine's invariants. *Climate in, circulation out — the two engines coupled.*
+    re-confirming the engine's invariants. *Climate in, circulation out — the two engines coupled.*
     """
     fig, axd = plt.subplot_mosaic(
         [["jet", "chain"], ["field", "conserve"]],

@@ -1,8 +1,8 @@
 """The Phase-4 banked artifact: the EBM gradient forces the shallow-water → an emergent jet.
 
 The capstone's closing payoff — and the moment the program's **two shared engines are coupled**.
-The frozen diffusion spine produces an equilibrium climate (:mod:`planet.ebm`); its
-**meridional temperature gradient** is handed to the frozen rotating shallow-water engine
+The diffusion spine produces an equilibrium climate (:mod:`planet.ebm`); its
+**meridional temperature gradient** is handed to the rotating shallow-water engine
 (:mod:`planet.circulation`); and a **geostrophically-balanced midlatitude westerly jet
 emerges** (:mod:`planet.coupler`). *Climate in, circulation out.*
 

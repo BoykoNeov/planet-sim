@@ -1,8 +1,8 @@
 """One-way EBM → shallow-water coupler: the climate gradient forces an emergent jet (Planet Phase 4).
 
-The capstone's final phase, and the one that **couples the two shared engines**: the frozen
+The capstone's final phase, and the one that **couples the two shared engines**: the
 diffusion spine (via the EBM, :mod:`planet.ebm`) hands its equilibrium
-**meridional temperature gradient** to the frozen rotating shallow-water engine (via
+**meridional temperature gradient** to the rotating shallow-water engine (via
 :mod:`planet.circulation`), and a **geostrophically-balanced midlatitude jet emerges**.
 This is the planet analogue of the whole-program payoff — *forcing → climate → circulation* —
 the third link in the chain after Steel's *cooling → microstructure* and Chip's *process → device*.
@@ -11,9 +11,9 @@ the third link in the chain after Steel's *cooling → microstructure* and Chip'
 Two-way coupling (an advected temperature tracer closing the heat budget back onto the EBM) is
 **rung 1** of the §5 GCM climb — seamed at the engine's ``tracer`` slot, not built (plan §3–4).
 
-How the two engines are coupled — forcing split *around* the frozen fluid engine
+How the two engines are coupled — forcing split *around* the bare fluid engine
 ---------------------------------------------------------------------------------
-The frozen :mod:`engines.fluid` solves the **bare** shallow-water equations: ``step`` carries no
+The shared :mod:`engines.fluid` solves the **bare** shallow-water equations: ``step`` carries no
 forcing term. So the thermal forcing is composed *around* it by **operator splitting** — the
 **identical idiom** the EBM uses to graft radiation around the diffusion engine
 (:meth:`~planet.ebm.EnergyBalanceModel._radiation_half`) and Steel's Jominy used for its
@@ -74,7 +74,7 @@ Validation triad (plan §3) — what is asserted tight vs loose
   **emergence** and **release** legs below, not the small balance residual, carry the decisive validation.
 * **Conservation (reframed — see below).** **Mass to machine precision** throughout the forced run
   (the zero-mean target + the engine's exact mass invariant), and a **release test**: turn the
-  forcing & drag *off* and run the bare frozen engine — mass / energy / potential enstrophy are
+  forcing & drag *off* and run the bare engine — mass / energy / potential enstrophy are
   conserved (the engine's Phase-3 guarantees re-confirmed in the coupled configuration) **and the jet
   persists**, proving it is a genuine balanced state, not a forcing-propped artifact.
 * **Benchmark (loose).** The westerly **jet latitude** (~30–45°) and **strength** (tens of m/s) vs the
@@ -90,7 +90,7 @@ internally inconsistent with its own "*forced* steady flow" — a **forced–dis
 otherwise would be false (the same honesty class as Phase 3's "energy *or* enstrophy, as measured").
 So the conservation leg is reframed: **mass machine-exact under forcing** + the **release test**
 re-confirms the engine's mass/energy/enstrophy invariants once the forcing is removed. This is the
-honest reading of "the frozen engine's guarantees re-confirmed in the coupled configuration".
+honest reading of "the engine's guarantees re-confirmed in the coupled configuration".
 
 Non-circularity, named scope edge (plan §3)
 -------------------------------------------
@@ -347,7 +347,7 @@ def couple_jet(state: ClimateState | None = None, nx: int = 96, ny: int = 96,
                 break
             u_ref = u_now
 
-    # -- release: forcing & drag OFF; the bare frozen engine must conserve and the jet must persist -- #
+    # -- release: forcing & drag OFF; the bare engine must conserve and the jet must persist -- #
     mr0, er0, zr0 = sw.mass(s), sw.energy(s), sw.potential_enstrophy(s)
     n_rel = int(release_periods * inertial / dt)
     times_r, mass_r, energy_r, enstrophy_r = [], [], [], []

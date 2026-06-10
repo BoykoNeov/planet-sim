@@ -1,4 +1,4 @@
-"""Solver mechanics — the frozen data boundary, construction guards, and the explicit-CFL contract.
+"""Solver mechanics — the stable data boundary, construction guards, and the explicit-CFL contract.
 
 Not physics (the wave / geostrophy / conservation files carry the triad) but the API
 promises: construction validation, the no-mutation step contract, the CFL stability guard

@@ -1,7 +1,7 @@
 """Planet Phase-1 validation: the latitudinal EBM machinery — the transport + Strang-split triad.
 
 Carries the engine-coupled half of the plan §3 triad (planet-earth-system.md). The EBM reuses the
-**frozen diffusion spine** for the latitudinal transport and Strang-splits the radiation around it
+**shared diffusion spine** for the latitudinal transport and Strang-splits the radiation around it
 (the Jominy idiom); these tests validate that assembly through the **interchangeable A/B/C trio**:
 
 * **Analytical limit (tight).** (a) the **0-D** global mean ``T̄ = [(S₀/4)(1−ᾱ) − A]/B`` reproduced to
@@ -9,9 +9,9 @@ Carries the engine-coupled half of the plan §3 triad (planet-earth-system.md). 
   ``T₀ + T₂·P₂(x)`` reproduced near-exactly by the dt-free direct solve with exact faces, with the
   harmonic-mean polar floor named, and the Strang relaxation shown to **converge** to it as dt→0.
 * **Conservation (tight).** net-TOA ``⟨S(1−α)⟩ − A − B⟨T⟩ = 0`` at equilibrium; pure transport
-  preserves ``∫T dx`` exactly (the frozen no-flux invariant).
+  preserves ``∫T dx`` exactly (the engine's no-flux invariant).
 * **Pinning.** the exact-face construction reproduces the true face coefficient; the direct solve's
-  reconstructed operator matches the frozen engine's ``step`` (so mode C cannot drift from the engine).
+  reconstructed operator matches the engine's ``step`` (so mode C cannot drift from the engine).
 
 The radiation/albedo constants are the cited climlab/North defaults ([[ebm-radiation-source]]), pinned
 in :mod:`planet.ebm` — not carried from memory.
@@ -130,7 +130,7 @@ def test_relaxation_converges_to_the_direct_steady_state():
 
 
 # --------------------------------------------------------------------------- #
-# Pinning: exact-face construction + the direct operator vs the frozen engine
+# Pinning: exact-face construction + the direct operator vs the engine
 # --------------------------------------------------------------------------- #
 def test_exact_face_helper_reproduces_the_true_face_coefficient():
     # The pre-distorted cell array's harmonic-mean faces equal the true (1−x²) face coefficient to
@@ -144,9 +144,9 @@ def test_exact_face_helper_reproduces_the_true_face_coefficient():
     assert np.all(Dc > 0.0)
 
 
-def test_direct_transport_operator_matches_the_frozen_engine():
+def test_direct_transport_operator_matches_the_engine():
     # The reconstructed L_T is pinned to the engine: the engine's pure-transport backward-Euler step
-    # equals solving (I − dt·L_T/C) — so mode C cannot silently drift from the frozen engine.
+    # equals solving (I − dt·L_T/C) — so mode C cannot silently drift from the engine.
     for face in ("harmonic", "exact"):
         m = ebm.EnergyBalanceModel(n_cells=90, face=face)
         sub, diag, sup = m._transport_tridiag()
@@ -174,7 +174,7 @@ def test_net_toa_is_zero_at_equilibrium():
 
 
 def test_pure_transport_conserves_total_under_no_flux():
-    # ∫T dx is conserved exactly by the insulated (Neumann 0) transport — the frozen engine's no-flux
+    # ∫T dx is conserved exactly by the insulated (Neumann 0) transport — the engine's no-flux
     # invariant, re-confirmed for the Neumann/Neumann pole pair the EBM uses.
     m = ebm.EnergyBalanceModel(n_cells=120)
     T = 10.0 + 5.0 * np.cos(np.pi * m.x)

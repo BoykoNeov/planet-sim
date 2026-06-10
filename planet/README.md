@@ -270,14 +270,14 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
 ## Test runner (tiered gate, ADR 0003 — the per-project successor)
 
 ```powershell
-python -m tools.gate planet -m "not slow"   # routine commit gate: planet's tests + the frozen engine's
+python -m tools.gate planet -m "not slow"   # routine commit gate: planet's tests + the engine's
 python -m tools.gate planet                  # full gate for planet (incl. the slow demo sweep) — EXCEPTIONAL
 ./run_tests.ps1 -m "not slow"               # whole-repo fast lane (release / CI / shared-engine edit)
 ```
 
 `pyproject.toml`'s `testpaths` already carries `projects` and `engines`, so both
 `planet/tests/` and `engines/fluid/tests/` are collected with no config change;
-`pythonpath = ["."]` lets planet import the frozen engines as `engines.diffusion…` / `engines.fluid…`.
+`pythonpath = ["."]` lets planet import the engines as `engines.diffusion…` / `engines.fluid…`.
 The full-resolution Snowball sweep (`test_demo_snowball`), the shallow-water demos
 (`test_demo_shallowwater`, `test_circulation` integration), the figure renders, and the live climlab
 cross-check are `slow`-marked / extra-gated, so the fast lane deselects them. Planet's gate `uses` is

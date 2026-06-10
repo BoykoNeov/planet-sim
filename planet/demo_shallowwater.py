@@ -11,8 +11,8 @@ The capstone's new shared engine (:mod:`engines.fluid`) made visible. It drives 
   2. **A westward-propagating Rossby wave** — a balanced large-scale undulation drifts *west*, the
      planetary-vorticity-gradient (β) signature, at the analytic phase speed.
 
-*The rotating fluid engine, validated and banked* — the structural counterpart of Steel freezing
-the diffusion spine, now for the program's second engine. Phase 4 will couple the EBM to it so a
+*The rotating fluid engine, validated and banked* — the structural counterpart of Steel validating
+and banking the diffusion spine, now for the program's second engine. Phase 4 will couple the EBM to it so a
 midlatitude jet emerges.
 
 Run headless (saves the figure, prints the summary):

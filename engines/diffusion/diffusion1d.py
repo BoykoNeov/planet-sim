@@ -29,10 +29,10 @@ Discretization
     - ``crank_nicolson`` (θ=½) — 2nd-order in time, unconditionally stable but
       *not monotone* (can produce decaying oscillations at large dt).
 
-The frozen data boundary (ADR 0001)
+The stable data boundary (ADR 0001)
 -----------------------------------
 The ``state`` is a plain 1-D ``ndarray`` of cell-centered ``u`` values. That
-array is the frozen data contract: :meth:`Diffusion1D.step` / :meth:`solve`
+array is the stable data contract: :meth:`Diffusion1D.step` / :meth:`solve`
 consume and return exactly it, and :meth:`total` / :meth:`flux` consume it. No
 live objects cross that boundary. The grid, ``D``, and boundary conditions are
 *construction-time configuration*: a compiled reimplementation parameterizes

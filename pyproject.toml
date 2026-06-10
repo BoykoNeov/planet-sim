@@ -13,7 +13,7 @@ include = ["engines*", "planet*"]
 [project]
 name = "planet-sim"
 version = "0.1.0"
-description = "Educational planetary climate simulator on two frozen, separately-validated solver engines (diffusion/heat + rotating shallow-water)."
+description = "Educational planetary climate simulator on two separately-validated solver engines (diffusion/heat + rotating shallow-water)."
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24",

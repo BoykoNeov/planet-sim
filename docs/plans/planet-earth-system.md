@@ -32,8 +32,8 @@ simultaneously the integration test for every Phase-1 module. Its 0-D limit has 
 **exact analytic equilibrium temperature**, and global energy balance is a **free
 conservation check**.
 
-**Why this is the right early win for the capstone.** It reuses the **frozen
-diffusion spine verbatim** (latitudinal heat transport *is* a diffusion equation),
+**Why this is the right early win for the capstone.** It reuses the **diffusion
+spine verbatim** (latitudinal heat transport *is* a diffusion equation),
 banks a complete planet-scale artifact before any new engine exists, and
 establishes the validation-triad habit on ground with an exact analytic anchor —
 exactly the build-order logic of ARCHITECTURE.md §4 ("the phasing-and-validation
@@ -45,11 +45,11 @@ discipline is internalized before the coupler is attempted").
 
 | Engine | Status here | Contract pointer |
 |---|---|---|
-| **Diffusion/heat (Fick / erfc)** — the program spine | **`[reuse frozen ✓ — Steel Phase 1a]`** | `engines/diffusion/CONTRACT.md`. Loaded as the **one-page contract**, never Steel's internals (ARCHITECTURE.md §6/§11). Planet instantiates **heat mode on the sphere**: `u = T`, the latitudinal transport `D·∂/∂x[(1−x²)∂T/∂x]` maps onto the engine's spatially-varying array diffusivity `D_eng(x) = D·(1−x²)` (x = sin φ); insulated **Neumann(0)** at both poles (no flux through a pole — the symmetry/conservation BC). The radiative source/sink is **not** carried by the engine (see the §3 Phase-1 splitting note). |
-| **Fluid / PDE (shallow-water on a rotating frame)** | **`[to build & freeze HERE — Phase 3]`** | **`engines/fluid/CONTRACT.md` — the project's central new contribution.** A rotating-frame **shallow-water** solver: hyperbolic, **explicit** (CFL-limited), staggered **C-grid** — sharing *no* machinery with the parabolic-implicit diffusion engine (that *is* the point). Built standalone, validated against geostrophic balance / wave speeds / PV conservation, then **frozen** behind its `CONTRACT.md` before Phase 4 couples to it. Designed **extension-ready** (§3 Phase-3, §5): `state` as *stacked fields* so 1→N layers is a contract *extension*, and *tracer-ready* so moisture/temperature advection slots in for the deep-end rungs. |
+| **Diffusion/heat (Fick / erfc)** — the program spine | **`[reuse unchanged ✓ — Steel Phase 1a]`** | `engines/diffusion/CONTRACT.md`. Loaded as the **one-page contract**, never Steel's internals (ARCHITECTURE.md §6/§11). Planet instantiates **heat mode on the sphere**: `u = T`, the latitudinal transport `D·∂/∂x[(1−x²)∂T/∂x]` maps onto the engine's spatially-varying array diffusivity `D_eng(x) = D·(1−x²)` (x = sin φ); insulated **Neumann(0)** at both poles (no flux through a pole — the symmetry/conservation BC). The radiative source/sink is **not** carried by the engine (see the §3 Phase-1 splitting note). |
+| **Fluid / PDE (shallow-water on a rotating frame)** | **`[to build HERE — Phase 3]`** | **`engines/fluid/CONTRACT.md` — the project's central new contribution.** A rotating-frame **shallow-water** solver: hyperbolic, **explicit** (CFL-limited), staggered **C-grid** — sharing *no* machinery with the parabolic-implicit diffusion engine (that *is* the point). Built standalone, validated against geostrophic balance / wave speeds / PV conservation, then **sealed** behind its `CONTRACT.md` before Phase 4 couples to it. Designed **extension-ready** (§3 Phase-3, §5): `state` as *stacked fields* so 1→N layers is a contract *extension*, and *tracer-ready* so moisture/temperature advection slots in for the deep-end rungs. |
 
 **The one new shared engine in the whole portfolio-trio is built here.** Steel built
-and froze the diffusion spine; Chip added only a *chip-local* module (Fourier
+and sealed the diffusion spine; Chip added only a *chip-local* module (Fourier
 optics) and reused the spine; **Planet is where the second `engines/` member is
 born** (ARCHITECTURE.md §5). It is promoted to `engines/` (not kept project-local
 like Chip's `litho.py`) because it is a genuine general solver the wider portfolio
@@ -104,18 +104,18 @@ with **ice-albedo feedback** (`α` jumps high where `T < T_freeze`), driven by a
 ramped solar constant to produce the **Snowball hysteresis**.
 
 > **The reuse is real but not glib — it reuses the *Jominy splitting pattern* too
-> (advisor, the crux).** The frozen engine solves `∂u/∂t = ∂/∂x(D ∂u/∂x) + S(x,t)`.
+> (advisor, the crux).** The shared engine solves `∂u/∂t = ∂/∂x(D ∂u/∂x) + S(x,t)`.
 > The transport term maps cleanly onto the engine's array diffusivity `D·(1−x²)`. But
 > the radiative terms **cannot be the engine's source**: `−(A+B·T)` is **linear in the
 > state** and the albedo source `S(x)(1−α(T))` is a **nonlinear pointwise function of
 > `T`**, while the engine's `S` is only `S(x,t)`, *not* `S(u)`. So the radiation is
-> composed *around* the frozen engine by **Strang operator splitting** — **exactly the
+> composed *around* the engine by **Strang operator splitting** — **exactly the
 > Phase-2a Jominy precedent**, which split a state-dependent lateral sink `−h(T−T_air)`
 > around the same engine for this identical reason. The linear `−B·T` relaxation is an
 > exact analytic exponential half-step (as Jominy's lateral sink was); the **albedo
 > threshold makes the local step a pointwise *nonlinear* relaxation — which is what
-> *creates* the multiple equilibria.** Phase 1 therefore reuses **both** the frozen
-> engine *and* the frozen splitting idiom — a *stronger* reuse story than "the EBM is
+> *creates* the multiple equilibria.** Phase 1 therefore reuses **both** the
+> engine *and* the splitting idiom — a *stronger* reuse story than "the EBM is
 > the engine," and the plan states it so the builder does not hit a wall on day one.
 
 **Validation triad — Phase 1**
@@ -127,7 +127,7 @@ ramped solar constant to produce the **Snowball hysteresis**.
 - *Conservation.* At equilibrium **net top-of-atmosphere flux integrates to zero**
   over the sphere: `∫(S(1−α) − (A+BT)) dx = 0` (absorbed solar = OLR globally). The
   **diffusive transport conserves structurally** — it only redistributes — guaranteed
-  by the frozen engine's exact no-flux invariant (poles are Neumann(0)), re-confirmed
+  by the engine's exact no-flux invariant (poles are Neumann(0)), re-confirmed
   for this BC pair.
 - *Benchmark.* **climlab's EBM** (`EBM`/`EBM_seasonal`) — the present-day **ice-line
   latitude** (~70°), the **Snowball threshold** (a solar dimming of ~2–10% triggers
@@ -136,7 +136,7 @@ ramped solar constant to produce the **Snowball hysteresis**.
   tool** (the pycalphad pattern, §7), never copied.
 
 **Non-circularity split.** What is *validated* (asserted tight): the **structural
-reuse** (frozen-engine transport + the analytic two-mode solution it must reproduce)
+reuse** (engine transport + the analytic two-mode solution it must reproduce)
 and the **existence and qualitative structure of the hysteresis** (two stable branches,
 a catastrophic jump — emergent, nothing but the feedback produces it). What is
 *calibrated* (cited, flagged): the radiation/albedo constants `A, B, D, α_ice, α_open,
@@ -212,7 +212,7 @@ dynamic vegetation / carbon feedback.
 sun → the Snowball **white planet**; change obliquity → bands redistribute. This is the
 project's dramatic end-to-end demo and the centerpiece of the **interactive map** (§9).
 
-### Phase 3 — The shallow-water engine (build & freeze the new shared engine)
+### Phase 3 — The shallow-water engine (build the new shared engine)
 
 The project's **central new contribution** and its **risk phase**: a rotating-frame
 **shallow-water** solver on a **β-plane** channel —
@@ -290,9 +290,9 @@ pressure/height field that forces the shallow-water flow → midlatitude jets em
   is reframed to what is actually true (the Phase-3 "energy *or* enstrophy, as measured" honesty
   class): **(a)** mass `∫h` is **machine-exact under forcing** (a discretely zero-mean height target +
   the engine's exact mass invariant), and **(b)** a **release test** — switch the forcing & drag *off*
-  and run the bare frozen engine: mass / energy / potential enstrophy are conserved (the engine's
+  and run the bare engine: mass / energy / potential enstrophy are conserved (the engine's
   Phase-3 guarantees re-confirmed in the coupled configuration) **and the jet persists**, proving it is
-  a genuine balanced state, not a forcing-propped artifact. *That* is "the frozen engine's guarantees
+  a genuine balanced state, not a forcing-propped artifact. *That* is "the engine's guarantees
   re-confirmed", read honestly.
 - *Benchmark.* **Jet latitude and strength** vs the observed midlatitude jet
   (~30–45°, tens of m/s — loose).
@@ -338,7 +338,7 @@ BigSim/
       CONTRACT.md             #   the one-page API (living/versioned; extension-ready: stacked fields, tracer slot)
       tests/                  #   geostrophic balance, wave speeds, PV/mass/energy — the seal
   planet/
-    ebm.py                    # 0-D + 1-D latitudinal EBM; frozen-diffusion transport + Strang-split radiation  (Phase 1)
+    ebm.py                    # 0-D + 1-D latitudinal EBM; diffusion-spine transport + Strang-split radiation  (Phase 1)
     albedo.py                 # ice-albedo feedback + the Snowball hysteresis continuation sweep                 (Phase 1)
     precip.py                 # diagnostic precipitation parameterization (named kinematic; C–C-scaled)          (Phase 2)
     biomes.py                 # Whittaker classifier: (T, P) → biome map                                          (Phase 2)
@@ -418,7 +418,7 @@ as an **albedo difference**, land/ocean fraction per band as continentality-lite
 **rungs 0–1** (no engine change); **ocean heat capacity → seasonality** needs the
 seasonal cycle the annual-mean v1 lacks (the §3 scope edge); and **true longitudinal
 geography → regional climate, orographic precip, rain shadows** (the user's north star)
-is the **rung-5** exit from the zonal-mean planet — new transport that leaves the frozen
+is the **rung-5** exit from the zonal-mean planet — new transport that leaves the
 1-D engine. Until those rungs, an imported/edited geography is **inert** (§9.3).
 
 ---
@@ -488,7 +488,7 @@ smoke-test; any long shallow-water integration).
 
 | Program invariant | How this plan honors it |
 |---|---|
-| 1 — build toolkit once, solver-heavy first | Reuses the frozen diffusion spine (Phases 1–2, 4) **and builds the program's one remaining shared engine** (`engines/fluid`, Phase 3) — the capstone's structural job. |
+| 1 — build toolkit once, solver-heavy first | Reuses the shared diffusion spine (Phases 1–2, 4) **and builds the program's one remaining shared engine** (`engines/fluid`, Phase 3) — the capstone's structural job. |
 | 2 — phase so each stage banks a working artifact | Four phases, each an explicit banked artifact (hysteresis loop, biome map, geostrophic-adjustment animation, emergent jet). **Payoff banked early** (biomes = Phase 2) so the project degrades gracefully if the new engine proves hard. |
 | 3 — validation triad from day one | Instantiated *concretely per phase* in §3 (analytic + conservation + benchmark), each with its non-circularity split + scope edge. The Phase-2 "conservation" leg is honestly flagged as a consistency/partition check, not a fabricated law. |
 | 4 — target consequence where mechanism is a wall | §5: a reduced coupled climate + biome map instead of a GCM — and the ceiling is written as a **documented staircase**, the consequence-now / climb-later form of §8. |
@@ -596,7 +596,7 @@ cost gradient (mirrored into the §5 table):
 |---|---|---|---|
 | **cheap — stays 1-D, annual-mean** | elevation `z`; land/ocean fraction per band | elevation → a **lapse-rate** map diagnostic `T_surf = T_band − Γ·z`; land/ocean → an **albedo difference** into the existing per-band albedo; fraction-per-band = continentality-lite | no engine change |
 | **needs seasonality** | ocean depth / **heat capacity** | thermal lag, continentality | **v1 cannot** — annual-mean drops `C` at equilibrium; named, not built |
-| **needs 2-D** (the north star) | true longitudinal geography | **regional climate, orographic precip, rain shadows** | new transport — **leaves the frozen 1-D engine** |
+| **needs 2-D** (the north star) | true longitudinal geography | **regional climate, orographic precip, rain shadows** | new transport — **leaves the 1-D engine** |
 
 **State interchange (ADR 0004 #3–4): pin a schema, not a format.** A documented
 **planet-spec** schema — grid geometry, **explicit units** (self-describing), the
@@ -700,11 +700,11 @@ conservation diagnostics). **Gate/infra consequences realized:** `planet`'s `use
 
 **Built — Phase 4: the one-way EBM→circulation coupler (2026-06-09 — the capstone complete).**
 `planet/coupler.py` (+ `demo_coupler.py`, `plots.coupler_figure`, the 9-test `test_coupler`
-triad + 2-test `test_demo_coupler`) **couples the two shared engines**: the frozen diffusion spine's
-EBM equilibrium hands its meridional temperature gradient to the frozen shallow-water engine, and a
+triad + 2-test `test_demo_coupler`) **couples the two shared engines**: the diffusion spine's
+EBM equilibrium hands its meridional temperature gradient to the shallow-water engine, and a
 **geostrophically-balanced midlatitude westerly jet emerges** (banked: ~16.5 m/s @ ~42°, core
 geostrophic residual ~0.6%, `docs/figures/planet-coupler.png`). The forcing is composed *around* the
-bare frozen engine by **operator splitting — the third reuse of the EBM/Jominy idiom**: exact-exponential
+bare engine by **operator splitting — the third reuse of the EBM/Jominy idiom**: exact-exponential
 **thermal relaxation** of `h` toward the EBM-derived target + weak **Rayleigh drag** (`τ_drag ≫ 1/f`,
 near-geostrophic), *half-forcing / full bare-engine-step / half-forcing*. Three calls baked in:
 **(1) y-periodicity** — the engine is doubly-periodic (walls are its named, unbuilt BC extension), so a

@@ -8,7 +8,7 @@ system (advisor-blessed; see :mod:`planet.coupler`):
   **latitude tracks the EBM gradient maximum** (an off-centre *synthetic* gradient makes the jet
   follow it — the decisive emergence proof: nothing imposes the jet location).
 * **Conservation (reframed).** Mass is machine-exact under forcing; the **release test** (forcing &
-  drag off → bare frozen engine) re-confirms the engine's mass/energy/enstrophy invariants **and the
+  drag off → bare engine) re-confirms the engine's mass/energy/enstrophy invariants **and the
   jet persists** — a genuine balanced state, not a forcing-propped artifact. (Energy/PV are *not*
   conserved *under* the forcing — that balance is what selects the steady jet; claiming otherwise
   would be false. The leg asserts what is true: mass forced + invariants on release.)
@@ -125,7 +125,7 @@ def test_mass_machine_exact_and_release_reconfirms_engine_invariants():
     """Conservation leg (reframed): mass forced-exact; release re-confirms invariants + the jet persists."""
     r = coupler.couple_jet(nx=48, ny=48)
     assert np.abs(r.mass).max() < 1e-10                        # mass machine-exact under forcing (zero-mean target)
-    # release: forcing & drag OFF → the bare frozen engine conserves its invariants ...
+    # release: forcing & drag OFF → the bare engine conserves its invariants ...
     assert np.abs(r.mass_release).max() < 1e-10
     assert np.abs(r.energy_release).max() < 1e-6
     assert np.abs(r.enstrophy_release).max() < 1e-3

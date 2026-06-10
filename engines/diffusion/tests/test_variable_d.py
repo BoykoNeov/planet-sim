@@ -1,9 +1,9 @@
 """Variable-diffusivity invariants: the callable ``D(t)`` and array ``D(x)`` paths.
 
-The frozen contract permits ``D`` as a scalar, a cell-centered array ``D(x)``, or
+The contract permits ``D`` as a scalar, a cell-centered array ``D(x)``, or
 a callable ``D(t)``. The three named seal tests all use a *scalar* ``D``, so these
 two surfaces — and the harmonic-mean face diffusivity that exists solely for
-unequal ``D`` — would otherwise be frozen untested. ``D(t)`` is not hypothetical:
+unequal ``D`` — would otherwise go untested. ``D(t)`` is not hypothetical:
 it is exactly steel's mass mode when carbon diffuses *during* cooling (Phase 1c).
 """
 import numpy as np

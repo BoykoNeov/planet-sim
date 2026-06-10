@@ -67,7 +67,7 @@ happens to compute.
 per-commit default; that does not scale, below.)*
 
 - *Routine commit gate* — `pytest -m "not slow"` (~8 s, ~240 tests). The
-  **whole-repo** fast lane: every project's pure tests **and** the frozen engines'
+  **whole-repo** fast lane: every project's pure tests **and** the shared engines'
   tests (the "used modules"). This runs before an ordinary commit.
 - *Full gate* — bare `pytest` → **everything**, incl. the live-solver / kernel
   tests (the tracked 248). Run only in **exceptional** cases: editing a shared

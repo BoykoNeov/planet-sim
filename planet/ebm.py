@@ -1,6 +1,6 @@
 """The latitudinal energy-balance model — the planet's climate spine (Planet Phase 1).
 
-Project #3 (the capstone) opens where Steel and Chip both started: **on the frozen
+Project #3 (the capstone) opens where Steel and Chip both started: **on the shared
 diffusion spine** (:mod:`engines.diffusion`). Latitudinal heat transport on a sphere
 *is* a diffusion equation, so the EBM reuses the sealed parabolic solver a **third**
 time — now as a planet's pole-to-equator heat transport. The governing 1-D
@@ -16,9 +16,9 @@ plain ``∫₀¹ T dx``). ``D·∂/∂x[(1−x²)∂T/∂x]`` is meridional diff
 banked artifact) is the **Snowball-Earth hysteresis** the ice-albedo feedback produces
 (:mod:`planet.albedo`); this module is the engine-coupled foundation it stands on.
 
-How the frozen engine is reused — transport in the engine, radiation split around it
+How the engine is reused — transport in the engine, radiation split around it
 -------------------------------------------------------------------------------------
-The frozen solver advances ``∂u/∂t = ∂/∂x(D_eng ∂u/∂x) + S(x,t)``. The **transport**
+The diffusion solver advances ``∂u/∂t = ∂/∂x(D_eng ∂u/∂x) + S(x,t)``. The **transport**
 maps on exactly: in heat mode ``u = T`` and the spatially-varying array diffusivity is
 
     D_eng(x) = (D / C)·(1 − x²)        (W m⁻² K⁻¹ → per-step diffusivity; vanishes at the pole)
@@ -26,7 +26,7 @@ maps on exactly: in heat mode ``u = T`` and the spatially-varying array diffusiv
 with **Neumann(0)** at both ends — the equator (x=0) end by hemispheric symmetry, the
 pole (x=1) end by no-flux through a pole. That insulated pair is the engine's exact
 conservation BC, so the transport **only redistributes** heat: ``∫T dx`` is conserved
-structurally (the engine's frozen no-flux invariant).
+structurally (the engine's no-flux invariant).
 
 The **radiation cannot be the engine's source.** ``−(A+B·T)`` is *linear in the state*
 and ``S(x)(1−α(T))`` is a *nonlinear pointwise function of T* (the albedo threshold),
@@ -34,7 +34,7 @@ while the engine's ``S`` is only ``S(x,t)`` — not ``S(u)``. So radiation is co
 *around* the engine by **Strang operator splitting**, the **identical idiom Steel's
 Jominy Phase-2a** used to graft its state-dependent lateral sink ``−h(T−T_air)`` onto
 the same solver (:mod:`projects.steel.jominy`). Each step is: a half-step of the local
-radiation ODE, a full implicit transport step (the frozen solver, untouched), a second
+radiation ODE, a full implicit transport step (the engine's solver, untouched), a second
 radiation half-step. The local ODE ``dT/dt = [S(1−α) − A − B·T]/C`` has, with α frozen
 at the substep's T, the **exact analytic** solution
 
@@ -44,8 +44,8 @@ at the substep's T, the **exact analytic** solution
 composition inherits the engine's unconditional stability with a 2nd-order splitting
 error in Δt. The **albedo threshold makes that pointwise step a nonlinear relaxation
 (α re-evaluated each substep) — which is precisely what creates the multiple equilibria**
-the Snowball demo rides. The reuse is therefore of *both* the frozen engine and the
-frozen splitting pattern — a stronger reuse than "the EBM is the engine."
+the Snowball demo rides. The reuse is therefore of *both* the engine and the
+Strang splitting pattern — a stronger reuse than "the EBM is the engine."
 
 Because equilibria are the target, ``C`` (heat capacity) sets only the relaxation
 *timescale*, not the steady state: at ``∂T/∂t = 0`` it cancels (``test_ebm`` asserts the
@@ -64,7 +64,7 @@ for accuracy/speed trade-offs and as a mutual cross-check web for validation:
   cell-centered ``(1−x²)`` and accepts that bias (a named ~0.1 °C polar floor on the North
   check); ``"exact"`` instead feeds cell values **pre-distorted** so the engine's harmonic
   mean *reproduces the true face coefficient* (:func:`cell_diffusivity_for_exact_faces`),
-  removing the floor (North → ~0.01 °C). Both feed the *same* relaxation and the *same* frozen
+  removing the floor (North → ~0.01 °C). Both feed the *same* relaxation and the *same*
   engine — the engine is never modified.
 * **Steady-state method** (``method=`` on :meth:`EnergyBalanceModel.equilibrium`).
   ``"relax"`` is the **Strang-split relaxation** above — the general path, the *only* one that
@@ -73,7 +73,7 @@ for accuracy/speed trade-offs and as a mutual cross-check web for validation:
   splitting error), but valid **only for a state-independent (constant-albedo) absorbed field**,
   so it serves as the fast splitting-error-free *reference* the no-feedback North check is
   cross-validated against (it raises if handed the ice feedback). Its reconstructed transport
-  operator ``L_T`` is **pinned to the frozen engine** by a test (the engine's transport ``step``
+  operator ``L_T`` is **pinned to the engine** by a test (the engine's transport ``step``
   equals solving ``(I − dt·L_T/C)``), so the "direct" path cannot silently drift from the engine.
 
 The default — ``face="harmonic"``, ``method="relax"`` — is the simple, general, snowball-capable
@@ -93,7 +93,7 @@ Validation triad (plan §3) — what is asserted tight vs loose
   correctly, in the no-feedback limit where the splitting is exact.
 * **Conservation (tight).** At equilibrium the **global energy balance**
   ``⟨S(1−α)⟩ = A + B·⟨T⟩`` (absorbed solar = OLR, area-mean ``⟨·⟩ = ∫₀¹·dx``) holds to
-  machine precision; the diffusive transport conserves ``∫T dx`` structurally (the frozen
+  machine precision; the diffusive transport conserves ``∫T dx`` structurally (the engine's
   no-flux invariant, re-confirmed for the Neumann(0)/Neumann(0) pair).
 * **Benchmark (loose).** climlab's EBM — present-day ice line ~70°, the Snowball threshold,
   the hysteresis width (:mod:`planet.climate_reference`, the pycalphad pattern:
@@ -101,7 +101,7 @@ Validation triad (plan §3) — what is asserted tight vs loose
 
 Non-circularity, named scope edge (plan §3)
 -------------------------------------------
-*Validated tight:* the structural reuse (frozen transport + the analytic two-mode it must
+*Validated tight:* the structural reuse (diffusive transport + the analytic two-mode it must
 reproduce) and the global-balance conservation. *Calibrated/flagged:* the radiation/albedo
 constants ``A, B, D, α, Tf`` are the climlab/North/Budyko defaults ([[ebm-radiation-source]],
 pinned at build) — so the *exact* threshold numbers are calibration-dependent, asserted only
@@ -215,7 +215,7 @@ def _harmonic_mean(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 def cell_diffusivity_for_exact_faces(grid, coeff) -> np.ndarray:
     """Cell-centered D whose engine harmonic-mean *faces* reproduce ``coeff(x)`` exactly (mode ``"exact"``).
 
-    The frozen engine builds each interior face diffusivity as the harmonic mean of the two
+    The engine builds each interior face diffusivity as the harmonic mean of the two
     adjacent **cell** values; for a smoothly-varying coefficient that is ~2nd-order accurate in
     the interior but O(1)-biased where the coefficient nearly vanishes (the pole, ``(1−x²)→0``).
     This inverts the harmonic mean so the engine sees the **true face values**: writing
@@ -289,10 +289,10 @@ class ClimateState:
 
 
 class EnergyBalanceModel:
-    """The transport + radiation EBM machinery: frozen-engine diffusion, Strang-split radiation.
+    """The transport + radiation EBM machinery: shared-engine diffusion, Strang-split radiation.
 
     Holds the OLR (``A``, ``B``) and transport (``D``) constants, the ice-line isotherm ``Tf``
-    (for the diagnostic), and the heat capacity ``C`` (from ``water_depth``). Builds the frozen
+    (for the diagnostic), and the heat capacity ``C`` (from ``water_depth``). Builds the
     :class:`~engines.diffusion.Diffusion1D` **once** in heat mode — array diffusivity
     ``D_eng(x) = (D/C)(1−x²)``, insulated (Neumann 0) at both ends — and reuses it across a
     whole continuation sweep (only the radiation forcing changes with S₀). The radiation is
@@ -321,7 +321,7 @@ class EnergyBalanceModel:
         self.face = face
         self.C = RHO_WATER * CW_WATER * self.water_depth     # J m⁻² K⁻¹ (timescale only)
         self.tau_rad = self.C / self.B                       # s — radiative relaxation time
-        # Build the frozen heat-transport solver ONCE: x = sin φ on [0, 1], insulated poles.
+        # Build the heat-transport solver ONCE: x = sin φ on [0, 1], insulated poles.
         self.grid = uniform_grid(1.0, self.n_cells)
         self.x = self.grid.centers                           # cell-center sin φ
         # The (scaled) transport coefficient (D/C)(1−x²), vanishing at the pole. In "harmonic"
@@ -337,7 +337,7 @@ class EnergyBalanceModel:
         self.solver = Diffusion1D(self.grid, self._Dcells, Neumann(0.0), Neumann(0.0))
 
     def global_mean(self, T: np.ndarray) -> float:
-        """Area-mean temperature ``∫₀¹ T dx`` (°C) — the frozen engine's ``total`` (Δx = equal area)."""
+        """Area-mean temperature ``∫₀¹ T dx`` (°C) — the engine's ``total`` (Δx = equal area)."""
         return float(self.solver.total(T))                   # L = 1, so total = area mean
 
     def _radiation_half(self, T: np.ndarray, absorbed: np.ndarray, dt: float) -> np.ndarray:
@@ -399,7 +399,7 @@ class EnergyBalanceModel:
     def _transport_tridiag(self):
         """Tridiagonals of the unscaled transport operator ``L_T = D·d/dx[(1−x²)d/dx]``.
 
-        Assembled **exactly as the frozen engine assembles its operator** — harmonic-mean faces
+        Assembled **exactly as the engine assembles its operator** — harmonic-mean faces
         of the model's cell diffusivity (plain or exact-face, per ``self.face``), divided by the
         center spacing, with insulated (Neumann 0) ends carrying no exterior-face term. Equals
         ``C × (the engine's transport rate operator)``; ``test_ebm`` pins the two together (the

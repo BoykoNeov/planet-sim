@@ -1,4 +1,4 @@
-"""Planet Phase-3 validation: the planetary instantiation of the frozen shallow-water engine.
+"""Planet Phase-3 validation: the planetary instantiation of the shared shallow-water engine.
 
 The *engine* seal (``engines/fluid/tests/``) validates the generic solver (wave speeds,
 geostrophic balance, PV at finite amplitude). *Here* the **planetary numbers** are pinned and

@@ -1,6 +1,6 @@
 """Source-term invariant: exact source-augmented conservation.
 
-``source`` is part of the frozen API and the PDE, so it carries its own seal. A
+``source`` is part of the engine's API and the PDE, so it carries its own seal. A
 spatially-uniform source ``S`` with no-flux boundaries and a uniform initial
 field keeps the field uniform, so every cell rises by exactly ``S·t`` and the
 total by ``S·L·t`` — both to machine precision (backward Euler is exact for a

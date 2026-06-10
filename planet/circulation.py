@@ -1,6 +1,6 @@
 """Planet's instantiation of the shallow-water engine — a midlatitude β-plane (Planet Phase 3).
 
-This is the **consumer** of the newly-frozen :mod:`engines.fluid` (load
+This is the **consumer** of the shared :mod:`engines.fluid` (load
 ``engines/fluid/CONTRACT.md``, never the engine internals): it pins the *planetary*
 constants the engine leaves to its consumer (Earth's rotation → ``f₀``, ``β``; an
 equivalent depth ``H`` → gravity-wave speed and the deformation radius ``L_R``) and drives

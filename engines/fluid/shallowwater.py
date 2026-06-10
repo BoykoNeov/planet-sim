@@ -20,7 +20,7 @@ the validation suite watches.
 This is a **hyperbolic, explicit** solver — it shares *no* machinery with the
 parabolic-implicit :mod:`engines.diffusion`. That is the point: the portfolio's
 second engine is a genuinely different solver class (a CFL-limited wave solver,
-not an unconditionally-stable tridiagonal one), built and frozen here so Planet's
+not an unconditionally-stable tridiagonal one), built here so Planet's
 circulation (Phase 4) and the documented GCM climb can reuse it behind a contract.
 
 Discretization
@@ -52,7 +52,7 @@ The stable data boundary (ADR 0001)
 -----------------------------------
 The ``state`` is a :class:`SWState` — three plain 2-D ``ndarray`` fields
 ``(h, u, v)`` of identical shape ``(ny, nx)``, *stacked fields* and nothing more.
-That bundle is the frozen data contract: :meth:`ShallowWater.step` / :meth:`solve`
+That bundle is the stable data contract: :meth:`ShallowWater.step` / :meth:`solve`
 consume and return exactly it, the diagnostics consume it, and no live object
 crosses the per-step boundary. The grid, ``g``, ``H``, ``f₀``, ``β``, and topography
 are **construction-time configuration** (they reduce to numbers / arrays during RHS
@@ -138,7 +138,7 @@ def uniform_grid(Lx: float, Ly: float, nx: int, ny: int) -> Grid2D:
 
 
 # --------------------------------------------------------------------------- #
-# State — the frozen data boundary: stacked plain 2-D fields
+# State — the stable data boundary: stacked plain 2-D fields
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class SWState:
