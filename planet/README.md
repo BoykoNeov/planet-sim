@@ -247,7 +247,12 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   staircase (rung-1 two-way coupler / editable elevation). The notebook stays matplotlib-only; the
   globe's obliquity/exoplanet sliders run in `planetmap.interactive_map` behind `[webviz]`, described
   not embedded. Executes clean top-to-bottom (the `slow` smoke test green, 29 s); **no module code, no
-  new engine, no gate-manifest change.**
+  new engine, no gate-manifest change.** **Pedagogy tiered (2026-06-10):** each of §1–§5 gained an
+  expert **`<details>` "Going deeper"** collapsible — the convention chip & steel already use, the one
+  notebook that lacked it — so the three reading depths are explicit (narrative = novice, sliders =
+  intermediate, the collapsible = expert: derivations, the Strang-split / C-grid / energy-not-enstrophy
+  machinery, and the named scope edges). Markdown-only, grounded in the cited module docstrings; banked
+  code-cell outputs byte-identical, smoke test still green.
 
 ## Test runner (tiered gate, ADR 0003 — the per-project successor)
 

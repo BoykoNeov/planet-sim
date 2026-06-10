@@ -668,7 +668,10 @@ engine, 2026-06-09).** *(Notebook extended 2026-06-10 to the full arc: §4 the w
 (`demo_shallowwater`) + §5 the emergent jet (`demo_coupler`) added as static banked renders, the §6
 deep-end globe de-staled — obliquity + `vector_overlay` now-built, "what's next" repointed up the §5
 staircase. Reach-not-evidence, so `nx=48` and the honest ~2 %-converges-to-~1 % Helmholtz framing;
-no module/engine change.)*
+no module/engine change. Pedagogy tiered 2026-06-10: §1–§5 each gained an expert `<details>` "Going
+deeper" collapsible — the chip/steel convention planet alone lacked — making the three reading depths
+explicit (narrative/sliders/collapsible = novice/intermediate/expert); markdown-only, banked outputs
+byte-identical.)*
 
 **Built — Phase 3: `engines/fluid` (the program's SECOND shared engine) + `circulation.py`** (2026-06-09).
 A rotating shallow-water solver on a doubly-periodic β-plane — **Arakawa C-grid, vector-invariant
