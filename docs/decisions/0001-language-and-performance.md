@@ -1,6 +1,8 @@
 # 0001 — Implementation language & performance-scaling strategy
 
-Status: Accepted — 2026-06-08
+Status: Accepted — 2026-06-08. **Partly superseded 2026-06-10 by ADR 0005** (engines are
+*living*, not immutable) — the *array-boundary interface* contract below stands; only the word
+"frozen" (in the don't-modify sense) is dropped.
 Scope: Program-level invariant; inherited by every per-project plan.
 
 ## Context
@@ -42,8 +44,8 @@ Performance is addressed by escalation, not by an up-front language bet:
 2. Accelerate a *profiled* hotspot in place — Numba (`@njit`) or Cython;
    JAX / CuPy for GPU.
 3. If a single engine genuinely needs a compiled core, reimplement **that
-   engine** behind its frozen `CONTRACT.md` (Rust / C++ / Julia) — consumers
-   untouched. No portfolio-wide language commitment.
+   engine** behind its stable `CONTRACT.md` *interface* (Rust / C++ / Julia) —
+   consumers untouched. No portfolio-wide language commitment.
 
 Engine contracts are kept **data-oriented** — plain arrays / numeric records in
 and out, no leaked Python objects (no live class instances or callbacks across
@@ -51,7 +53,7 @@ an engine boundary). This makes a single boundary serve *both* as the extension
 seam for a deferred heavy module (phase-field, GCM…) *and* as the language
 boundary at which that module may be a compiled implementation (built as a
 Python extension via PyO3 / pybind11 / Cython, or — for the heaviest — run as a
-separate process exchanging arrays). This property is stated and frozen in each
+separate process exchanging arrays). This property is stated and held stable in each
 engine's `CONTRACT.md`.
 
 ## Consequences

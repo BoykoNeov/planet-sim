@@ -223,8 +223,9 @@ The project's **central new contribution** and its **risk phase**: a rotating-fr
 ```
 
 — hyperbolic, **explicit** time stepping (CFL), staggered **C-grid**. Built standalone
-in `engines/fluid/`, validated, then **frozen** behind its own `CONTRACT.md` before
-Phase 4 depends on it (freeze-before-reuse, invariant 5).
+in `engines/fluid/`, validated, then sealed behind its own `CONTRACT.md` (its passing suite)
+before Phase 4 depends on it (build-and-validate before reuse; engines are *living* contracts,
+ADR 0005).
 
 **Validation triad — Phase 3**
 - *Analytical limit.* **Geostrophic balance** (steady state: `f×u = −g∇h`) reproduced;
@@ -242,7 +243,7 @@ Phase 4 depends on it (freeze-before-reuse, invariant 5).
 > radius / geostrophic adjustment** are the legs that fail loudly if `f`, `β`, or the
 > C-grid Coriolis averaging is wrong — so those are the seal, not `√(gH)`.
 
-**Extension-ready contract (the GCM-climb foresight, §5).** The frozen
+**Extension-ready contract (the GCM-climb foresight, §5).** The
 `engines/fluid/CONTRACT.md` declares `state` as a **stack of plain 2-D fields**
 (`h`, `u`, `v`, and an *optional tracer slot*) so that (a) **1→N layers** is a
 contract **extension**, not a rewrite (rung 3 — baroclinic), and (b) an **advected
@@ -331,10 +332,10 @@ internals (ARCHITECTURE.md §6). Mirrors `projects/steel/` and `projects/chip/`.
 ```
 BigSim/
   engines/
-    diffusion/CONTRACT.md     # the FROZEN spine Planet reuses (load this, not steel/)
-    fluid/                    # the NEW shared engine, built & frozen in Phase 3
+    diffusion/CONTRACT.md     # the diffusion spine Planet reuses (load this, not steel/)
+    fluid/                    # the NEW shared engine, built & validated in Phase 3
       shallowwater.py         #   rotating β-plane shallow water (C-grid, explicit)
-      CONTRACT.md             #   the FROZEN one-page API (extension-ready: stacked fields, tracer slot)
+      CONTRACT.md             #   the one-page API (living/versioned; extension-ready: stacked fields, tracer slot)
       tests/                  #   geostrophic balance, wave speeds, PV/mass/energy — the seal
   planet/
     ebm.py                    # 0-D + 1-D latitudinal EBM; frozen-diffusion transport + Strang-split radiation  (Phase 1)
@@ -491,7 +492,7 @@ smoke-test; any long shallow-water integration).
 | 2 — phase so each stage banks a working artifact | Four phases, each an explicit banked artifact (hysteresis loop, biome map, geostrophic-adjustment animation, emergent jet). **Payoff banked early** (biomes = Phase 2) so the project degrades gracefully if the new engine proves hard. |
 | 3 — validation triad from day one | Instantiated *concretely per phase* in §3 (analytic + conservation + benchmark), each with its non-circularity split + scope edge. The Phase-2 "conservation" leg is honestly flagged as a consistency/partition check, not a fabricated law. |
 | 4 — target consequence where mechanism is a wall | §5: a reduced coupled climate + biome map instead of a GCM — and the ceiling is written as a **documented staircase**, the consequence-now / climb-later form of §8. |
-| 5 — reuse only frozen modules | Reuses `engines/diffusion/CONTRACT.md` (sealed in Steel 1a); **freezes `engines/fluid` behind its own seal before Phase 4 couples to it.** |
+| 5 — reuse validated modules behind their `CONTRACT.md` | Reuses `engines/diffusion/CONTRACT.md` (validated in Steel 1a); **builds & validates `engines/fluid` behind its own suite before Phase 4 couples to it** (engines are *living* contracts — ADR 0005). |
 | 6 — updating docs is part of every change | This plan + per-module READMEs + `engines/fluid/CONTRACT.md` + `docs/decisions/` + the ARCHITECTURE.md §11 pointer are maintained per change. |
 | Terms of use (§9) | §6: clean (no export dimension); the lone diligence item is an **observed biome/topography/reanalysis dataset** license-check — flagged, the CALPHAD-DB analogue. |
 
@@ -675,8 +676,8 @@ byte-identical.)*
 
 **Built — Phase 3: `engines/fluid` (the program's SECOND shared engine) + `circulation.py`** (2026-06-09).
 A rotating shallow-water solver on a doubly-periodic β-plane — **Arakawa C-grid, vector-invariant
-form, explicit SSP-RK3** — built standalone in `engines/fluid/` and **frozen behind
-`engines/fluid/CONTRACT.md`** before any coupling (invariant 5). It deliberately shares *no* machinery
+form, explicit SSP-RK3** — built standalone in `engines/fluid/` and **sealed behind its passing
+suite in `engines/fluid/CONTRACT.md`** before any coupling (build-and-validate before reuse). It deliberately shares *no* machinery
 with the parabolic-implicit `engines/diffusion` (a hyperbolic, CFL-limited wave solver). **Validation
 triad:** gravity-wave `√(gH)` + **Poincaré dispersion `ω²=f₀²+gHk²`** to ~1e-3 (the rotation check),
 **Rossby waves** westward & dispersive (loose band, *converging to analytic as the grid refines* — a

@@ -1,7 +1,9 @@
 # 0003 — Test execution policy (the tiered gate)
 
 Status: Accepted — 2026-06-09 (amended same day — see Amendment; the per-project Successor
-was built 2026-06-09 once Microchip landed — see *Successor*)
+was built 2026-06-09 once Microchip landed — see *Successor*). **Partly superseded 2026-06-10
+by ADR 0005** (engines are living contracts, not frozen) — see Amendment (2026-06-10); the gate
+mechanics are unchanged.
 Scope: Program-level invariant; inherited by every per-project plan.
 
 > **Extraction note (standalone repo).** This ADR was written for the BigSim monorepo. In this
@@ -42,8 +44,9 @@ Forces in play:
   is green," or heavyweight/flaky tests rot silently between commits.
 - The tracked invariant ("248 green") is externalized contract memory (§6–§7);
   it must have **one** canonical source, not a fast-count competing with it.
-- Freeze-before-reuse (§6) already makes the dependency graph a DAG: a frozen
-  engine's tests can only break when that engine is edited.
+- The dependency graph is a DAG: an engine's tests can only break when that engine is
+  **edited** — so a commit that does not touch an engine cannot regress it (this needs no
+  freeze; engines are living contracts, ADR 0005).
 
 ## Decision
 
@@ -98,7 +101,7 @@ test that should have run is worse than a convention) plus a dependency map to m
 A secondary note, *not* a load-bearing reason: `pytest projects/steel` collects only
 the test *files* under that path, so the engine's own `engines/diffusion/tests/` are
 not run **as tests**. The engine *code* is still exercised (steel imports it), and —
-because the engine is **frozen** — a steel-only commit cannot regress those engine
+because a steel-only commit does **not edit** the engine — it cannot regress those engine
 tests anyway, so not collecting them is *harmless* here, not a real loss. It only
 matters when you actually edit the engine, which is the cross-cutting **full-gate**
 case. So whole-repo fast lane wins on (a)+(b), not on "scoping would miss a regression."
@@ -150,8 +153,8 @@ reason or pin the solve. Until then it is a known, full-gate-visible flake.
   between identical sets, the fast lane is already ~8 s so scoping buys ~nothing, and
   a classifier that silently skips a needed test is a worse failure mode than a
   convention. Deferred to the ~30 s trigger. (See §4 for why the "narrow scoping drops
-  the used-module/engine tests" framing is only a secondary, frozen-harmless note, not
-  the reason.)
+  the used-module/engine tests" framing is only a secondary, harmless-because-untouched note,
+  not the reason.)
 - **Mark by a time threshold (e.g. `> 2 s`)** — rejected: brittle (drifts with
   hardware and incidental test growth) and not self-documenting. "Drives a live
   external engine" is a stable, intent-revealing rule.
@@ -281,3 +284,14 @@ Decisions settled at build (the ones the ADR left open / flagged):
   has nothing to check (§8: name the extension, don't build it). Forward note: when built it
   must run *inside* the per-project gate, not only the whole-repo lane, or it won't fire on
   a per-project commit.
+
+## Amendment (2026-06-10) — engines are living contracts (ADR 0005)
+
+This ADR's body justifies *not collecting* an engine's tests on a project-only commit partly
+by "the engine is **frozen**". **Engines are no longer frozen** — they are living, versioned
+contracts extended directly by consumers (ADR 0005). **The gate mechanics are unchanged**, and
+the reasoning holds without the freeze: a commit that does **not modify** an engine cannot
+regress it (it doesn't touch it); a commit that **does** modify a shared engine is the
+cross-cutting **full-gate** case (Decision #2) — which now also runs the **import-drift guard**
+(built with engine #2, the *Built* note above). The freeze-based phrasings in the body have
+been reframed to "untouched"; nothing in the policy moves.

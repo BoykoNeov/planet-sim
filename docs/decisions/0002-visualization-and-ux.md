@@ -15,7 +15,7 @@ doctrine.
 Forces in play:
 
 - Engines are headless and data-oriented (arrays / numeric records out) behind
-  frozen contracts (ADR 0001). Visualization must not contaminate that.
+  their stable data contracts (ADR 0001). Visualization must not contaminate that.
 - Correctness is established by the validation triad on the *numbers*
   (ARCHITECTURE.md §7) — not by how a plot looks.
 - The product teaches mechanisms and runs what-ifs on a laptop; it is not a

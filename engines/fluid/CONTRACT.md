@@ -1,11 +1,16 @@
 # `engines.fluid` — 2-D rotating shallow-water solver — CONTRACT
 
-> **Status: FROZEN — 2026-06-09** (Planet Phase 3). Sealed behind its passing
-> validation suite (`engines/fluid/tests/`, run via `./run_tests.ps1`). This one
-> page is the unit of context downstream code loads — Planet's circulation coupler
-> (Phase 4) and the documented GCM climb depend on *this*, never on
-> `planet/` internals. Changing the frozen surface below means a new ADR +
-> re-running the seal (ARCHITECTURE.md §5–6).
+> **Status: LIVING CONTRACT — versioned; the test suite *is* the contract.** Built
+> in Planet Phase 3, extended for the GCM climb (the advected tracer, rung 1 — see
+> below + the Changelog). Guarded by its passing validation suite
+> (`engines/fluid/tests/`, run via `./run_tests.ps1`); this one page is the unit of
+> context downstream code loads — Planet's circulation coupler and the documented
+> GCM climb depend on *this*, never on `planet/` internals. **Extend it directly
+> when a consumer needs it:** keep the suite green, add tests covering the new
+> surface, and record the change in the Changelog. Editing a shared engine triggers
+> the **full-repo gate** + the import-drift guard (ADR 0003) — that is the guardrail.
+> Engines are no longer frozen artifacts (ADR 0005, which supersedes the freeze
+> clauses of ADR 0001 / 0003).
 >
 > **The program's second shared engine** — and deliberately a *different solver
 > class* from `engines.diffusion`: hyperbolic & **explicit** (CFL-limited), where the
@@ -72,13 +77,13 @@ sw.relative_vorticity(state)    # ζ at corners     (∫ζ dA = 0 to machine pre
 sw.gravity_wave_speed           # √(gH);   sw.rossby_radius  √(gH)/|f0|
 ```
 
-- **`SWState`** is the frozen data boundary: three plain `(ny, nx)` `ndarray` fields
+- **`SWState`** is the stable (ADR-0001) data boundary: three plain `(ny, nx)` `ndarray` fields
   `(h, u, v)` — *stacked fields and nothing more* — plus an **optional `tracer`** slot.
 - **`step`** does not mutate its input; it **raises** on non-positive `dt`, on `dt`
   above the CFL stability limit (the explicit analogue of the diffusion engine's
   stability promise — here *conditional*, so enforced), and on a set `tracer` (below).
 
-### The frozen data boundary (ADR 0001)
+### The stable data boundary (ADR 0001)
 
 `state` is an `SWState` of plain 2-D arrays — and only it crosses the per-step boundary:
 `step`/`solve` consume and return it, the diagnostics consume it. No live object crosses.
@@ -96,7 +101,7 @@ advected in v1** — `step` raises `NotImplementedError` naming rung 1, the same
 seam, not the machinery" idiom as the map's unpainted `vector_overlay`. Adding either is a
 contract *extension* that does not change the per-step array boundary.
 
-## Frozen invariants (what the test suite guarantees — = the contract)
+## Guaranteed invariants (what the test suite enforces — = the contract)
 
 1. **Gravity-wave speed `√(gH)`** and **Poincaré dispersion `ω² = f₀² + gH·k²`**
    reproduced to ~1e-3 (`test_waves.py`). The Poincaré leg is the *rotation* check — the
@@ -142,3 +147,8 @@ contract *extension* that does not change the per-step array boundary.
   no vertical structure (multi-layer = rung 3), no moisture/tracer advection (rung 1), no
   sphere (rung 5 — the pole problem). The `SWState` array boundary is the seam where each is
   slotted without touching consumers.
+
+## Changelog
+
+- **2026-06-09 — Planet Phase 3.** Initial build & validation (the guaranteed invariants above).
+- **2026-06-10 — doctrine.** Status FROZEN → living, versioned contract (ADR 0005); no API change.

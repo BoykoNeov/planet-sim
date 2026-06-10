@@ -1,10 +1,14 @@
 # `engines.diffusion` — 1-D conservative parabolic solver — CONTRACT
 
-> **Status: FROZEN — 2026-06-08** (Steel Phase 1a). Sealed behind its passing
-> validation suite (`engines/diffusion/tests/`, run via `./run_tests.ps1`).
-> This one page is the unit of context downstream projects load — Microchip and
-> Planet depend on *this*, never on `projects/steel/`. Changing the frozen
-> surface below means a new ADR + re-running the seal (ARCHITECTURE.md §5–6).
+> **Status: LIVING CONTRACT — versioned; the test suite *is* the contract.** Built
+> in Steel Phase 1a; guarded by its passing validation suite
+> (`engines/diffusion/tests/`, run via `./run_tests.ps1`). This one page is the unit
+> of context downstream projects load — Microchip and Planet depend on *this*, never
+> on `projects/steel/`. **Extend it directly when a consumer needs it:** keep the
+> suite green, add tests covering the new surface, and record the change in the
+> Changelog. Editing a shared engine triggers the **full-repo gate** + the
+> import-drift guard (ADR 0003) — that is the guardrail. Engines are no longer frozen
+> artifacts (ADR 0005, which supersedes the freeze clauses of ADR 0001 / 0003).
 
 ## What it solves
 
@@ -77,7 +81,7 @@ at `"right"` `J>0` is outflow. The exact backward-Euler identity
 `total(stepped) − total(state) = dt·(flux(left) − flux(right))` holds to machine
 precision (test `test_flux_bookkeeping_exact_backward_euler`).
 
-### The frozen data boundary (ADR 0001)
+### The stable data boundary (ADR 0001)
 
 `state` is a **plain 1-D `ndarray`** of cell-centered `u`. That array — and only
 it — crosses the per-step boundary: `step`/`solve` consume and return it,
@@ -87,7 +91,7 @@ assembly; a compiled reimplementation (PyO3/Cython/…) parameterizes them nativ
 (e.g. `D₀,Q`; a BC enum + params) and exposes the same `state` array. The viz
 layer (ADR 0002) consumes the same `state` — never a live solver object.
 
-## Frozen invariants (what the test suite guarantees — = the contract)
+## Guaranteed invariants (what the test suite enforces — = the contract)
 
 1. **erfc semi-infinite profile** within tolerance, and **~2nd-order spatial
    convergence** (`test_erfc.py`; measured rates ≈ 2.00). The headline analytical
@@ -119,7 +123,7 @@ Phase 1a validates the **solver machinery** with constant/given `D`. The
 material parameter *values* — the Arrhenius `D₀, Q` for carbon, the `α` and
 convective `h` for heat — are supplied by the **consumer** (`projects/steel/`)
 and validated **there**, against the erfc carbon-profile benchmark and published
-TTT/Jominy data (Steel plan §3, Phases 1–2). The frozen seal here promises a
+TTT/Jominy data (Steel plan §3, Phases 1–2). The validation seal here promises a
 *correct generic parabolic solver*, not specific physical constants.
 
 ## Units & scope
@@ -128,3 +132,8 @@ TTT/Jominy data (Steel plan §3, Phases 1–2). The frozen seal here promises a
 - **Not in v1:** nonlinear `D(u)`; 2-D/3-D; explicit time stepping. The
   array-`state` boundary is the seam where a deferred heavy regime (or a compiled
   core) is later slotted without touching consumers (ARCHITECTURE.md §8, ADR 0001).
+
+## Changelog
+
+- **2026-06-08 — Steel Phase 1a.** Initial build & validation (the guaranteed invariants above).
+- **2026-06-10 — doctrine.** Status FROZEN → living, versioned contract (ADR 0005); no API change.
