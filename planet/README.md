@@ -267,16 +267,20 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   reduction-to-EBM (`D_eff`), not a tuned PW number.
 - **Rung 1 — step 2, Phase A BUILT** (the two-way feedback *machinery*; `planet/transport.py`). Given a
   meridional eddy heat flux `⟨v'θ'⟩(φ)`, the **κ→D bridge** (`D = C_atm·κ/a²`, physical/citable;
-  rung-0 `D=0.555` ⟺ `κ≈2.2×10⁶ m²/s`, the observed eddy-diffusivity order) maps the diagnosed
-  band-bulk down-gradient diffusivity to an EBM transport coefficient, which **re-equilibrates** the
-  EBM. **THE anchor — reduction-to-EBM:** the closure `⟨v'θ'⟩=−D_eff·∂θ̄/∂y` has the same *form* as the
-  EBM transport term, so the two-way model with a constant flow-diagnosed `D_eff` *is* a rung-0
-  diffusive EBM with that `D` (and rung-0 is a fixed point of the map). Phase A drives the machinery
-  with a **synthetic** down-gradient flux (the Phase-4 synthetic-gradient playbook) so it lands
-  independent of the eddy sim; `EnergyBalanceModel` now takes a callable `D(x)` for the band-limited
-  diagnostic. `tests/test_transport.py` (reduction, bridge, right-signed response, diagnosis sign).
+  rung-0 `D=0.555` ⟺ `κ≈2.17×10⁶ m²/s`, the observed eddy-diffusivity order — **pinned absolutely**,
+  not just round-tripped) maps the diagnosed band-bulk down-gradient diffusivity to an EBM transport
+  coefficient, which **re-equilibrates** the EBM. The *design* anchor is **reduction-to-EBM** (the
+  closure `⟨v'θ'⟩=−D_eff·∂θ̄/∂y` has the same *form* as the EBM transport term). Phase A drives the
+  machinery with a **synthetic** down-gradient flux (the Phase-4 synthetic-gradient playbook), so the
+  **machinery + pinned bridge + right-signed response** (stronger flux ⇒ flatter contrast — the EBM's
+  genuine physical response) land *independent* of the eddy sim; `EnergyBalanceModel` now takes a
+  callable `D(x)` for the band-limited diagnostic. **Honest scope:** Phase A's reduction reduces to
+  rung-0 *by construction* (re-equilibration re-runs the scalar-`D` EBM) — plumbing, not an independent
+  anchor; the *tight* reduction (independent flux-divergence = EBM operator, + the Cartesian↔spherical
+  geometry correspondence) needs the emergent flux → **Phase B**. `tests/test_transport.py`.
   **Next — step 2, Phase B:** the *emergent* eddy flux (advect θ on the unstable jet, diagnose
-  `⟨v'θ'⟩` post-saturation, magnitude named tuned); then **step 3** circulation-informed precip.
+  `⟨v'θ'⟩` post-saturation via a life-cycle integral, magnitude named tuned, + a `D_eff`-tracks-climate
+  non-circularity test); then **step 3** circulation-informed precip.
 
 ## Test runner (tiered gate, ADR 0003)
 

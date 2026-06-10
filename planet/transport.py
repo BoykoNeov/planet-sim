@@ -13,17 +13,21 @@ The A/B split — an anchored spine driven by a (tuned) eddy engine
 -----------------------------------------------------------------
 The deliverable separates into two parts with very different validation status:
 
-* **(A) the feedback *machinery* — where the tight anchor lives (this module, Phase A).** Given
-  *any* meridional flux ``⟨v'θ'⟩(φ)``, the κ→D bridge + re-equilibration is a clean, physical,
-  testable pipeline. Its anchor is **reduction-to-EBM**: the down-gradient closure
+* **(A) the feedback *machinery* — where the reduction-to-EBM anchor lives (this module, Phase A).**
+  Given *any* meridional flux ``⟨v'θ'⟩(φ)``, the κ→D bridge + re-equilibration is a clean, physical,
+  testable pipeline. The *design* anchor is **reduction-to-EBM**: the down-gradient closure
   ``⟨v'θ'⟩ = −D_eff·∂θ̄/∂y`` has the **same form** as the EBM's own transport term
   ``D·∂/∂x[(1−x²)∂T/∂x]``, so the two-way model with a constant flow-diagnosed ``D_eff`` *is* a
-  rung-0 diffusive EBM with that ``D``. To land this independent of the (messy) eddy simulation,
-  Phase A drives the machinery with a **synthetic, exactly down-gradient flux** (the Phase-4
-  playbook — there a synthetic off-centre gradient proved the jet tracked the climate, not the
-  channel; here a synthetic flux proves the feedback reduces to the EBM). :func:`two_way_pass`
-  takes the flux through an injectable ``flux_fn`` — the seam where the Phase-B eddy simulation
-  plugs in unchanged.
+  rung-0 diffusive EBM with that ``D``. Phase A drives the machinery with a **synthetic, exactly
+  down-gradient flux** (the Phase-4 playbook — there a synthetic off-centre gradient proved the jet
+  tracked the climate, not the channel), which lets the **machinery**, the **pinned bridge**, and the
+  **right-signed response** land *independent* of the (messy) eddy sim. **Honest scope:** Phase A's
+  "reduction" reduces to rung-0 *by construction* — :func:`two_way_pass` literally re-runs the
+  scalar-``D`` rung-0 EBM at ``D_eff`` — so it is *plumbing*, not an independent test. The genuinely
+  tight reduction (an **independent** two-way budget whose flux-divergence must match the EBM
+  operator, plus the Cartesian-channel ↔ spherical-EBM geometry correspondence) needs the emergent
+  flux and **arrives in Phase B**. :func:`two_way_pass` takes the flux through an injectable
+  ``flux_fn`` — the seam where the Phase-B eddy sim plugs in unchanged.
 * **(B) the eddy *engine* — where the magnitude is a named tuned scope edge (Phase B, not built
   here).** A real ``⟨v'θ'⟩`` comes from advecting θ (relaxed toward the EBM target) on the
   **barotropically unstable** Phase-4 jet (the step-0 probe established the instability exists), so

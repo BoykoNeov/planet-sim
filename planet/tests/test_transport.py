@@ -6,22 +6,27 @@ Phase A validates the **feedback machinery** driven by a *synthetic* exactly-dow
 (the Phase-B eddy simulation is not built yet — it plugs into the ``flux_fn`` seam). What is
 asserted, and its honesty class:
 
-* **THE anchor — reduction-to-EBM (tight).** The down-gradient closure ``⟨v'θ'⟩ = −D_eff·∂θ̄/∂y``
-  has the **same form** as the EBM's transport term, so the two-way model with a constant
-  flow-diagnosed ``D_eff`` *is* a rung-0 diffusive EBM with that ``D``: re-equilibrating at the
-  diagnosed ``D_eff`` reproduces a rung-0 EBM run directly at the bridge-implied ``D``
-  (``test_reduction_to_ebm``), and rung-0 is a **fixed point** of the two-way map when the flux is
-  the EBM's own diffusive flux (``test_rung0_is_a_fixed_point``). This threads the *entire* pipeline
-  (flux → gradient → κ → D → climate) — a sign, an ``a²``, the ``C_atm`` value, or the band mask
-  being wrong all break it. (Distinct from the *refactor-hygiene* array≡scalar ``D`` test in
-  ``test_ebm`` — that has no eddy content.)
-* **The κ→D bridge (physical, tight).** ``D = C_atm·κ/a²`` round-trips exactly, and rung-0's
-  ``D = 0.555`` maps to ``κ ≈ 2.2×10⁶ m²/s`` — the observed midlatitude eddy-diffusivity order.
-* **Right-signed climate response (the headline-supporting leg).** A *stronger* eddy flux (larger
-  ``D_eff``) flattens the equator-to-pole contrast; a weaker one steepens it — monotone. (One
-  feedback pass; the converged self-consistent fixed point and the *emergent* flux are Phase B.)
-* **Diagnosis (tight).** ``bulk_diffusivity`` recovers the prescribed ``κ`` from an exactly
-  down-gradient flux and reports the correct **sign** (down-gradient → positive).
+* **The κ→D bridge — physical, pinned (tight).** ``D = C_atm·κ/a²`` (``C_atm = c_p·p_s/g``, the
+  atmospheric column heat capacity) is pinned to its **computed value** (``test_bridge…``) — not
+  just round-tripped, which would let a wrong ``a²``/``C_atm`` cancel — so the "physical/citable
+  bridge" claim is actually backed: rung-0's ``D = 0.555`` maps to ``κ ≈ 2.17×10⁶ m²/s``, the
+  observed midlatitude eddy-diffusivity order.
+* **Right-signed climate response (tight, non-tautological — the headline-supporting leg).** A
+  *stronger* eddy flux (larger ``D_eff``) flattens the equator-to-pole contrast; a weaker one
+  steepens it (``test_stronger_flux…``) — the EBM's genuine *physical* response to transport (it
+  varies ``D`` and checks the climate, so it cannot pass by construction). One feedback pass; the
+  converged self-consistent fixed point and the *emergent* flux are Phase B.
+* **Feedback plumbing (tight).** ``bulk_diffusivity`` recovers a prescribed ``κ`` with the correct
+  **sign** (down-gradient → positive; up-gradient → negative → the EBM rejects it), and
+  ``two_way_pass`` *routes* the diagnosed ``D_eff`` into the EBM re-equilibration
+  (``test_reduction_to_ebm``, ``test_rung0_is_a_fixed_point``).
+* **What Phase A does NOT yet anchor (honest scope).** The design anchor "reduction-to-EBM"
+  *reduces to rung-0 by construction* here — ``two_way_pass`` literally re-runs the scalar-``D``
+  rung-0 EBM at ``D_eff``, so it cannot fail and is plumbing, not an independent test. The genuinely
+  tight reduction (an *independent* two-way budget whose flux-divergence must match the EBM operator
+  ``D·∂/∂x[(1−x²)∂T/∂x]``, plus the Cartesian-channel ↔ spherical-EBM geometry correspondence) needs
+  the emergent flux and arrives in **Phase B**. (Distinct from the *refactor-hygiene* array≡scalar
+  ``D`` test in ``test_ebm`` — that has no eddy content either.)
 """
 from dataclasses import replace
 
@@ -44,11 +49,11 @@ def test_bridge_roundtrips_and_recovers_observed_eddy_diffusivity():
     # Round-trip is exact (the bridge is a single multiplicative constant C_atm/a²).
     for D in (0.2, 0.555, 1.0):
         assert float(tr.kappa_to_ebm_D(tr.ebm_D_to_kappa(D))) == pytest.approx(D, rel=1e-12)
-    # Magnitude sanity: rung-0 D = 0.555 ⟺ κ in the observed midlatitude range (~1–5×10⁶ m²/s).
-    kappa0 = float(tr.ebm_D_to_kappa(D_TRANSPORT))
-    assert 1.0e6 < kappa0 < 5.0e6
-    # C_atm is the textbook tropospheric column heat capacity (~10⁷ J m⁻² K⁻¹).
-    assert 0.8e7 < tr.C_ATM < 1.2e7
+    # PIN THE BRIDGE ABSOLUTELY (not just the round-trip, which would let a wrong a²/C_atm cancel):
+    # C_atm = c_p·p_s/g ≈ 1.037×10⁷ J m⁻² K⁻¹, and rung-0 D = 0.555 ⟺ κ ≈ 2.17×10⁶ m²/s — the
+    # computed value, which also lands in the observed midlatitude eddy-diffusivity range (~1–5×10⁶).
+    assert tr.C_ATM == pytest.approx(1.037e7, rel=1e-2)
+    assert float(tr.ebm_D_to_kappa(D_TRANSPORT)) == pytest.approx(2.17e6, rel=2e-2)
 
 
 # --------------------------------------------------------------------------- #
@@ -77,22 +82,25 @@ def test_bulk_diffusivity_raises_on_zero_gradient():
 # THE anchor — reduction-to-EBM.
 # --------------------------------------------------------------------------- #
 def test_reduction_to_ebm():
-    """With a constant flow-diagnosed D_eff, the two-way model *is* a rung-0 diffusive EBM with that
-    D: re-equilibrating at the diagnosed D_eff reproduces a rung-0 EBM run directly at the bridge-
-    implied D. Driven by an INDEPENDENT κ (not the bridge's own κ₀), so it is not circular."""
-    kappa_test = 1.5e6                               # an independent physical diffusivity
+    """PLUMBING (not the tight anchor — see the module docstring): the machinery recovers a
+    prescribed κ from the synthetic flux and *routes* the diagnosed D_eff into re-equilibration —
+    the re-equilibrated climate is a rung-0 EBM at the diagnosed D. Note this is correct *by
+    construction* (two_way_pass re-runs the scalar-D rung-0 EBM) and the bridge cancels on both
+    sides, so it does NOT test the bridge value (that is pinned absolutely above); the genuinely
+    tight reduction (independent flux-divergence = EBM operator) is Phase B."""
+    kappa_test = 1.5e6
     res = tr.two_way_pass(params=COARSE,
                           flux_fn=lambda theta, y: tr.diffusive_flux(theta, y, kappa_test))
-    # the machinery recovers the prescribed κ from the synthetic flux …
-    assert res.kappa_eff == pytest.approx(kappa_test, rel=1e-9)
-    # … and its re-equilibrated climate is a rung-0 EBM at the bridge-implied D (the reduction)
-    ref = present_day_climate(replace(COARSE, D=float(tr.kappa_to_ebm_D(kappa_test))))
-    assert np.allclose(res.climate_after.T, ref.T, atol=1e-6)
+    assert res.kappa_eff == pytest.approx(kappa_test, rel=1e-9)   # κ recovered from the flux
+    ref = present_day_climate(replace(COARSE, D=res.D_eff))       # re-equilibration routes D_eff …
+    assert np.allclose(res.climate_after.T, ref.T, atol=1e-6)     # … into a rung-0 EBM at that D
 
 
 def test_rung0_is_a_fixed_point():
     """The down-gradient limit recovers rung 0: when the eddy flux equals the EBM's own diffusive
-    flux (the default flux_fn), the two-way map returns rung-0 — D_eff = D and the climate unchanged."""
+    flux (the default flux_fn), the two-way map returns rung-0 — D_eff = D (a κ→D round-trip) and the
+    climate unchanged (by construction, the re-equilibration re-runs rung-0). A consistency check on
+    the pipeline, not an independent bridge/structure test (those are pinned/deferred respectively)."""
     res = tr.two_way_pass(params=COARSE)             # default flux = rung-0's diffusive flux
     assert res.D_eff == pytest.approx(D_TRANSPORT, rel=1e-9)
     assert res.kappa_eff == pytest.approx(float(tr.ebm_D_to_kappa(D_TRANSPORT)), rel=1e-9)

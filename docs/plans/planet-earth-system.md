@@ -756,19 +756,26 @@ closes the loop given *any* meridional eddy heat flux `⟨v'θ'⟩(φ)`: the **�
 eddy-diffusivity order) maps the **band-bulk** down-gradient diffusivity (least-squares over the
 window-flat interior) to an EBM transport coefficient, which **re-equilibrates** the EBM (uniform
 `D_eff` is the headline; `EnergyBalanceModel` now also accepts a callable `D(x)` for the band-limited
-diagnostic). **THE anchor — reduction-to-EBM:** the closure `⟨v'θ'⟩=−D_eff·∂θ̄/∂y` has the *same form*
-as the EBM transport term, so the two-way model with a constant flow-diagnosed `D_eff` *is* a rung-0
-diffusive EBM with that `D`; tested by (a) re-equilibrating at an *independently*-chosen κ recovering a
-rung-0 EBM at the bridge-implied `D`, and (b) **rung-0 being a fixed point** of the map (the EBM's own
-diffusive flux → `D_eff=D`, climate unchanged). Plus the bridge round-trip/magnitude and the
-**right-signed response** (stronger flux ⇒ flatter contrast). **De-risked the A/B split** (advisor):
-Phase A drives the machinery with a **synthetic** down-gradient flux (the Phase-4 synthetic-gradient
-playbook), so it lands *independent* of the (tuned) eddy sim; the `flux_fn` argument is the seam Phase B
-plugs into. Planet gate **151 passed, 1 skip** (no shared-engine edit → planet gate, not full-repo).
-**Next (step 2, Phase B):** the *emergent* eddy flux — advect θ (relaxed to the EBM target) on the
-barotropically-unstable jet, diagnose `⟨v'θ'⟩` **post-saturation** via a life-cycle integral (release
-mode), magnitude named tuned; the loop-closes claim scoped to **one feedback pass** (a converged
-fixed-point is a `slow` demo if it converges cleanly). Then **step 3** circulation-informed precip.
+diagnostic). The *design* anchor is **reduction-to-EBM:** the closure `⟨v'θ'⟩=−D_eff·∂θ̄/∂y` has the
+*same form* as the EBM transport term, so the two-way model with a constant flow-diagnosed `D_eff` *is*
+a rung-0 diffusive EBM with that `D`. **What Phase A actually validates (advisor-corrected honesty):**
+(i) the **bridge pinned absolutely** (`C_atm≈1.037e7`, `κ₀≈2.17e6` — *not* just round-tripped, which
+would let a wrong `a²`/`C_atm` cancel); (ii) the **right-signed response** (stronger flux ⇒ flatter
+contrast — the EBM's genuine physical response, non-tautological); (iii) the **plumbing** (κ recovered
++ `D_eff` routed into re-equilibration, sign rejected if up-gradient). The reduction itself **reduces
+to rung-0 by construction** in Phase A (the re-equilibration re-runs the scalar-`D` EBM) — plumbing,
+not an independent test; the **genuinely tight reduction** (an independent two-way budget whose
+flux-divergence matches the EBM operator, *plus* the **Cartesian-channel ↔ spherical-EBM geometry
+correspondence** — the bridge is derived for uniform κ on the sphere) needs the emergent flux and
+arrives in **Phase B**. **De-risked the A/B split** (advisor): Phase A drives the machinery with a
+**synthetic** down-gradient flux (the Phase-4 synthetic-gradient playbook), so it lands *independent*
+of the (tuned) eddy sim; the `flux_fn` argument is the seam Phase B plugs into. Planet gate
+**151 passed, 1 skip** (no shared-engine edit → planet gate, not full-repo). **Next (step 2, Phase B):**
+the *emergent* eddy flux — advect θ (relaxed to the EBM target) on the barotropically-unstable jet,
+diagnose `⟨v'θ'⟩` **post-saturation** via a life-cycle integral (release mode), magnitude named tuned,
++ a **`D_eff`-tracks-climate** non-circularity test (warm/flatter ⇒ smaller `D_eff`, else the loop is
+cosmetic); the loop-closes claim scoped to **one feedback pass** (a converged fixed-point is a `slow`
+demo if it converges cleanly). Then **step 3** circulation-informed precip.
 
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
