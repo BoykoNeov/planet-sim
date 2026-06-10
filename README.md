@@ -1,5 +1,7 @@
 # planet-sim — a planetary climate simulator
 
+[![full-gate](https://github.com/BoykoNeov/planet-sim/actions/workflows/full-gate.yml/badge.svg)](https://github.com/BoykoNeov/planet-sim/actions/workflows/full-gate.yml)
+
 *Stellar flux + planet parameters in, climate, circulation, and biomes out.* An educational
 simulator for planetary climate: a latitudinal energy-balance model (EBM) with the Snowball-Earth
 bifurcation, a Whittaker biome classifier, rotating shallow-water atmospheric circulation, a
