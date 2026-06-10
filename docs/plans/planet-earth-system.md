@@ -664,7 +664,11 @@ change**; opt-in behind a new `[webviz]` extra (Plotly + ipywidgets). 31-test pa
 registry always-green; render smoke-tests `importorskip` on Plotly — fast, not `slow`).
 
 **Built — the teaching notebook (`planet.ipynb`, 2026-06-09)** then **Phase 3 (the shallow-water
-engine, 2026-06-09).**
+engine, 2026-06-09).** *(Notebook extended 2026-06-10 to the full arc: §4 the winds
+(`demo_shallowwater`) + §5 the emergent jet (`demo_coupler`) added as static banked renders, the §6
+deep-end globe de-staled — obliquity + `vector_overlay` now-built, "what's next" repointed up the §5
+staircase. Reach-not-evidence, so `nx=48` and the honest ~2 %-converges-to-~1 % Helmholtz framing;
+no module/engine change.)*
 
 **Built — Phase 3: `engines/fluid` (the program's SECOND shared engine) + `circulation.py`** (2026-06-09).
 A rotating shallow-water solver on a doubly-periodic β-plane — **Arakawa C-grid, vector-invariant

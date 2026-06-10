@@ -204,8 +204,7 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   while the jet persists. The interactive map now **paints** the `vector_overlay` (the deferred
   Phase-4 seam): a `circulation` layer over the temperature field. One-way / dry single layer; two-way
   is rung 1 (the `tracer` seam). No engine modified; `planet` uses `{engines/diffusion, engines/fluid}`
-  unchanged. The chip-style teaching notebook `planet.ipynb` is built (Phases 1–2); a Phase-3/4 notebook
-  section is a later touch.
+  unchanged.
 - **§9.1 — the exoplanet knobs (stellar spectrum & planet size): BUILT** (2026-06-09, a growth-axis
   batch on the complete capstone). `exoplanet.py` adds two **parameter-deriving** knobs (no engine, no
   new EBM physics — both compute an `EBMParams` the existing machinery consumes): **(1) stellar
@@ -237,6 +236,18 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   no gate-manifest change**. Scope edge: the single-P₂-mode insolation truncates at high tilt (the real
   annual-mean grows `s₄`), and the model is annual-mean (no seasonal extremes); eccentricity/precession
   are a separate deferred Milankovitch axis.
+- **The teaching notebook now covers the full arc (`planet.ipynb`, §4–6 added): BUILT** (2026-06-10).
+  The chip-style thin skin (built 2026-06-09 for Phases 1–2 + the deep-end globe) gained the two
+  dynamics sections it was missing — **§4 the winds** (the second shared engine: geostrophic adjustment
+  + a westward Rossby wave, `demo_shallowwater`) and **§5 the emergent jet** (the one-way coupler's
+  capstone payoff, `demo_coupler`) — both static banked renders at `nx=48` (the demos still bank the
+  full-resolution figures; the notebook is *reach*, so the Helmholtz match prints the honest ~2 % and
+  names it as the converges-with-resolution beat). The deep-end globe section (now §6) was de-staled:
+  obliquity + the `vector_overlay` are now-built, not deferred, and "what's next" points up the GCM
+  staircase (rung-1 two-way coupler / editable elevation). The notebook stays matplotlib-only; the
+  globe's obliquity/exoplanet sliders run in `planetmap.interactive_map` behind `[webviz]`, described
+  not embedded. Executes clean top-to-bottom (the `slow` smoke test green, 29 s); **no module code, no
+  new engine, no gate-manifest change.**
 
 ## Test runner (tiered gate, ADR 0003 — the per-project successor)
 
