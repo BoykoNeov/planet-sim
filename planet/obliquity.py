@@ -93,6 +93,14 @@ OBLIQUITY_EARTH = 23.44        # °  — present-day Earth obliquity (the ratio 
 OBLIQUITY_MIN = 0.0            # °  — knob clamp: an untilted world (sunlight pinned at the equator, s₂ = −5/8)
 OBLIQUITY_MAX = 90.0           # °  — knob clamp: a pole-on world (the physics is defined to here)
 
+# A UI/scope edge, NOT a pinned physics number: the tilt up to which the single-P₂-mode knob stays
+# faithful — s₂ still negative and the s₄ the truncation drops still small (the "Scope edge, named"
+# docstring above). The interactive slider caps here and plots.py shades the same band; shared so the
+# figure annotation can't drift from the live control. The independent physics anchor — that s₂ is
+# still negative at this tilt — is asserted on a bare literal in tests.test_obliquity (kept separate
+# on purpose, so moving this cap can't silently move what the test pins).
+OBLIQUITY_FAITHFUL_MAX = 45.0  # °  — slider cap / faithful-regime edge (negative, pre-reversal s₂)
+
 _N_LAMBDA = 720                # year samples (0.5° of solar longitude) — the annual-mean integral
 _N_PHI = 721                   # latitude samples (0.25°, equator→pole) — the P₂ projection integral
 

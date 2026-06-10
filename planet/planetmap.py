@@ -107,12 +107,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from projects.planet import demo_biomes, exoplanet, obliquity
+from projects.planet import demo_biomes, exoplanet
 from projects.planet.albedo import EBMParams
 from projects.planet.biomes import Biome, BIOME_COLORS, BIOME_NAMES
 from projects.planet.ebm import A_OLR, D_TRANSPORT, S0_EARTH
 from projects.planet.exoplanet import T_SUN, exoplanet_params
-from projects.planet.obliquity import OBLIQUITY_EARTH, insolation_s2
+from projects.planet.obliquity import OBLIQUITY_EARTH, OBLIQUITY_FAITHFUL_MAX, OBLIQUITY_MIN, insolation_s2
 
 N_LON = 73                     # default longitude samples (−180…180 inclusive) — bands, so coarse is fine
 LIVE_N_TAU = 0.01              # relaxation step for a live recompute; matches demo_biomes' fine present-day
@@ -546,7 +546,7 @@ def interactive_map(n_tau: float = LIVE_N_TAU):
     size = widgets.FloatSlider(value=1.0, min=exoplanet.SIZE_MIN, max=2.0, step=0.05,
                                description="size (R⊕)", continuous_update=False, readout_format=".2f",
                                tooltip="planet size → transport only (bigger = sharper gradient; §9.1)")
-    obliquity = widgets.FloatSlider(value=OBLIQUITY_EARTH, min=0.0, max=45.0, step=0.5,
+    obliquity = widgets.FloatSlider(value=OBLIQUITY_EARTH, min=OBLIQUITY_MIN, max=OBLIQUITY_FAITHFUL_MAX, step=0.5,
                                     description="obliquity (°)", continuous_update=False, readout_format=".1f",
                                     tooltip="axial tilt → insolation gradient (more tilt = flatter, ice retreats; §9.1)")
     layer = widgets.Dropdown(options=["biome", "temperature", "precipitation", "elevation"],

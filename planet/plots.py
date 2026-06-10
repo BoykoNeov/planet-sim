@@ -544,7 +544,7 @@ def exoplanet_figure(sun_loop: HysteresisLoop, mdwarf_loop: HysteresisLoop, mdwa
 # --------------------------------------------------------------------------- #
 # §9.1 obliquity knob — axial tilt → the annual-mean-insolation P₂ coefficient s₂
 # --------------------------------------------------------------------------- #
-from .obliquity import OBLIQUITY_EARTH                         # noqa: E402 (grouped with its figure)
+from .obliquity import OBLIQUITY_EARTH, OBLIQUITY_FAITHFUL_MAX   # noqa: E402 (grouped with its figure)
 
 S2_CURVE_COLOR = "#6a4c93"      # the geometric s₂(ε) curve
 ANCHOR_COLOR = "#c0392b"        # the exact analytic anchors (−5/8, Earth)
@@ -560,7 +560,8 @@ def obliquity_s2_axes(ax, eps_grid, s2_grid, s2_earth) -> None:
     approximates the strongly-flattened profile (the named scope edge).
     """
     ax.axhline(0.0, color="#cccccc", lw=0.8, zorder=0)
-    ax.axvspan(0.0, 45.0, color="#f0ecf7", zorder=0, label="wired slider range (0–45°)")
+    ax.axvspan(0.0, OBLIQUITY_FAITHFUL_MAX, color="#f0ecf7", zorder=0,
+               label=f"wired slider range (0–{OBLIQUITY_FAITHFUL_MAX:g}°)")
     cross = float(np.interp(0.0, s2_grid, eps_grid))          # where the gradient reverses (s₂ = 0)
     ax.axvspan(cross, eps_grid[-1], color="#fdebd0", zorder=0, label="poles warmer than equator (s₂ > 0)")
     ax.plot(eps_grid, s2_grid, "-", color=S2_CURVE_COLOR, lw=2.2, label="s₂(ε)  (annual-mean insolation)")
