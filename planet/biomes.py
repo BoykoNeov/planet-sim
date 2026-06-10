@@ -1,8 +1,8 @@
 """The Whittaker biome classifier — climate → habitability (Planet Phase 2, the consequence payoff).
 
 This is the project's **dramatic end-to-end win** (plan §3, banked early): two climate inputs — the
-EBM temperature ``T(φ)`` (:mod:`projects.planet.ebm`) and the diagnostic precipitation ``P(φ)``
-(:mod:`projects.planet.precip`) — are mapped to a **biome** at every latitude, producing the bands
+EBM temperature ``T(φ)`` (:mod:`planet.ebm`) and the diagnostic precipitation ``P(φ)``
+(:mod:`planet.precip`) — are mapped to a **biome** at every latitude, producing the bands
 of life that **migrate as the planetary knobs turn**. It is the planet analogue of Steel's
 *microstructure* and Chip's *device*: knobs → climate → **habitability**, no lookup table.
 
@@ -50,7 +50,7 @@ Non-circularity, named scope edge (plan §3)
 *Calibrated/flagged (loose):* the threshold values + slopes (cited to Whittaker/Ricklefs), so absolute
 biome latitudes move only in loose bands. *Scope edge:* **Whittaker** (annual ``T, P``) is used, not
 **Köppen** — Köppen needs *seasonal/monthly* precip the annual-mean v1 does not produce (named). No
-continentality / orography (zonal-mean planet); precip is prescribed (:mod:`projects.planet.precip`);
+continentality / orography (zonal-mean planet); precip is prescribed (:mod:`planet.precip`);
 no dynamic vegetation or carbon feedback. The cold-limited bands are precip-independent (a
 simplification: a very wet sub-zero climate is still called boreal here — outside the planet's actual
 trajectory).

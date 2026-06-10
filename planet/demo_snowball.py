@@ -2,7 +2,7 @@
 
 The planet's first complete, demonstrable artifact and the counterpart of Steel's four-curves
 and Chip's process→device flow. It drives the latitudinal energy-balance model
-(:mod:`projects.planet.ebm`) with the ice-albedo feedback (:mod:`projects.planet.albedo`) and
+(:mod:`planet.ebm`) with the ice-albedo feedback (:mod:`planet.albedo`) and
 traces the **Snowball-Earth hysteresis** by a parameter-continuation sweep in the solar constant:
 
   1. **Present-day climate** — the temperate planet with a polar ice cap (ice line ~70°). This is the
@@ -21,7 +21,7 @@ every Phase-1 module (transport + the Strang-split radiation + the feedback).
 
 Run headless (saves the figure, prints the loop):
 
-    python -m projects.planet.demo_snowball
+    python -m planet.demo_snowball
 """
 from __future__ import annotations
 

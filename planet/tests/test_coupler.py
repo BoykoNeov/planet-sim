@@ -1,7 +1,7 @@
 """Planet Phase-4 validation: the one-way EBM → shallow-water coupler (the emergent jet).
 
 The validation triad (plan §3), with the conservation leg **reframed** for a forced–dissipative
-system (advisor-blessed; see :mod:`projects.planet.coupler`):
+system (advisor-blessed; see :mod:`planet.coupler`):
 
 * **Analytical limit (tight, amplitude-independent).** The emergent jet is in **geostrophic
   balance** — the steady zonal-mean ``f·u ≈ −g·∂h/∂y`` to a few percent in the core; and the jet
@@ -22,10 +22,10 @@ inertial periods) and run at coarse resolution — the engine's own physics is s
 import numpy as np
 import pytest
 
-from projects.planet import circulation as circ
-from projects.planet import coupler
-from projects.planet.albedo import present_day_climate
-from projects.planet.ebm import ClimateState
+from planet import circulation as circ
+from planet import coupler
+from planet.albedo import present_day_climate
+from planet.ebm import ClimateState
 
 
 # --------------------------------------------------------------------------- #

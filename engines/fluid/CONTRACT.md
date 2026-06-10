@@ -4,7 +4,7 @@
 > validation suite (`engines/fluid/tests/`, run via `./run_tests.ps1`). This one
 > page is the unit of context downstream code loads — Planet's circulation coupler
 > (Phase 4) and the documented GCM climb depend on *this*, never on
-> `projects/planet/` internals. Changing the frozen surface below means a new ADR +
+> `planet/` internals. Changing the frozen surface below means a new ADR +
 > re-running the seal (ARCHITECTURE.md §5–6).
 >
 > **The program's second shared engine** — and deliberately a *different solver

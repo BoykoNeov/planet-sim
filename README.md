@@ -1,0 +1,59 @@
+# planet-sim — a planetary climate simulator
+
+*Stellar flux + planet parameters in, climate, circulation, and biomes out.* An educational
+simulator for planetary climate: a latitudinal energy-balance model (EBM) with the Snowball-Earth
+bifurcation, a Whittaker biome classifier, rotating shallow-water atmospheric circulation, a
+one-way EBM→circulation coupler that grows an emergent jet, exoplanet knobs (stellar spectrum,
+planet size, obliquity), and an interactive Plotly globe — each leg validated against cited
+climate references.
+
+It is the program's capstone: the **only simulator built on two** separately-validated solver
+engines — the frozen 1-D diffusion/heat solver (`engines/diffusion`, the meridional heat
+transport) and a rotating shallow-water solver (`engines/fluid`, the circulation). Each engine
+carries its own contract and test suite.
+
+## Layout
+
+```
+engines/diffusion/   # the frozen 1-D diffusion/heat solver (+ its own tests)
+engines/fluid/       # the rotating shallow-water solver (C-grid / SSP-RK3) (+ its own tests)
+planet/              # the simulator: ebm, albedo, climate_reference, biomes, precip,
+                     #   circulation, coupler, exoplanet, obliquity, planetmap + planet_spec,
+                     #   plots, demos, planet.ipynb
+docs/decisions/      # ADRs 0001–0004 (incl. 0004 interactive maps + state interchange)
+docs/plans/          # planet-earth-system.md — the full build plan
+docs/figures/        # banked figures (planet-*.png) + two interactive globes
+                     #   (planet-map.html, planet-coupler-map.html)
+```
+
+## Quickstart
+
+```powershell
+pip install -e ".[viz]"                  # compute + figures
+python planet/demo_snowball.py           # any demo prints its validation table + banks a figure
+jupyter lab planet/planet.ipynb          # the teaching notebook (needs .[viz,notebook])
+# the interactive deep-end globe (needs .[webviz]): planet.planetmap.interactive_map()
+```
+
+**Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
+
+```powershell
+./run_tests.ps1 -m "not slow"     # routine fast lane — 143 tests
+./run_tests.ps1                   # full suite — 167 tests (adds slow live-solver + notebook)
+```
+
+The suite is **167 tests**, all green. The one **live-climlab** cross-check needs the
+`[climate]` extra and otherwise skips — it is an opt-in bonus on top of the EBM's analytic +
+frozen-table validation, so it skips in CI by design. The Plotly map render smoke-tests need
+`[webviz]`; the planet-spec round-trip-identity test (the deep end's one real correctness
+property) is NumPy-only and always runs. Optional stacks are importorskip-gated, so a headless
+checkout skips rather than errors.
+
+## Provenance
+
+planet-sim was developed inside the **BigSim** monorepo — an educational program of three
+simulators (steel, microchip, planet) sharing two separately-validated solver engines — then
+extracted into a standalone repo with its history. The diffusion/heat engine was first frozen by
+the steel simulator; planet added the shallow-water engine and is the capstone that couples the
+two. The sibling simulators live in their own repos. The archive:
+[github.com/BoykoNeov/BigSim](https://github.com/BoykoNeov/BigSim).

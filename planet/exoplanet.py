@@ -5,7 +5,7 @@ The §9.1 *exoplanet sandbox*: two knobs that turn the present-day Earth model i
 source is pinned** — the ``[[…-source]]`` discipline that gates every climate number in this
 project. Crucially, neither adds physics: each is a **parameter derivation** that computes an
 effective ice albedo ``a_ice`` and an effective meridional transport ``D`` which the existing
-EBM already accepts (:class:`~projects.planet.albedo.EBMParams` ``ai`` / ``D``). No engine, no
+EBM already accepts (:class:`~planet.albedo.EBMParams` ``ai`` / ``D``). No engine, no
 EBM machinery, and no validated constant is touched — turn both knobs to their solar/Earth
 values and the present-day model is recovered **exactly** (the knobs are clean perturbations,
 asserted in :mod:`tests.test_exoplanet`).
@@ -36,7 +36,7 @@ spherical Laplacian written in the area coordinate, and each meridional derivati
 effectively per unit area → a steeper equator-to-pole gradient**. This is a **derivation**, not a
 published scaling law — North 1975/1981 source the *value* of ``D``, not its ``a``-dependence;
 that comes from the geometry. The **0-D global mean is identically size-invariant** (``D`` enters
-only the mean-preserving transport, never :func:`~projects.planet.ebm.equilibrium_temperature_0d`),
+only the mean-preserving transport, never :func:`~planet.ebm.equilibrium_temperature_0d`),
 so size sharpens the gradient without *directly* shifting the mean — the clean analytic anchor.
 With the ice feedback, the mean *does* drift, but only through the albedo response to the sharpened
 gradient (a colder pole grows the ice cap) — a feedback-mediated shift, named as such.
@@ -144,7 +144,7 @@ def stellar_ice_albedo(T_star: float = T_SUN, ai_base: float = ALBEDO_ICE) -> fl
     ``a_ice(T★) = ai_base · R(T★)``. The solar anchor ``R(T_SUN) = 1`` makes ``stellar_ice_albedo(T_SUN)``
     return ``ai_base`` (the climlab ``0.62``) **exactly**. A cooler/redder star lowers ``a_ice`` →
     the ice-albedo feedback weakens → the planet is **harder to snowball**. The ``a_nir`` floor keeps
-    ``a_ice`` bounded *above* the ice-free ocean/land albedo (:data:`~projects.planet.ebm.ALBEDO_A0`)
+    ``a_ice`` bounded *above* the ice-free ocean/land albedo (:data:`~planet.ebm.ALBEDO_A0`)
     for every stellar type, so the ice/ocean contrast **weakens but never inverts** — *modest*, not a
     sign flip (asserted in the triad). Only this bright-ice albedo is modified (the scope edge).
     """
@@ -174,7 +174,7 @@ def transport_for_size(size: float = 1.0, D_base: float = D_TRANSPORT) -> float:
     A larger planet has a smaller ``D`` → a **steeper equator-to-pole gradient** (the two-mode
     amplitude ``|T₂| ∝ 1/(6D + B)`` grows). ``transport_for_size(1.0) == D_base`` **exactly** (Earth
     recovers the model). Because ``D`` is absent from
-    :func:`~projects.planet.ebm.equilibrium_temperature_0d`, the **0-D global mean is identically
+    :func:`~planet.ebm.equilibrium_temperature_0d`, the **0-D global mean is identically
     size-invariant** — the clean analytic anchor; the relaxed ice-cap mean drifts only through the
     feedback (named in the module docstring).
     """
@@ -185,14 +185,14 @@ def transport_for_size(size: float = 1.0, D_base: float = D_TRANSPORT) -> float:
 # The composition point — both knobs into one EBMParams (the loose-coupling currency).
 # --------------------------------------------------------------------------- #
 def exoplanet_params(T_star: float = T_SUN, size: float = 1.0, base: EBMParams | None = None) -> EBMParams:
-    """An :class:`~projects.planet.albedo.EBMParams` for a world around a ``T_star`` star at ``size`` Earth radii.
+    """An :class:`~planet.albedo.EBMParams` for a world around a ``T_star`` star at ``size`` Earth radii.
 
     Returns ``base`` with **only** its ice albedo and transport replaced by the knob-derived values
     (``ai = stellar_ice_albedo(T_star, base.ai)``, ``D = transport_for_size(size, base.D)``); every
     other parameter (S₀, A, B, the ice-free albedo, …) is untouched. The solar/Earth defaults
     (``T_star=T_SUN``, ``size=1``) return an ``EBMParams`` **equal to ``base``** — the knobs are clean
     perturbations that compose on top of whatever the caller already set. This is the bundle the demo
-    (:mod:`projects.planet.demo_exoplanet`) and the interactive map (:mod:`projects.planet.planetmap`)
+    (:mod:`planet.demo_exoplanet`) and the interactive map (:mod:`planet.planetmap`)
     consume.
     """
     if base is None:

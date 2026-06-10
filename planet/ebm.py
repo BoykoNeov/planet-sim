@@ -14,7 +14,7 @@ plain ``∫₀¹ T dx``). ``D·∂/∂x[(1−x²)∂T/∂x]`` is meridional diff
 ``S(x)(1−α)`` the absorbed shortwave, and ``A + B·T`` the linearized outgoing longwave
 (the OLR *parameterization* — the named scope edge). The headline payoff (Phase 1's
 banked artifact) is the **Snowball-Earth hysteresis** the ice-albedo feedback produces
-(:mod:`projects.planet.albedo`); this module is the engine-coupled foundation it stands on.
+(:mod:`planet.albedo`); this module is the engine-coupled foundation it stands on.
 
 How the frozen engine is reused — transport in the engine, radiation split around it
 -------------------------------------------------------------------------------------
@@ -96,7 +96,7 @@ Validation triad (plan §3) — what is asserted tight vs loose
   machine precision; the diffusive transport conserves ``∫T dx`` structurally (the frozen
   no-flux invariant, re-confirmed for the Neumann(0)/Neumann(0) pair).
 * **Benchmark (loose).** climlab's EBM — present-day ice line ~70°, the Snowball threshold,
-  the hysteresis width (:mod:`projects.planet.climate_reference`, the pycalphad pattern:
+  the hysteresis width (:mod:`planet.climate_reference`, the pycalphad pattern:
   a frozen reference table keeps the triad green without the ``[climate]`` extra).
 
 Non-circularity, named scope edge (plan §3)
@@ -166,7 +166,7 @@ def insolation(x: np.ndarray | float, S0: float = S0_EARTH, s2: float = S2_INSOL
     sunlight at the equator (``s₂ < 0`` → ``S`` larger where ``P₂ < 0``). Its area mean is
     ``∫₀¹ S dx = S₀/4`` (since ``∫₀¹ P₂ dx = 0``), so the global-mean forcing is the textbook
     ``S₀/4``. This is *incident* flux; the absorbed flux multiplies by the coalbedo ``1−α``
-    (supplied by :mod:`projects.planet.albedo`).
+    (supplied by :mod:`planet.albedo`).
     """
     return (S0 / 4.0) * (1.0 + s2 * legendre_P2(x))
 
@@ -299,7 +299,7 @@ class EnergyBalanceModel:
     **injected** as an ``absorbed(x, T) → W m⁻²`` callable (the absorbed shortwave
     ``S(x)(1−α)``), so this machinery is *forcing-agnostic*: the no-feedback North check feeds
     a constant-albedo callable, the Snowball demo feeds the ice-albedo one
-    (:mod:`projects.planet.albedo`). That mirrors the engine's own "machinery here, physical
+    (:mod:`planet.albedo`). That mirrors the engine's own "machinery here, physical
     constants in the consumer" boundary.
     """
 

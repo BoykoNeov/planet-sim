@@ -1,7 +1,7 @@
 """Ice-albedo feedback and the Snowball-Earth hysteresis (Planet Phase 1, the banked payoff).
 
 This module supplies the **nonlinearity** that turns the linear energy-balance machinery of
-:mod:`projects.planet.ebm` into the project's dramatic early win. The albedo jumps from its
+:mod:`planet.ebm` into the project's dramatic early win. The albedo jumps from its
 ice-free value to a high ice value wherever the surface freezes (``T < Tf``); fed through the
 EBM as the absorbed-shortwave forcing, that threshold makes the local radiation step a
 *nonlinear* relaxation — which gives the system **two stable climates for one sun** over a
@@ -22,7 +22,7 @@ The albedo model (climlab `StepFunctionAlbedo`, [[ebm-radiation-source]])
 ice-free albedo), and ``α = a_ice`` wherever ``T < Tf``. The absorbed shortwave the EBM
 integrates is then ``S(x)·(1 − α(x, T))`` — the **one place** the ice nonlinearity enters; the
 transport and OLR stay linear. Constants are the climlab defaults
-(``a₀=0.30, a₂=0.078, a_ice=0.62, Tf=−10 °C``), pinned in :mod:`~projects.planet.ebm`.
+(``a₀=0.30, a₂=0.078, a_ice=0.62, Tf=−10 °C``), pinned in :mod:`~planet.ebm`.
 
 Validation (plan §3) — what is asserted tight vs loose
 ------------------------------------------------------
@@ -32,7 +32,7 @@ re-melt at a *higher* S₀ than the freeze (the loop has positive width). Nothin
 feedback produces this; it is emergent, so it is asserted firmly. *Calibrated/flagged (loose):*
 the **exact threshold S₀ values and the loop width** depend on the cited albedo/radiation
 constants, so they are asserted only in loose bands (and benchmarked against climlab in
-:mod:`~projects.planet.climate_reference`). The present-day ice line (~70°) is the loose
+:mod:`~planet.climate_reference`). The present-day ice line (~70°) is the loose
 benchmark this module's :func:`present_day_climate` reproduces.
 """
 from __future__ import annotations
@@ -81,7 +81,7 @@ class EBMParams:
     Bundles the radiation/albedo forcing (``S0, s2, Tf, a0, a2, ai``) with the EBM machinery
     constants (``A, B, D, water_depth, n_cells``) so a sweep can vary one knob (``S0``) with
     :func:`dataclasses.replace` while holding the rest fixed. :meth:`model` builds the
-    (S₀-independent) :class:`~projects.planet.ebm.EnergyBalanceModel`; :meth:`absorbed_fn`
+    (S₀-independent) :class:`~planet.ebm.EnergyBalanceModel`; :meth:`absorbed_fn`
     builds the S₀-/albedo-dependent forcing callable.
     """
 

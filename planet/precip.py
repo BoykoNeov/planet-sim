@@ -1,7 +1,7 @@
 """Diagnostic precipitation parameterization — the second input to the biome map (Planet Phase 2).
 
-The Phase-2 payoff (the biome map, :mod:`projects.planet.biomes`) needs two climate inputs: the
-**temperature** ``T(φ)`` the EBM produces (:mod:`projects.planet.ebm`) and a **precipitation**
+The Phase-2 payoff (the biome map, :mod:`planet.biomes`) needs two climate inputs: the
+**temperature** ``T(φ)`` the EBM produces (:mod:`planet.ebm`) and a **precipitation**
 field ``P(φ)``. This module supplies the latter. It is, deliberately and explicitly, a **prescribed
 kinematic parameterization, NOT a simulated water cycle** (plan §3, the honesty flag): neither the
 EBM (energy only) nor the later single-layer dry shallow-water engine (no thermodynamic moisture
@@ -38,7 +38,7 @@ Validation triad (plan §3) — what is asserted tight vs loose
 * **Analytical/structural (tight).** The pattern has the right *qualitative band structure*: the
   equator (ITCZ) is the wettest, the subtropics (~25–30°) are a local dry minimum (drier than both
   the equator and the midlatitudes), and the poles are dry. These are partition-of-latitude facts,
-  asserted firmly (:mod:`projects.planet.tests.test_precip`).
+  asserted firmly (:mod:`planet.tests.test_precip`).
 * **Conservation — a *consistency* check, honestly weaker (named).** A prescribed precip field obeys
   no water-mass conservation law (there is no evaporation/condensation budget — that is the rung-2
   moist model). The honest leg is the **global-water budget *consistency***: the C–C-scaled global
@@ -73,7 +73,7 @@ Non-circularity, named scope edge (plan §3)
 Units — cm/yr (to match the Whittaker classifier's axes), latitude in degrees
 -----------------------------------------------------------------------------
 ``P`` is **cm of precipitation per year** — the unit of Whittaker's diagram
-(:mod:`projects.planet.biomes`), chosen so the two modules share one unit with no conversion in the
+(:mod:`planet.biomes`), chosen so the two modules share one unit with no conversion in the
 path (the recurring units discipline). Latitude ``φ`` is in **degrees**; the EBM's area coordinate
 ``x = sin φ`` converts via ``φ = asin(x)`` (``ClimateState.latitude_deg``).
 """
@@ -136,7 +136,7 @@ def precipitation(lat_deg: np.ndarray | float, global_mean_T: float = PRECIP_REF
 
     The circulation-set latitudinal pattern (:func:`precip_pattern`) times the global C–C moisture
     amplitude (:func:`clausius_clapeyron_factor`). Always non-negative (both factors are). This is the
-    second input — beside the EBM temperature — the Whittaker classifier (:mod:`projects.planet.biomes`)
+    second input — beside the EBM temperature — the Whittaker classifier (:mod:`planet.biomes`)
     consumes. Pass the climate's ``global_mean_T`` to intensify the bands as the planet warms; the
     default reference leaves the pattern at its present-day calibration.
     """
@@ -144,7 +144,7 @@ def precipitation(lat_deg: np.ndarray | float, global_mean_T: float = PRECIP_REF
 
 
 def precip_field(state: ClimateState) -> np.ndarray:
-    """Precipitation ``P(φ)`` (cm/yr) for an equilibrium :class:`~projects.planet.ebm.ClimateState`.
+    """Precipitation ``P(φ)`` (cm/yr) for an equilibrium :class:`~planet.ebm.ClimateState`.
 
     Convenience over :func:`precipitation`: reads the climate's latitudes (``state.latitude_deg()``)
     and its ``global_mean_T`` (the C–C amplitude knob), returning the precip field on the EBM's own

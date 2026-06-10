@@ -14,7 +14,7 @@ Carries the engine-coupled half of the plan §3 triad (planet-earth-system.md). 
   reconstructed operator matches the frozen engine's ``step`` (so mode C cannot drift from the engine).
 
 The radiation/albedo constants are the cited climlab/North defaults ([[ebm-radiation-source]]), pinned
-in :mod:`projects.planet.ebm` — not carried from memory.
+in :mod:`planet.ebm` — not carried from memory.
 """
 import math
 
@@ -22,7 +22,7 @@ import numpy as np
 import pytest
 from scipy.linalg import solve_banded
 
-from projects.planet import ebm
+from planet import ebm
 
 S0 = ebm.S0_EARTH
 ALPHA = ebm.ALBEDO_A0

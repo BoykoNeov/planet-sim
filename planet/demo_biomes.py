@@ -1,9 +1,9 @@
 """The Phase-2 banked artifact: climate → habitability — the biome map (the dramatic end-to-end win).
 
 The capstone's payoff, banked **early** (plan §3): the planet's climate state — the EBM temperature
-``T(φ)`` (:mod:`projects.planet.ebm`) and the diagnostic precipitation ``P(φ)``
-(:mod:`projects.planet.precip`) — is mapped through the **Whittaker classifier**
-(:mod:`projects.planet.biomes`) into a **map of biomes**: tropical rain forest at the equator,
+``T(φ)`` (:mod:`planet.ebm`) and the diagnostic precipitation ``P(φ)``
+(:mod:`planet.precip`) — is mapped through the **Whittaker classifier**
+(:mod:`planet.biomes`) into a **map of biomes**: tropical rain forest at the equator,
 savanna and the great deserts in the subtropics, temperate forest in the midlatitudes, then boreal
 forest and tundra toward the poles. *Planetary knobs in, bands of life out* — the planet analogue of
 Steel's microstructure and Chip's device.
@@ -14,7 +14,7 @@ OLR offset ``A``) and shows the biomes shift **poleward** — the tropics expand
 
 Run headless (saves the figure, prints the bands):
 
-    python -m projects.planet.demo_biomes
+    python -m planet.demo_biomes
 """
 from __future__ import annotations
 
@@ -76,7 +76,7 @@ def compute(params: EBMParams | None = None, n_tau: float = PRESENT_N_TAU) -> Bi
 
     ``n_tau`` is the relaxation step (a multiple of τ_rad) passed through to the equilibration; it
     defaults to the fine present-day step :data:`PRESENT_N_TAU`. The interactive map
-    (:mod:`projects.planet.planetmap`) calls this with the same fine step so its live globe matches the
+    (:mod:`planet.planetmap`) calls this with the same fine step so its live globe matches the
     banked figure — the steady state carries an O(Δt) operator-splitting bias, so it must *not* be
     coarsened for speed.
     """

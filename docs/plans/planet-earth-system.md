@@ -59,7 +59,7 @@ it across Phases 3–4 + the documented climb.
 > **No third shared engine.** The §5 toolkit table lists ODE integrators against
 > Planet, but the time-stepping Planet needs is **folded into `engines/fluid`** (the
 > shallow-water explicit integrator) and a small EBM relaxation loop that stays
-> **planet-local** (`projects/planet/ebm.py`). Per invariant 5 / rule-of-three, a
+> **planet-local** (`planet/ebm.py`). Per invariant 5 / rule-of-three, a
 > standalone ODE engine is **not** built here (1 use ≠ 3) — saying so explicitly so a
 > future session does not read the §5 table as a mandate for a third engine build.
 
@@ -336,7 +336,7 @@ BigSim/
       shallowwater.py         #   rotating β-plane shallow water (C-grid, explicit)
       CONTRACT.md             #   the FROZEN one-page API (extension-ready: stacked fields, tracer slot)
       tests/                  #   geostrophic balance, wave speeds, PV/mass/energy — the seal
-  projects/planet/
+  planet/
     ebm.py                    # 0-D + 1-D latitudinal EBM; frozen-diffusion transport + Strang-split radiation  (Phase 1)
     albedo.py                 # ice-albedo feedback + the Snowball hysteresis continuation sweep                 (Phase 1)
     precip.py                 # diagnostic precipitation parameterization (named kinematic; C–C-scaled)          (Phase 2)
@@ -351,7 +351,7 @@ BigSim/
     climate_reference.py      # frozen climlab reference table (keeps the triad green without the [climate] extra)
     README.md                 # per-module map + per-session load pointer
     tests/                    # the validation triads (the seal)
-  pyproject.toml              # testpaths += projects/planet, engines/fluid; [climate] + [webviz] extras
+  pyproject.toml              # testpaths += planet, engines/fluid; [climate] + [webviz] extras
 ```
 
 **Contracts kept short.** Each module's docstring is its contract (the steel/chip
@@ -475,7 +475,7 @@ need not run `engines/fluid`'s.
   declare it is the failure the guard catches). This lands with Phase 3 (when
   `engines/fluid` first exists and `circulation.py` imports it).
 
-`pyproject.toml` gains `projects/planet` and `engines/fluid` in `testpaths`; the
+`pyproject.toml` gains `planet` and `engines/fluid` in `testpaths`; the
 existing `pythonpath = ["."]` lets planet import both engines with no install step. New
 tests that drive a live external solver / kernel / subprocess / the `[climate]` or
 `[webviz]` stack get the **`slow`** marker (the climlab live cross-check; the notebook
@@ -698,7 +698,7 @@ conservation diagnostics). **Gate/infra consequences realized:** `planet`'s `use
 **import-drift guard** (deferred to engine #2) is **built and live** in `tools/tests/test_gate.py`.
 
 **Built — Phase 4: the one-way EBM→circulation coupler (2026-06-09 — the capstone complete).**
-`projects/planet/coupler.py` (+ `demo_coupler.py`, `plots.coupler_figure`, the 9-test `test_coupler`
+`planet/coupler.py` (+ `demo_coupler.py`, `plots.coupler_figure`, the 9-test `test_coupler`
 triad + 2-test `test_demo_coupler`) **couples the two shared engines**: the frozen diffusion spine's
 EBM equilibrium hands its meridional temperature gradient to the frozen shallow-water engine, and a
 **geostrophically-balanced midlatitude westerly jet emerges** (banked: ~16.5 m/s @ ~42°, core

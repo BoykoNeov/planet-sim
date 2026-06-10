@@ -2,14 +2,14 @@
 
 The benchmark leg's two halves: (1) the **frozen** reference table keeps the triad green without the
 ``[climate]`` extra — here we check it is internally sane and that its pinned climlab defaults are the
-*same numbers* :mod:`projects.planet.ebm` computes with (single source of truth); (2) the **live**
+*same numbers* :mod:`planet.ebm` computes with (single source of truth); (2) the **live**
 climlab cross-check is ``slow`` / ``importorskip`` — it runs only where the opt-in ``[climate]`` extra
 is installed, comparing climlab's own present-day climate to the reference bands.
 """
 import pytest
 
-from projects.planet import ebm
-from projects.planet.climate_reference import REFERENCE, climlab_present_day
+from planet import ebm
+from planet.climate_reference import REFERENCE, climlab_present_day
 
 
 def test_reference_climlab_defaults_match_the_model_constants():

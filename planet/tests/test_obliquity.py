@@ -11,9 +11,9 @@ equilibration).
 import numpy as np
 import pytest
 
-from projects.planet import obliquity as ob
-from projects.planet.albedo import EBMParams, present_day_climate
-from projects.planet.ebm import S2_INSOLATION
+from planet import obliquity as ob
+from planet.albedo import EBMParams, present_day_climate
+from planet.ebm import S2_INSOLATION
 
 
 # --------------------------------------------------------------------------- #

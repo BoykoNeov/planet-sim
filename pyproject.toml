@@ -1,0 +1,65 @@
+# Build config exists for ONE consumer: full-gate CI (`pip install -e .[…]` to pull the
+# optional stacks). Local dev never installs — pytest's `pythonpath = ["."]` (below) puts
+# the repo root on sys.path, so `engines.*` / `planet.*` import without a build step. The
+# flat layout has top-level packages setuptools won't auto-discover, so name them explicitly
+# here (else `pip install -e .` fails with "Multiple top-level packages discovered").
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["engines*", "planet*"]
+
+[project]
+name = "planet-sim"
+version = "0.1.0"
+description = "Educational planetary climate simulator on two frozen, separately-validated solver engines (diffusion/heat + rotating shallow-water)."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+# Visualization is opt-in (ADR 0002): the compute core and the test suite stay
+# headless/matplotlib-free; only the render layer (planet/plots.py, demos, the notebook)
+# needs this. Install with `pip install -e .[viz]`.
+viz = ["matplotlib>=3.7"]
+# The teaching notebook (planet.ipynb) is opt-in: jupyterlab (the editor a human opens it in) +
+# the headless run stack (ipywidgets + nbclient/nbformat/ipykernel) the execution smoke-test
+# (planet/tests/test_planet_notebook.py) uses. matplotlib stays in [viz], so the full runnable
+# combo is `pip install -e .[viz,notebook]`. The committed suite stays notebook-free (the
+# smoke-test is slow-marked and importorskip/kernelspec-gated).
+notebook = ["jupyterlab>=4", "ipywidgets>=8", "nbclient", "nbformat", "ipykernel"]
+# The interactive deep-end map is opt-in (§9 / ADR 0004): only planet/planetmap.py (the Plotly
+# globe + the ipywidgets live-slider loop) needs this. The layer registry, the layer builders,
+# and the planet-spec interchange schema (planet_spec.py) are NumPy-only, so their tests —
+# including the round-trip-identity test, the one *real* correctness property of the deep end —
+# stay in the always-green committed suite; the map's render smoke-tests are importorskip-gated on
+# plotly (fast — no kernel/subprocess, so NOT slow-marked). Install with `pip install -e .[webviz]`.
+# plotly alone covers the figure + the standalone HTML artifact (no server, no kaleido); ipywidgets
+# is only for the in-notebook live-slider loop (interactive_map()). matplotlib stays in [viz].
+webviz = ["plotly>=5", "ipywidgets>=8"]
+# Climate reference is opt-in (Phase 1): only the live climlab cross-check
+# (planet/climate_reference.py + its slow test) needs climlab. The committed Phase-1 tests
+# validate the EBM against analytic anchors + a frozen reference table and stay climlab-free;
+# climlab is consumed as a reference tool, never copied. The live cross-check test is slow-marked
+# + importorskip-gated, so a clean checkout skips it. Install with `pip install -e .[climate]`.
+climate = ["climlab>=0.8"]
+
+# Single-command test runner config. `pythonpath = ["."]` puts the repo root on
+# sys.path so tests import the engines as `engines.diffusion...` / `engines.fluid...`
+# (and the project as `planet...`) without an install step.
+#
+# Tiered gate (ADR 0003): the routine local gate is the fast lane
+#   `pytest -m "not slow"`   — the always-on suite
+#   `pytest`                 — the full suite, incl. the slow live-climlab + notebook tests (CI / release)
+# `slow` marks the handful of tests that drive a live external solver / kernel / subprocess.
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["engines", "planet"]
+addopts = "-q"
+markers = [
+    "slow: drives a live external solver / kernel / subprocess; deselect in the inner loop with -m 'not slow' (ADR 0003)",
+]

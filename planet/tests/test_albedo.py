@@ -4,14 +4,14 @@ The nonlinear half of the plan §3 triad (planet-earth-system.md). What is asser
 *structural/qualitative* — the existence and shape of the bistability (two stable branches, a
 catastrophic freezing jump, a re-melt at a brighter sun than the freeze); what is **loose** is the
 *calibrated thresholds* (the exact freeze/melt S₀, the ice-line latitude), bounded against the cited
-climlab reference bands ([[ebm-radiation-source]] / :mod:`projects.planet.climate_reference`). Nothing
+climlab reference bands ([[ebm-radiation-source]] / :mod:`planet.climate_reference`). Nothing
 but the feedback produces the hysteresis — it is emergent, so it is asserted firmly.
 """
 import numpy as np
 import pytest
 
-from projects.planet import ebm, albedo
-from projects.planet.climate_reference import REFERENCE
+from planet import ebm, albedo
+from planet.climate_reference import REFERENCE
 
 
 # --------------------------------------------------------------------------- #

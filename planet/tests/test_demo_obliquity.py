@@ -9,8 +9,8 @@ the structural physics is covered fast by ``test_obliquity``. The figure smoke-t
 import numpy as np
 import pytest
 
-from projects.planet import demo_obliquity as demo
-from projects.planet.ebm import S2_INSOLATION
+from planet import demo_obliquity as demo
+from planet.ebm import S2_INSOLATION
 
 
 @pytest.mark.slow
@@ -35,7 +35,7 @@ def test_demo_obliquity_figure_renders():
     pytest.importorskip("matplotlib")
     import matplotlib
     matplotlib.use("Agg")
-    from projects.planet.plots import obliquity_figure
+    from planet.plots import obliquity_figure
 
     r = demo.compute(n_cells=48, curve_n=20, climate_n_tau=0.06)
     fig = obliquity_figure(r.eps_grid, r.s2_grid, r.s2_earth, r.climate_states, r.tilts)

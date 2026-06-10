@@ -1,6 +1,6 @@
 """The planet-spec interchange schema — export/import a planet's state (Planet §9.3, ADR 0004 #3–4).
 
-The deep-end map (:mod:`projects.planet.planetmap`) lets you author a climate; this module lets you
+The deep-end map (:mod:`planet.planetmap`) lets you author a climate; this module lets you
 take that world **out** (share, inspect) and bring an externally-authored one **in** (a future
 geography-editing app paints elevation/coastlines, the model imports them). ADR 0004 #3 fixes the
 design call: **pin a *schema*, not a file format**. The portable artifact is a documented, versioned,
@@ -9,11 +9,11 @@ self-describing **planet-spec**:
 * the **grid geometry** (lat/lon, in degrees);
 * **explicit units** — each layer and each knob carries its unit string, so an external consumer
   cannot misread it (this program is unit-obsessive by §7 discipline);
-* the **layer list** — *the* :class:`~projects.planet.planetmap.PlanetView` registry **is** the export
+* the **layer list** — *the* :class:`~planet.planetmap.PlanetView` registry **is** the export
   manifest (ADR 0004 #3: one structure serialized, not a second one invented — this module imports
-  :class:`~projects.planet.planetmap.Layer`/:class:`~projects.planet.planetmap.Grid`, it does not
+  :class:`~planet.planetmap.Layer`/:class:`~planet.planetmap.Grid`, it does not
   reinvent them);
-* the **knob values** (the :class:`~projects.planet.albedo.EBMParams` that reproduce the climate); and
+* the **knob values** (the :class:`~planet.albedo.EBMParams` that reproduce the climate); and
 * a **``schema_version``** for forward/backward compatibility.
 
 The **encoding** is chosen per consumer, *behind* the schema. v1 ships the **lean default — a JSON
@@ -43,7 +43,7 @@ A geography layer (elevation/bathymetry/mask) round-trips like any other — but
 running a model that *responds* to it is a separate, staircase-gated capability**. Until the consuming
 physics exists (a lapse-rate diagnostic at the cheap tier; true 2-D orographic precip at rung 5), an
 imported geometry is **inert**: carried, displayed, round-tripped, but not changing the climate. That
-is the :attr:`~projects.planet.planetmap.Layer.inert` flag — the round-trip guarantee is *array
+is the :attr:`~planet.planetmap.Layer.inert` flag — the round-trip guarantee is *array
 identity*, not a changed climate. Named, not blurred.
 """
 from __future__ import annotations
@@ -55,8 +55,8 @@ from pathlib import Path
 
 import numpy as np
 
-from projects.planet.albedo import EBMParams
-from projects.planet.planetmap import Grid, Layer, LayerKind, PlanetView
+from planet.albedo import EBMParams
+from planet.planetmap import Grid, Layer, LayerKind, PlanetView
 
 SCHEMA_VERSION = 1
 
@@ -99,9 +99,9 @@ def _layers_equal(x: Layer, y: Layer) -> bool:
 class PlanetSpec:
     """A versioned, self-describing snapshot of a planet — the portable interchange artifact (ADR 0004 #3).
 
-    Bundles the :class:`~projects.planet.planetmap.PlanetView` registry (``grid`` + ``layers`` — the
+    Bundles the :class:`~planet.planetmap.PlanetView` registry (``grid`` + ``layers`` — the
     export manifest itself) with the ``knobs`` that reproduce the climate (the
-    :class:`~projects.planet.albedo.EBMParams` fields), their ``knob_units``, and a ``schema_version``.
+    :class:`~planet.albedo.EBMParams` fields), their ``knob_units``, and a ``schema_version``.
     ``eq=False`` because equality must be array-aware: :meth:`__eq__` compares the metadata exactly and
     every array with :func:`numpy.array_equal` — the ADR 0004 #4 round-trip invariant.
     """
@@ -127,11 +127,11 @@ class PlanetSpec:
         return all(_layers_equal(x, y) for x, y in zip(self.layers, other.layers))
 
     def view(self) -> PlanetView:
-        """The :class:`~projects.planet.planetmap.PlanetView` (grid + layers) for the renderer."""
+        """The :class:`~planet.planetmap.PlanetView` (grid + layers) for the renderer."""
         return PlanetView(grid=self.grid, layers=tuple(self.layers))
 
     def to_params(self) -> EBMParams:
-        """Reconstruct the :class:`~projects.planet.albedo.EBMParams` from the knobs — the world made re-runnable.
+        """Reconstruct the :class:`~planet.albedo.EBMParams` from the knobs — the world made re-runnable.
 
         The ``knobs`` dict is exactly ``dataclasses.asdict(EBMParams)``, so this round-trips the
         forcing/machinery that produced the climate. (At v1 an imported *geography* layer is still
@@ -199,7 +199,7 @@ def save(spec: PlanetSpec, path) -> tuple[Path, Path]:
 def load(path) -> PlanetSpec:
     """Read a planet-spec back from its ``<stem>.json`` + ``<stem>.npz`` — the import side.
 
-    Rebuilds the exact :class:`~projects.planet.planetmap.Grid` / :class:`~projects.planet.planetmap.Layer`
+    Rebuilds the exact :class:`~planet.planetmap.Grid` / :class:`~planet.planetmap.Layer`
     objects (arrays from the ``.npz``, metadata from the JSON), so ``load(save(spec)) == spec``
     (the ADR 0004 #4 round-trip invariant). The arrays are copied out of the ``.npz`` handle before it
     closes.

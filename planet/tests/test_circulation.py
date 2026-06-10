@@ -15,7 +15,7 @@ constants against published data:
 import numpy as np
 import pytest
 
-from projects.planet import circulation as circ
+from planet import circulation as circ
 
 
 # --------------------------------------------------------------------------- #

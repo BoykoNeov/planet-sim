@@ -1,9 +1,9 @@
 """One-way EBM → shallow-water coupler: the climate gradient forces an emergent jet (Planet Phase 4).
 
 The capstone's final phase, and the one that **couples the two shared engines**: the frozen
-diffusion spine (via the EBM, :mod:`projects.planet.ebm`) hands its equilibrium
+diffusion spine (via the EBM, :mod:`planet.ebm`) hands its equilibrium
 **meridional temperature gradient** to the frozen rotating shallow-water engine (via
-:mod:`projects.planet.circulation`), and a **geostrophically-balanced midlatitude jet emerges**.
+:mod:`planet.circulation`), and a **geostrophically-balanced midlatitude jet emerges**.
 This is the planet analogue of the whole-program payoff — *forcing → climate → circulation* —
 the third link in the chain after Steel's *cooling → microstructure* and Chip's *process → device*.
 
@@ -16,7 +16,7 @@ How the two engines are coupled — forcing split *around* the frozen fluid engi
 The frozen :mod:`engines.fluid` solves the **bare** shallow-water equations: ``step`` carries no
 forcing term. So the thermal forcing is composed *around* it by **operator splitting** — the
 **identical idiom** the EBM uses to graft radiation around the diffusion engine
-(:meth:`~projects.planet.ebm.EnergyBalanceModel._radiation_half`) and Steel's Jominy used for its
+(:meth:`~planet.ebm.EnergyBalanceModel._radiation_half`) and Steel's Jominy used for its
 lateral sink. Each coupler step is *half-forcing / full bare-engine-step / half-forcing*, where the
 forcing half-step is two **exact-exponential** relaxations (so it is unconditionally stable and
 contributes no splitting instability):
@@ -36,7 +36,7 @@ high-pressure field; the jet's very existence is the rotation signature.)
 The geometry bridge — embedding the 1-D zonal-mean EBM in the 2-D β-plane channel
 ---------------------------------------------------------------------------------
 The EBM is 1-D zonal-mean on ``x = sin φ ∈ [0, 1]`` (one hemisphere); the engine is a 2-D
-doubly-periodic β-plane channel (:mod:`projects.planet.circulation`). The bridge
+doubly-periodic β-plane channel (:mod:`planet.circulation`). The bridge
 (:func:`height_target`): sample the EBM temperature at the channel's latitudes, form the anomaly
 ``θ(y) = T(φ(y)) − ⟨T⟩``, scale it to a height anomaly ``η_target = α·θ`` (warm → high, the
 thermal/hydrostatic sign), and **make it admissible for the doubly-periodic engine** — this is the
@@ -57,7 +57,7 @@ one non-obvious step:
   trade-wind/polar-easterly reconstruction (plan §3).
 * **The baroclinic zone, not the ice cliff.** The channel is centred at :data:`PHI_REF_DEG` and
   spans the smooth midlatitude gradient, deliberately **excluding the ice-line albedo cliff**
-  (~73°, :mod:`projects.planet.albedo`), whose sharp gradient would otherwise dominate the forcing.
+  (~73°, :mod:`planet.albedo`), whose sharp gradient would otherwise dominate the forcing.
 * **Emergence, not placement.** Because the window is broad and flat across the interior, the jet
   lands where the **EBM gradient is steepest** (≈ the gradient maximum, :data:`PHI_REF_DEG`-poleward
   for present-day Earth) — *not* hand-placed at the channel centre. ``test_coupler`` proves this with

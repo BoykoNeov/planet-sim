@@ -10,8 +10,8 @@ check (ADR 0002), not a physics one.
 """
 import pytest
 
-from projects.planet import demo_biomes as demo
-from projects.planet.biomes import Biome
+from planet import demo_biomes as demo
+from planet.biomes import Biome
 
 
 @pytest.mark.slow
@@ -43,7 +43,7 @@ def test_demo_figure_renders():
     pytest.importorskip("matplotlib")
     import matplotlib
     matplotlib.use("Agg")
-    from projects.planet.plots import biomes_figure
+    from planet.plots import biomes_figure
 
     r = demo.compute()
     fig = biomes_figure(r.state, r.precip_cm, r.codes)

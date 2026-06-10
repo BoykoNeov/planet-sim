@@ -1,17 +1,17 @@
 """The deep-end interactive planet map — a layer registry painted by Plotly (Planet §9, ADR 0004).
 
 Planet is the **first project in the program to reach the deep end** of ADR 0002 §4 — a payoff
-that is inherently a *map*. Beyond the static matplotlib floor (:mod:`projects.planet.plots`) and
+that is inherently a *map*. Beyond the static matplotlib floor (:mod:`planet.plots`) and
 the teaching notebook, this module is the **interactive planet map**: a rotatable globe whose
 knob-sliders drive an instant recompute-and-remap. Its **first version is the biome map** — the
-Phase-2 dramatic end-to-end win (:mod:`projects.planet.demo_biomes`) made live.
+Phase-2 dramatic end-to-end win (:mod:`planet.demo_biomes`) made live.
 
 It adds **reach, not correctness** (ADR 0002): every array it paints is produced by a model already
 sealed behind its own validation triad (the EBM, the precip parameterization, the Whittaker
 classifier). This module introduces **no new physics, no new constant** — it is a pure consumer of
-:func:`projects.planet.demo_biomes.compute`, the same way Steel's ``app.py`` is a pure re-composition
+:func:`planet.demo_biomes.compute`, the same way Steel's ``app.py`` is a pure re-composition
 of its ``sweep`` harness. Its only *real* correctness property lives next door in
-:mod:`projects.planet.planet_spec` (the round-trip-identity of the exported state); the map's own
+:mod:`planet.planet_spec` (the round-trip-identity of the exported state); the map's own
 test is an **execution smoke-test** (ADR 0002 §2 / ADR 0004 #4).
 
 The layer registry (ADR 0004 #1 — the structural heart)
@@ -29,7 +29,7 @@ Later phases register more — circulation streamlines / the jet axis (Phase 4, 
 ``vector_overlay`` was a **declared-but-unpainted** kind through Phases 1–3 ("build the seam, not the
 machinery" — ADR 0004): :func:`render` raised for it until there was a real flow to draw. **Phase 4
 builds the machinery** (:func:`_vector_overlay_trace`): a Phase-4 coupled jet
-(:func:`projects.planet.coupler.couple_jet`) registers a ``circulation`` ``vector_overlay`` layer
+(:func:`planet.coupler.couple_jet`) registers a ``circulation`` ``vector_overlay`` layer
 (:func:`circulation_layer`), painted as flow arrows on the globe — the emergent jet *is* the consumer.
 The jet is **not** part of the live-slider loop (it is a separate integration, the first compute too
 heavy for the rung-0 instant remap; §9.2): a circulation view is *computed, then viewed*.
@@ -40,7 +40,7 @@ Three layers of code, by the ADR-0002 / Steel-``app.py`` discipline
    that turn a climate result into a :class:`PlanetView`. They import **neither Plotly nor
    ipywidgets**, so the module imports on a bare core install and the builders are unit-tested
    *always-green* (``tests/test_planetmap.py``), exactly like the ``sweep`` tests. This is also the
-   half :mod:`projects.planet.planet_spec` imports (the :class:`Layer` it serializes), so the
+   half :mod:`planet.planet_spec` imports (the :class:`Layer` it serializes), so the
    interchange schema never pulls a render dependency.
 2. **The renderer + the HTML artifact** (:func:`render`, :func:`save_html`) — Plotly imported
    **lazily** inside the function, smoke-tested with ``importorskip("plotly")`` (fast — no kernel,
@@ -68,26 +68,26 @@ compute; the map is a consumer of arrays — only the former is tier-dependent.
 The knobs (plan §9.1)
 ---------------------
 The map wires the climate levers — **solar constant ``S₀``** (the Snowball lever), **CO₂** (a drop in
-the OLR offset ``A`` — :mod:`projects.planet.demo_biomes`'s warming knob), and **meridional transport
-``D``** — plus the two **exoplanet** knobs (:mod:`projects.planet.exoplanet`, now that each one's
+the OLR offset ``A`` — :mod:`planet.demo_biomes`'s warming knob), and **meridional transport
+``D``** — plus the two **exoplanet** knobs (:mod:`planet.exoplanet`, now that each one's
 source is pinned): the host **star's effective temperature ``T_star``** (a redder star lowers the ice
 albedo → harder to snowball) and the **planet ``size``** in Earth radii (bigger → weaker transport → a
 sharper gradient); and the **obliquity** (axial tilt → the insolation P₂ coefficient ``s₂`` —
-:mod:`projects.planet.obliquity`, now that its ``s₂(obliquity)`` relation is pinned and wired). All are
+:mod:`planet.obliquity`, now that its ``s₂(obliquity)`` relation is pinned and wired). All are
 already-validated parameter knobs, so the default (Sun, Earth-size, Earth-tilt) recovers the present-day
 map exactly.
 
 The geography seam — preplanned, carried inert (ADR 0004 #4 / plan §9.3)
 -----------------------------------------------------------------------
 Every view carries an **elevation** scalar layer tagged ``inert=True`` — carried, displayed, and
-round-tripped (via :mod:`projects.planet.planet_spec`), but it **does not change the climate** at v1
+round-tripped (via :mod:`planet.planet_spec`), but it **does not change the climate** at v1
 (the consuming physics is a rung on the §5 staircase: a lapse-rate diagnostic at the cheap tier,
 true 2-D orographic precip at rung 5). Default elevation is flat (zeros); an imported heightmap rides
 the same layer. The honesty flag is named, not blurred.
 
 Units (the §7 discipline, carried into the interchange)
 -------------------------------------------------------
-Temperature in **°C**, precipitation in **cm/yr**, biome as integer :class:`~projects.planet.biomes.Biome`
+Temperature in **°C**, precipitation in **cm/yr**, biome as integer :class:`~planet.biomes.Biome`
 codes, latitude/longitude in **degrees**, elevation in **m**. Each :class:`Layer` carries its unit
 string so the exported state is self-describing.
 """
@@ -101,18 +101,18 @@ from pathlib import Path
 import numpy as np
 
 # --- run-as-script bootstrap: put the repo root on sys.path BEFORE the absolute imports below,
-#     so `python -m projects.planet.planetmap` (the HTML-artifact demo) and a notebook `%run`
-#     both resolve `projects.planet.*`. A no-op under pytest / `python -m`, where it is already there.
+#     so `python -m planet.planetmap` (the HTML-artifact demo) and a notebook `%run`
+#     both resolve `planet.*`. A no-op under pytest / `python -m`, where it is already there.
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from projects.planet import demo_biomes, exoplanet
-from projects.planet.albedo import EBMParams
-from projects.planet.biomes import Biome, BIOME_COLORS, BIOME_NAMES
-from projects.planet.ebm import A_OLR, D_TRANSPORT, S0_EARTH
-from projects.planet.exoplanet import T_SUN, exoplanet_params
-from projects.planet.obliquity import OBLIQUITY_EARTH, OBLIQUITY_FAITHFUL_MAX, OBLIQUITY_MIN, insolation_s2
+from planet import demo_biomes, exoplanet
+from planet.albedo import EBMParams
+from planet.biomes import Biome, BIOME_COLORS, BIOME_NAMES
+from planet.ebm import A_OLR, D_TRANSPORT, S0_EARTH
+from planet.exoplanet import T_SUN, exoplanet_params
+from planet.obliquity import OBLIQUITY_EARTH, OBLIQUITY_FAITHFUL_MAX, OBLIQUITY_MIN, insolation_s2
 
 N_LON = 73                     # default longitude samples (−180…180 inclusive) — bands, so coarse is fine
 LIVE_N_TAU = 0.01              # relaxation step for a live recompute; matches demo_biomes' fine present-day
@@ -146,7 +146,7 @@ class Grid:
 
     ``lat`` runs pole-to-pole (−90 → +90: the hemisphere EBM grid mirrored about the equator);
     ``lon`` runs −180 → +180. ``eq=False`` because the fields are NumPy arrays (element-wise ``==``
-    is ambiguous); array-aware equality lives in :mod:`projects.planet.planet_spec` (the one place a
+    is ambiguous); array-aware equality lives in :mod:`planet.planet_spec` (the one place a
     *real* equality test — the round-trip invariant — is needed).
     """
 
@@ -181,7 +181,7 @@ class Layer:
 class PlanetView:
     """An ordered stack of :class:`Layer` over a shared :class:`Grid` — the registry, and the export manifest.
 
-    This single structure is what :func:`render` paints and what :mod:`projects.planet.planet_spec`
+    This single structure is what :func:`render` paints and what :mod:`planet.planet_spec`
     serializes (ADR 0004 #3: "the registry *is* the export manifest — one structure, not two"). The
     layers are stored in registration order; :meth:`ordered` returns them by ``z_order`` for painting.
     """
@@ -211,7 +211,7 @@ def _mirror_profile(profile: np.ndarray) -> np.ndarray:
 
     The EBM grid is one hemisphere (``x = sin φ`` on [0, 1]); the annual-mean climate is
     hemispherically symmetric, so the southern hemisphere is the northern one reversed
-    (``concat([profile[::-1], profile])`` — the same mirroring the static :mod:`~projects.planet.plots`
+    (``concat([profile[::-1], profile])`` — the same mirroring the static :mod:`~planet.plots`
     biome map uses). Pairs with :func:`_mirror_latitude`.
     """
     profile = np.asarray(profile)
@@ -284,7 +284,7 @@ def circulation_layer(jet, lat_full: np.ndarray, n_lon: int = N_LON) -> Layer:
 def build_view(result, n_lon: int = N_LON, elevation: np.ndarray | None = None, jet=None) -> PlanetView:
     """Turn a Phase-2 climate result into the v1 :class:`PlanetView` — the biome-map layer stack.
 
-    Consumes a :class:`~projects.planet.demo_biomes.BiomeResult` (the validated climate → precip →
+    Consumes a :class:`~planet.demo_biomes.BiomeResult` (the validated climate → precip →
     biome composition) and registers the v1 layers: **temperature** & **precipitation** & **biome**
     (``SCALAR_FIELD`` — each the hemisphere profile mirrored + broadcast across longitude), the **ice
     line** (``ANNOTATION``), and an inert **elevation** layer (the geography seam, §9.3 — flat zeros by
@@ -295,14 +295,14 @@ def build_view(result, n_lon: int = N_LON, elevation: np.ndarray | None = None, 
     Parameters
     ----------
     result : BiomeResult
-        The climate state + precip field + biome codes (:func:`projects.planet.demo_biomes.compute`).
+        The climate state + precip field + biome codes (:func:`planet.demo_biomes.compute`).
     n_lon : int
         Longitude samples for the broadcast (bands, so coarse is fine).
     elevation : ndarray | None
         Optional full-globe ``(n_lat, n_lon)`` elevation field (m) for the inert geography layer;
         defaults to flat (zeros). Carried and round-tripped, never consumed by the climate at v1.
     jet : CoupledJet | None
-        Optional Phase-4 emergent jet (:func:`projects.planet.coupler.couple_jet`); if given, a
+        Optional Phase-4 emergent jet (:func:`planet.coupler.couple_jet`); if given, a
         ``circulation`` ``VECTOR_OVERLAY`` layer is registered. (Not part of the live-slider loop — the
         jet is a separate integration, the first compute too heavy for the rung-0 instant remap, §9.2.)
     """
@@ -342,19 +342,19 @@ def climate_view(S0: float = S0_EARTH, A: float = A_OLR, D: float = D_TRANSPORT,
                  elevation: np.ndarray | None = None) -> PlanetView:
     """The live recompute: knob values → a fresh equilibrium climate → the biome-map :class:`PlanetView`.
 
-    Pure re-composition of :func:`projects.planet.demo_biomes.compute` (the tested chain) at a knob
+    Pure re-composition of :func:`planet.demo_biomes.compute` (the tested chain) at a knob
     setting — the rung-0 instant-remap trigger (ADR 0004 #2). The wired knobs are all **already
     validated**: the climate levers ``S₀`` (the Snowball lever), the OLR offset ``A`` (a drop ≈ a CO₂
-    increase — :mod:`~projects.planet.demo_biomes`'s warming knob), and the meridional transport ``D``;
+    increase — :mod:`~planet.demo_biomes`'s warming knob), and the meridional transport ``D``;
     the **obliquity** ``obliquity_deg`` (axial tilt → the insolation P₂ coefficient ``s₂`` —
-    :mod:`projects.planet.obliquity`, now that its source is pinned; more tilt spreads sunlight poleward
+    :mod:`planet.obliquity`, now that its source is pinned; more tilt spreads sunlight poleward
     → a flatter planet, the ice cap retreats); plus the two **exoplanet** knobs
-    (:mod:`projects.planet.exoplanet`, §9.1) — the host **star's effective temperature ``T_star``** (a
+    (:mod:`planet.exoplanet`, §9.1) — the host **star's effective temperature ``T_star``** (a
     redder star lowers the ice albedo → harder to snowball) and the **planet ``size``** in Earth radii
     (bigger → weaker transport → a sharper gradient). Defaults (``T_star=T_SUN``, ``size=1``,
     ``obliquity_deg=OBLIQUITY_EARTH``) recover the Earth model exactly, so the present-day map is
     unchanged. Each call relaxes to equilibrium from the Earth-like initial condition
-    (:func:`~projects.planet.albedo.present_day_climate`'s finite-cap start), so it shows the *climate
+    (:func:`~planet.albedo.present_day_climate`'s finite-cap start), so it shows the *climate
     at these knobs* — **not** the hysteresis branch-tracking, which is the Snowball demo's continuation
     sweep (a different, path-dependent question).
     """
@@ -527,7 +527,7 @@ def interactive_map(n_tau: float = LIVE_N_TAU):
     the only statements that can raise are widget/Plotly calls. Not unit-tested (the live UI is reach,
     ADR 0002). Sliders: the climate levers ``S₀`` / CO₂ (→ ``A``) / transport ``D``, the two **exoplanet**
     knobs **star ``T_star``** & **planet ``size``** (§9.1 — now pinned and wired), the **obliquity**
-    (axial tilt → ``s₂`` — :mod:`projects.planet.obliquity`, now pinned and wired too), and a layer
+    (axial tilt → ``s₂`` — :mod:`planet.obliquity`, now pinned and wired too), and a layer
     selector. Requires the ``[webviz]`` extra (Plotly + ipywidgets).
     """
     import ipywidgets as widgets

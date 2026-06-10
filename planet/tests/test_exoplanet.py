@@ -11,9 +11,9 @@ and the snowball-resistance threshold. The expensive end-to-end demo is ``slow``
 import numpy as np
 import pytest
 
-from projects.planet import exoplanet as ex
-from projects.planet.albedo import EBMParams
-from projects.planet.ebm import (
+from planet import exoplanet as ex
+from planet.albedo import EBMParams
+from planet.ebm import (
     ALBEDO_A0, ALBEDO_ICE, B_OLR, D_TRANSPORT, S0_EARTH, S2_INSOLATION,
     equilibrium_temperature_0d, two_mode_solution,
 )
@@ -61,7 +61,7 @@ def test_redder_star_resists_snowball_where_the_sun_freezes():
     # The Sun-like planet snowballs (ice to the equator); the SAME planet around an M-dwarf — weaker
     # ice feedback — keeps a temperate cap. One equilibration each (the finite-cap start, comfortably
     # off the cold-start bifurcation edge); the full hysteresis-shift is the slow demo.
-    from projects.planet.albedo import present_day_climate
+    from planet.albedo import present_day_climate
     S0 = 1200.0
     sun_st = present_day_climate(EBMParams(S0=S0, ai=ALBEDO_ICE, n_cells=90), n_tau=0.05)
     mdwarf_st = present_day_climate(EBMParams(S0=S0, ai=ex.stellar_ice_albedo(3000.0), n_cells=90), n_tau=0.05)
@@ -102,7 +102,7 @@ def test_zero_d_mean_is_exactly_size_invariant_but_the_gradient_sharpens():
 def test_bigger_planet_pushes_the_ice_line_equatorward():
     # Loose qualitative benchmark on the relaxed present-day climate: a bigger planet's weaker transport
     # leaves a colder pole, so the ice cap reaches further toward the equator.
-    from projects.planet.albedo import present_day_climate
+    from planet.albedo import present_day_climate
     icelines = [present_day_climate(EBMParams(D=ex.transport_for_size(s), n_cells=90), n_tau=0.05).ice_line_lat
                 for s in (0.5, 1.0, 2.0)]
     assert icelines[0] > icelines[1] > icelines[2]

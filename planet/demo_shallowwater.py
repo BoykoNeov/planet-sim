@@ -1,7 +1,7 @@
 """The Phase-3 banked artifact: the rotating shallow-water engine, exercised with planetary numbers.
 
 The capstone's new shared engine (:mod:`engines.fluid`) made visible. It drives the planetary
-β-plane (:mod:`projects.planet.circulation`) through the two classic rotating-fluid demonstrations:
+β-plane (:mod:`planet.circulation`) through the two classic rotating-fluid demonstrations:
 
   1. **Geostrophic adjustment** — an unbalanced height anomaly (a pressure bump at rest) radiates
      inertia-gravity waves and **settles into a geostrophically-balanced vortex of scale ``L_R``**
@@ -17,7 +17,7 @@ midlatitude jet emerges.
 
 Run headless (saves the figure, prints the summary):
 
-    python -m projects.planet.demo_shallowwater
+    python -m planet.demo_shallowwater
 """
 from __future__ import annotations
 

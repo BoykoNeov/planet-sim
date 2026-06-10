@@ -19,9 +19,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from projects.planet import planet_spec as ps
-from projects.planet import planetmap as pm
-from projects.planet.albedo import EBMParams
+from planet import planet_spec as ps
+from planet import planetmap as pm
+from planet.albedo import EBMParams
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -57,7 +57,7 @@ def _synthetic_spec() -> ps.PlanetSpec:
 def test_importing_planet_spec_stays_headless():
     # The interchange schema must run on a bare core install (the round-trip test is always-green).
     # Checked in a clean subprocess (session-robust — see test_planetmap's guard for why).
-    code = ("import sys, projects.planet.planet_spec\n"
+    code = ("import sys, planet.planet_spec\n"
             "print(','.join(m for m in ('plotly', 'ipywidgets', 'matplotlib') if m in sys.modules))\n")
     out = subprocess.run([sys.executable, "-c", code], cwd=str(REPO_ROOT),
                          capture_output=True, text=True)

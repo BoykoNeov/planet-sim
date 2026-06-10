@@ -1,6 +1,6 @@
 """The §9.1 banked artifact: the exoplanet knobs — other-world climate from two pinned levers.
 
-The capstone's *exoplanet sandbox* made into a demonstration. Two knobs (:mod:`projects.planet.exoplanet`)
+The capstone's *exoplanet sandbox* made into a demonstration. Two knobs (:mod:`planet.exoplanet`)
 turn the present-day Earth model into an other-world climate, each a **parameter derivation**, not new
 physics:
 
@@ -15,7 +15,7 @@ physics:
 
 Run headless (saves the figure, prints the story):
 
-    python -m projects.planet.demo_exoplanet
+    python -m planet.demo_exoplanet
 """
 from __future__ import annotations
 
@@ -60,9 +60,9 @@ def compute(mdwarf_teff: float = MDWARF_TEFF, sizes: tuple[float, ...] = SIZES,
             size_n_tau: float = SIZE_N_TAU) -> ExoplanetResult:
     """Run both knobs → :class:`ExoplanetResult` (no plotting).
 
-    The stellar headline traces the Snowball hysteresis (:func:`~projects.planet.albedo.snowball_hysteresis`)
+    The stellar headline traces the Snowball hysteresis (:func:`~planet.albedo.snowball_hysteresis`)
     for a Sun-like and an ``mdwarf_teff`` host star (only the ice albedo differs); the size headline
-    relaxes the present-day climate (:func:`~projects.planet.albedo.present_day_climate`) at each of
+    relaxes the present-day climate (:func:`~planet.albedo.present_day_climate`) at each of
     ``sizes`` (only the transport ``D`` differs). ``n_cells`` / ``n_steps`` / ``sweep_n_tau`` are the
     sweep's resolution knobs (kept modest — this is a banked demo, not the gate); the structural physics
     is sealed fast by :mod:`tests.test_exoplanet`.

@@ -4,6 +4,13 @@ Status: Accepted — 2026-06-09 (amended same day — see Amendment; the per-pro
 was built 2026-06-09 once Microchip landed — see *Successor*)
 Scope: Program-level invariant; inherited by every per-project plan.
 
+> **Extraction note (standalone repo).** This ADR was written for the BigSim monorepo. In this
+> single-project repo the per-project `python -m tools.gate <project>` runner and the `GATES`
+> manifest it describes **stayed in the monorepo** (they coordinate multiple projects); here the
+> tiered gate collapses to plain pytest — `pytest -m "not slow"` (routine fast lane) and `pytest`
+> (the full gate, adding the slow live-solver / kernel tests). The *rationale* below still holds;
+> only the multi-project tooling is absent.
+
 ## Context
 
 The program grows by accretion: many loosely-coupled modules across `engines/`

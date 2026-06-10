@@ -9,7 +9,7 @@ sweeps); the structural physics is covered fast by ``test_exoplanet``. The figur
 import numpy as np
 import pytest
 
-from projects.planet import demo_exoplanet as demo
+from planet import demo_exoplanet as demo
 
 
 @pytest.mark.slow
@@ -37,7 +37,7 @@ def test_demo_exoplanet_figure_renders():
     pytest.importorskip("matplotlib")
     import matplotlib
     matplotlib.use("Agg")
-    from projects.planet.plots import exoplanet_figure
+    from planet.plots import exoplanet_figure
 
     r = demo.compute(n_cells=48, n_steps=8, sweep_n_tau=0.15)
     fig = exoplanet_figure(r.sun_loop, r.mdwarf_loop, r.mdwarf_label, r.stellar_ai,

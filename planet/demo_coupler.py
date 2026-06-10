@@ -1,10 +1,10 @@
 """The Phase-4 banked artifact: the EBM gradient forces the shallow-water → an emergent jet.
 
 The capstone's closing payoff — and the moment the program's **two shared engines are coupled**.
-The frozen diffusion spine produces an equilibrium climate (:mod:`projects.planet.ebm`); its
+The frozen diffusion spine produces an equilibrium climate (:mod:`planet.ebm`); its
 **meridional temperature gradient** is handed to the frozen rotating shallow-water engine
-(:mod:`projects.planet.circulation`); and a **geostrophically-balanced midlatitude westerly jet
-emerges** (:mod:`projects.planet.coupler`). *Climate in, circulation out.*
+(:mod:`planet.circulation`); and a **geostrophically-balanced midlatitude westerly jet
+emerges** (:mod:`planet.coupler`). *Climate in, circulation out.*
 
   1. **The forcing chain** — a warm equator / cold pole sets a high/low target height field; the
      coupler relaxes the flow toward it (thermal relaxation + weak drag, split around the bare engine).
@@ -22,7 +22,7 @@ One-way only (climate → circulation); two-way is rung 1 of the GCM climb (plan
 
 Run headless (saves the figure, prints the summary):
 
-    python -m projects.planet.demo_coupler
+    python -m planet.demo_coupler
 """
 from __future__ import annotations
 
@@ -101,7 +101,7 @@ def save_circulation_globe(r: CouplerResult) -> Path:
 
     The plan's Phase-4 map artifact (§9): the deep-end interactive map *registers* the coupled jet as a
     ``circulation`` ``vector_overlay`` over the temperature field. Recomposes the biome climate
-    (:func:`projects.planet.demo_biomes.compute`) into a :class:`~projects.planet.planetmap.PlanetView`
+    (:func:`planet.demo_biomes.compute`) into a :class:`~planet.planetmap.PlanetView`
     with the jet overlay and writes a standalone Plotly HTML globe — the seam the renderer paints with no
     restructuring (ADR 0004 #1). Returns the written path.
     """

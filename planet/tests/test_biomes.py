@@ -11,9 +11,9 @@ with boundaries this module drew. What is **loose** is the calibrated threshold 
 import numpy as np
 import pytest
 
-from projects.planet import biomes, precip
-from projects.planet.albedo import present_day_climate
-from projects.planet.biomes import Biome, classify, classify_field
+from planet import biomes, precip
+from planet.albedo import present_day_climate
+from planet.biomes import Biome, classify, classify_field
 
 
 # --------------------------------------------------------------------------- #

@@ -7,11 +7,11 @@ shared engine (``engines/fluid``, the shallow-water solver).
 
 Phase 1 public API — the latitudinal EBM & the Snowball bifurcation::
 
-    from projects.planet.ebm import (
+    from planet.ebm import (
         EnergyBalanceModel, ClimateState, insolation, legendre_P2,
         equilibrium_temperature_0d, two_mode_solution, ice_line_latitude,
     )
-    from projects.planet.albedo import (
+    from planet.albedo import (
         EBMParams, planetary_albedo, absorbed_shortwave,
         present_day_climate, snowball_hysteresis, HysteresisLoop,
     )
@@ -19,5 +19,5 @@ Phase 1 public API — the latitudinal EBM & the Snowball bifurcation::
 > **UNIT SYSTEM — SI / climlab-conventional** (W m⁻², °C, ``x = sin φ`` dimensionless), unlike
 > Chip's per-module native units: the EBM constants (climlab/North ``A, B, D, α, Tf``) are
 > tabulated in W m⁻²/°C, and the frozen engine is fed the transport in those units directly.
-> Latitudes are reported in degrees. See :mod:`~projects.planet.ebm` for the full banner.
+> Latitudes are reported in degrees. See :mod:`~planet.ebm` for the full banner.
 """

@@ -1,4 +1,4 @@
-# `projects/planet` — the Earth-system / Planet simulator (the capstone)
+# `planet` — the Earth-system / Planet simulator (the capstone)
 
 *Planetary knobs in, climate & habitability out.* Project #3 of the program and its **capstone** —
 the first project to reuse the frozen diffusion/heat spine (`engines/diffusion`) a **third** time
@@ -263,7 +263,7 @@ python -m tools.gate planet                  # full gate for planet (incl. the s
 ```
 
 `pyproject.toml`'s `testpaths` already carries `projects` and `engines`, so both
-`projects/planet/tests/` and `engines/fluid/tests/` are collected with no config change;
+`planet/tests/` and `engines/fluid/tests/` are collected with no config change;
 `pythonpath = ["."]` lets planet import the frozen engines as `engines.diffusion…` / `engines.fluid…`.
 The full-resolution Snowball sweep (`test_demo_snowball`), the shallow-water demos
 (`test_demo_shallowwater`, `test_circulation` integration), the figure renders, and the live climlab

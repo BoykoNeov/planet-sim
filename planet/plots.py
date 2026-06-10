@@ -1,7 +1,7 @@
 """Planet-local plot helpers — the render layer (Planet Phase 1; ADR 0002).
 
 The **viz floor**: static matplotlib figures that *consume* the plain arrays
-:mod:`projects.planet.ebm` / :mod:`projects.planet.albedo` produce. Per ADR 0002 this layer is
+:mod:`planet.ebm` / :mod:`planet.albedo` produce. Per ADR 0002 this layer is
 strictly downstream of correctness — a figure draws already-validated numbers, it is never
 evidence of validity (the §3 triad tests do that). It is the only place in planet that imports a
 plotting library; the compute modules stay headless so the test suite never needs matplotlib.

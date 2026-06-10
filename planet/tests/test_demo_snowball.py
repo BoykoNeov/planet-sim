@@ -2,7 +2,7 @@
 
 Runs the full continuation sweep the demo banks (present-day climate + the hysteresis loop) and
 asserts the headline numbers against the cited climlab reference bands
-(:mod:`projects.planet.climate_reference`). ``slow``-marked — the full-resolution sweep relaxes the
+(:mod:`planet.climate_reference`). ``slow``-marked — the full-resolution sweep relaxes the
 EBM at ~120 solar constants — so the fast lane deselects it (the structural physics is covered fast
 by ``test_albedo``); it runs in the full gate. The figure smoke-test is ``importorskip``-gated on the
 optional ``[viz]`` extra and is an *execution* check (ADR 0002), not a physics one.
@@ -10,9 +10,9 @@ optional ``[viz]`` extra and is an *execution* check (ADR 0002), not a physics o
 import numpy as np
 import pytest
 
-from projects.planet import demo_snowball as demo
-from projects.planet.albedo import EBMParams, HysteresisLoop
-from projects.planet.climate_reference import REFERENCE
+from planet import demo_snowball as demo
+from planet.albedo import EBMParams, HysteresisLoop
+from planet.climate_reference import REFERENCE
 
 
 @pytest.mark.slow
@@ -38,8 +38,8 @@ def test_demo_figure_renders():
     pytest.importorskip("matplotlib")
     import matplotlib
     matplotlib.use("Agg")
-    from projects.planet.albedo import present_day_climate, snowball_hysteresis
-    from projects.planet.plots import snowball_figure
+    from planet.albedo import present_day_climate, snowball_hysteresis
+    from planet.plots import snowball_figure
 
     params = EBMParams(n_cells=60)
     present = present_day_climate(params, n_tau=0.05)

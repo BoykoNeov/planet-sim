@@ -10,7 +10,7 @@ an *execution* check (ADR 0002), not a physics one.
 import numpy as np
 import pytest
 
-from projects.planet import demo_shallowwater as demo
+from planet import demo_shallowwater as demo
 
 
 @pytest.mark.slow
@@ -32,8 +32,8 @@ def test_demo_figure_renders():
     pytest.importorskip("matplotlib")
     import matplotlib
     matplotlib.use("Agg")
-    from projects.planet.circulation import geostrophic_adjustment, rossby_wave
-    from projects.planet.plots import shallowwater_figure
+    from planet.circulation import geostrophic_adjustment, rossby_wave
+    from planet.plots import shallowwater_figure
 
     adj = geostrophic_adjustment(nx=48, ny=48, n_periods=6.0)
     ros = rossby_wave(nx=48, ny=48, frac_period=0.3)

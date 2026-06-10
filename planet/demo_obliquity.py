@@ -1,9 +1,9 @@
 """The §9.1 banked artifact: the obliquity knob — axial tilt sets the insolation gradient.
 
 The capstone's *obliquity* lever made into a demonstration. Like the two exoplanet knobs
-(:mod:`projects.planet.demo_exoplanet`), it is a **parameter derivation**, not new physics: a planet's
+(:mod:`planet.demo_exoplanet`), it is a **parameter derivation**, not new physics: a planet's
 **axial tilt** ``ε`` fixes the second-Legendre coefficient ``s₂`` of its annual-mean insolation
-(:mod:`projects.planet.obliquity`), and that single number sets how steeply the year's sunlight is
+(:mod:`planet.obliquity`), and that single number sets how steeply the year's sunlight is
 graded from equator to pole.
 
 * **Less tilt → a steeper gradient.** At zero tilt the sun is pinned over the equator
@@ -17,7 +17,7 @@ graded from equator to pole.
 
 Run headless (saves the figure, prints the story):
 
-    python -m projects.planet.demo_obliquity
+    python -m planet.demo_obliquity
 """
 from __future__ import annotations
 
@@ -59,10 +59,10 @@ def compute(tilts: tuple[float, ...] = CLIMATE_TILTS, n_cells: int = 90,
             curve_n: int = CURVE_N, climate_n_tau: float = CLIMATE_N_TAU) -> ObliquityResult:
     """Run the obliquity knob → :class:`ObliquityResult` (no plotting).
 
-    Traces the geometric ``s₂(ε)`` curve over 0–90° (:func:`~projects.planet.obliquity.insolation_p2_coefficient`)
-    and relaxes the present-day climate (:func:`~projects.planet.albedo.present_day_climate`) at each of
+    Traces the geometric ``s₂(ε)`` curve over 0–90° (:func:`~planet.obliquity.insolation_p2_coefficient`)
+    and relaxes the present-day climate (:func:`~planet.albedo.present_day_climate`) at each of
     ``tilts`` (only ``s₂`` differs — the knob feeds it through
-    :func:`~projects.planet.obliquity.insolation_s2`). ``curve_n`` / ``n_cells`` / ``climate_n_tau`` are
+    :func:`~planet.obliquity.insolation_s2`). ``curve_n`` / ``n_cells`` / ``climate_n_tau`` are
     resolution knobs (kept modest — this is a banked demo, not the gate; the physics is sealed fast by
     :mod:`tests.test_obliquity`).
     """

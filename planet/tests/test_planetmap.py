@@ -1,7 +1,7 @@
 """Tests for the deep-end interactive map (Planet §9 / ADR 0004).
 
 ``planetmap.py`` adds **no new physics** — it re-shapes the validated climate arrays
-(:func:`projects.planet.demo_biomes.compute`) into a layer registry and paints them. Per ADR 0002 /
+(:func:`planet.demo_biomes.compute`) into a layer registry and paints them. Per ADR 0002 /
 ADR 0004 #4 the *render* itself is a **reach** layer (its only test is an execution smoke-test, not a
 physics check); the genuine correctness property — the state round-trip — lives in
 ``test_planet_spec.py``. So these tests split three ways, exactly like ``test_app.py``:
@@ -10,7 +10,7 @@ physics check); the genuine correctness property — the state round-trip — li
   seam — mirroring + broadcast), the live recompute, and robustness at the slider extremes;
 * **importorskip("plotly")** (fast — no kernel, so **not** ``@slow``): the figure builds, switches
   active layer, draws the annotation, and paints the Phase-4 circulation ``vector_overlay`` (cones);
-* **untested**: :func:`~projects.planet.planetmap.interactive_map` (the live ipywidgets loop — the
+* **untested**: :func:`~planet.planetmap.interactive_map` (the live ipywidgets loop — the
   ``main()`` analogue, reach).
 
 The load-bearing structural guard (its own test): importing the module must **not** pull Plotly or
@@ -25,10 +25,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from projects.planet import planetmap as pm
-from projects.planet import demo_biomes
-from projects.planet.albedo import EBMParams
-from projects.planet.biomes import Biome, biome_area_fractions
+from planet import planetmap as pm
+from planet import demo_biomes
+from planet.albedo import EBMParams
+from planet.biomes import Biome, biome_area_fractions
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -53,7 +53,7 @@ def test_importing_the_map_modules_stays_headless():
     # tests below import plotly into the shared session), so import the modules fresh and assert
     # nothing heavy was pulled — this is the session-robust form of test_app's streamlit guard.
     code = (
-        "import sys, projects.planet.planetmap, projects.planet.planet_spec\n"
+        "import sys, planet.planetmap, planet.planet_spec\n"
         "print(','.join(m for m in ('plotly', 'ipywidgets', 'matplotlib') if m in sys.modules))\n"
     )
     out = subprocess.run([sys.executable, "-c", code], cwd=str(REPO_ROOT),

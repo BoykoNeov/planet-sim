@@ -10,8 +10,8 @@ field has no water-mass conservation law, so the "conservation" leg is a **consi
 import numpy as np
 import pytest
 
-from projects.planet import precip
-from projects.planet.albedo import present_day_climate
+from planet import precip
+from planet.albedo import present_day_climate
 
 
 def _area_grid(n: int = 400):

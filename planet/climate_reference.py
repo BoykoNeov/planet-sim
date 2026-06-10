@@ -42,7 +42,7 @@ class ClimateReference:
     # The hysteresis is *wide*: the white planet re-melts only at a much brighter sun than it froze.
     hysteresis_positive: bool = True                  # melt_S0 > freeze_S0 (the loop has positive width)
 
-    # The climlab EBM defaults these benchmarks come from (pinned; == projects.planet.ebm constants).
+    # The climlab EBM defaults these benchmarks come from (pinned; == planet.ebm constants).
     climlab_S0: float = 1365.2
     climlab_A: float = 210.0
     climlab_B: float = 2.0
@@ -62,7 +62,7 @@ def climlab_present_day(num_lat: int = 180, years: float = 5.0):
 
     Builds climlab's annual-mean ``EBM`` at its defaults and **seeds an Earth-like (capped) initial
     condition** — warm equator, frozen pole — so it settles on the *same* finite-cap branch this
-    model's :func:`~projects.planet.albedo.present_day_climate` targets (the system is bistable at
+    model's :func:`~planet.albedo.present_day_climate` targets (the system is bistable at
     present S₀, so the cross-check must compare like branch with like). Integrates to equilibrium and
     reads the global-mean surface temperature and the ice-line latitude (where ``Ts`` crosses ``Tf``).
     Used **only** by the ``slow`` / ``importorskip`` benchmark test (climlab is the opt-in

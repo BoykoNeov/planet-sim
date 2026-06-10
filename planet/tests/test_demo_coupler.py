@@ -10,7 +10,7 @@ is an *execution* check (ADR 0002), not a physics one.
 import numpy as np
 import pytest
 
-from projects.planet import demo_coupler as demo
+from planet import demo_coupler as demo
 
 
 @pytest.mark.slow
@@ -32,7 +32,7 @@ def test_demo_figure_renders():
     pytest.importorskip("matplotlib")
     import matplotlib
     matplotlib.use("Agg")
-    from projects.planet.plots import coupler_figure
+    from planet.plots import coupler_figure
 
     r = demo.compute(nx=48, ny=48)
     fig = coupler_figure(r.jet, r.state)

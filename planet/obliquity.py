@@ -4,15 +4,15 @@ The §9.1 plan named **obliquity** as a core climate knob but left it *deferred*
 slider — until its ``s₂(obliquity)`` relation could be **pinned to a source**, the
 ``[[…-source]]`` discipline that gates every climate number in this project
 ([[obliquity-insolation-source]]). This module supplies it, and like the two exoplanet knobs
-(:mod:`projects.planet.exoplanet`) it adds **no physics**: it is a **parameter derivation** that
+(:mod:`planet.exoplanet`) it adds **no physics**: it is a **parameter derivation** that
 computes the insolation P₂ coefficient ``s₂`` the EBM already accepts
-(:attr:`~projects.planet.albedo.EBMParams.s2`). No engine, no EBM machinery, no validated constant
+(:attr:`~planet.albedo.EBMParams.s2`). No engine, no EBM machinery, no validated constant
 is touched — set the obliquity to Earth's and the present-day model is recovered **exactly** (a clean
 perturbation, asserted in :mod:`tests.test_obliquity`).
 
 The physics — axial tilt sets how evenly the year's sunlight is spread in latitude
 ------------------------------------------------------------------------------------
-The EBM's insolation is the single-mode ``S(x) = (S₀/4)(1 + s₂·P₂(x))`` (:func:`~projects.planet.ebm.insolation`,
+The EBM's insolation is the single-mode ``S(x) = (S₀/4)(1 + s₂·P₂(x))`` (:func:`~planet.ebm.insolation`,
 ``x = sin φ``), with ``s₂ < 0`` concentrating sunlight at the equator. That ``s₂`` is **not** a free
 constant — it is the second-Legendre coefficient of the **annual-mean insolation**, which is fixed by
 the planet's **obliquity** ``ε`` (the tilt of the spin axis to the orbital plane). This module computes
@@ -36,7 +36,7 @@ it from first principles rather than pinning a memorized number:
 3. **Projection onto P₂.** With the equator-symmetric ``Q̄`` expanded in even Legendre modes
    ``Q̄ ∝ 1 + s₂P₂ + s₄P₄ + …``, the coefficient is ``s₂ = 5∫₀¹Q̄P₂dx / ∫₀¹Q̄dx``
    (:func:`insolation_p2_coefficient`) — the geometric/raw value, the analogue of
-   :func:`~projects.planet.exoplanet.two_band_ice_albedo`.
+   :func:`~planet.exoplanet.two_band_ice_albedo`.
 
 As ``ε`` grows the summer sun reaches higher latitudes (even over the pole), so the annual sunlight
 spreads out: ``s₂`` rises **toward zero**, and past a **critical obliquity ≈ 55°** it goes **positive**
@@ -44,7 +44,7 @@ spreads out: ``s₂`` rises **toward zero**, and past a **critical obliquity ≈
 Uranus). The exact analytic limits seal the construction: at ``ε = 0`` the orbit is flat, ``δ ≡ 0``,
 ``Q̄ ∝ √(1−x²)``, and the projection is **exactly ``s₂ = −5/8 = −0.625``** (no polar cutoffs anywhere);
 at Earth's ``ε ≈ 23.44°`` the geometry independently lands on ``s₂ ≈ −0.48`` — the climlab/North-1975
-fit the EBM already pins (:data:`~projects.planet.ebm.S2_INSOLATION`), a **non-circular cross-check**
+fit the EBM already pins (:data:`~planet.ebm.S2_INSOLATION`), a **non-circular cross-check**
 (the two come from independent places and agree to <1%).
 
 The knob — a ratio anchor, so Earth recovers the model exactly
@@ -53,8 +53,8 @@ The geometric ``s₂(ε)`` lands near but not exactly on the pinned climlab ``�
 the knob is applied as the **ratio to the Earth value** (:func:`obliquity_s2_factor`), exactly as the
 stellar-albedo knob ratios to the solar value — the **Sun/Earth defaults recover the model bit-for-bit**
 (``factor(ε_Earth) == 1`` by construction → :func:`insolation_s2` returns
-:data:`~projects.planet.ebm.S2_INSOLATION` exactly). :func:`obliquity_params` composes it onto an
-:class:`~projects.planet.albedo.EBMParams`, replacing only ``s2``.
+:data:`~planet.ebm.S2_INSOLATION` exactly). :func:`obliquity_params` composes it onto an
+:class:`~planet.albedo.EBMParams`, replacing only ``s2``.
 
 Scope edge, named
 -----------------
@@ -65,7 +65,7 @@ P₂ truncation cannot carry. So the knob is most faithful near present tilt and
 truncates at high obliquity** — the analogue of the EBM's "linear OLR accurate only near the present
 climate". The sign reversal is real and surfaced, but asserted only as a **loose bracket** (negative at
 45°, positive by 65°), not at a pinned crossing. Likewise **only the insolation ``s₂`` responds to
-tilt — the ice-free albedo's poleward ``a₂`` structure (:data:`~projects.planet.ebm.ALBEDO_A2`) is held
+tilt — the ice-free albedo's poleward ``a₂`` structure (:data:`~planet.ebm.ALBEDO_A2`) is held
 fixed** (the standard EBM treatment: North 1975 varies the *insolation* with obliquity, not the albedo's
 zenith-angle dependence). Combined with the **annual-mean** model (no seasonal extremes — the very thing
 high obliquity makes dramatic), this is the named ceiling. Eccentricity and precession are a separate
@@ -138,7 +138,7 @@ def insolation_p2_coefficient(obliquity_deg: float, n_phi: int = _N_PHI) -> floa
     direct ``x``-quadrature would hit at ``x = 1``). Exact analytic value at ``ε = 0``: **``−5/8``**
     (the tight test anchor); ``≈ −0.477`` at Earth's tilt (the climlab cross-check); **positive** above
     the ≈55° critical obliquity. This is the analogue of
-    :func:`~projects.planet.exoplanet.two_band_ice_albedo` — the raw quantity the knob then ratios.
+    :func:`~planet.exoplanet.two_band_ice_albedo` — the raw quantity the knob then ratios.
     """
     phi = np.linspace(0.0, 0.5 * np.pi, n_phi)
     Qbar = annual_mean_insolation(phi, obliquity_deg)
@@ -172,20 +172,20 @@ def insolation_s2(obliquity_deg: float = OBLIQUITY_EARTH, s2_base: float = S2_IN
     ``insolation_s2(OBLIQUITY_EARTH)`` return ``s2_base`` (the climlab ``−0.48``) **exactly** — the
     clean-perturbation property. A *smaller* tilt → a *more negative* ``s₂`` (sun pinned at the equator,
     a steeper gradient, a colder pole); a *larger* tilt → ``s₂`` toward 0 and beyond (a flatter, then
-    pole-warm planet). Feeds straight into :attr:`~projects.planet.albedo.EBMParams.s2`.
+    pole-warm planet). Feeds straight into :attr:`~planet.albedo.EBMParams.s2`.
     """
     return s2_base * obliquity_s2_factor(obliquity_deg)
 
 
 def obliquity_params(obliquity_deg: float = OBLIQUITY_EARTH, base: EBMParams | None = None) -> EBMParams:
-    """An :class:`~projects.planet.albedo.EBMParams` for a planet of axial tilt ``ε`` (degrees).
+    """An :class:`~planet.albedo.EBMParams` for a planet of axial tilt ``ε`` (degrees).
 
     Returns ``base`` with **only** its insolation coefficient replaced by the knob-derived value
     (``s2 = insolation_s2(ε, base.s2)``); every other parameter is untouched. The Earth default
     (``obliquity_deg=OBLIQUITY_EARTH``) returns an ``EBMParams`` **equal to ``base``** — a clean
     perturbation, composing on top of whatever the caller already set (it commutes with the exoplanet
-    knobs, which replace ``ai``/``D`` only). The bundle the demo (:mod:`projects.planet.demo_obliquity`)
-    and the interactive map (:mod:`projects.planet.planetmap`) consume.
+    knobs, which replace ``ai``/``D`` only). The bundle the demo (:mod:`planet.demo_obliquity`)
+    and the interactive map (:mod:`planet.planetmap`) consume.
     """
     from dataclasses import replace
     if base is None:
