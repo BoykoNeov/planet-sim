@@ -777,6 +777,56 @@ diagnose `⟨v'θ'⟩` **post-saturation** via a life-cycle integral (release mo
 cosmetic); the loop-closes claim scoped to **one feedback pass** (a converged fixed-point is a `slow`
 demo if it converges cleanly). Then **step 3** circulation-informed precip.
 
+**Rung 1, step 2 — Phase B BUILT (the EMERGENT eddy flux; 2026-06-11).** `planet/eddy_flux.py` fills
+Phase A's `flux_fn` seam with the real thing: the meridional eddy heat flux `⟨v'θ'⟩(φ)` diagnosed from
+a passive temperature tracer advected on the **released** barotropically-unstable Phase-4 jet
+(`eddy_life_cycle`: spin up the jet **dry** → init `θ` = windowed-EBM profile → deterministic `cos(kx)`
+v-perturbation → forcing-**OFF** release → life-cycle integral `κ_eff = −∫F̄ dt / ∫θ̄_y dt` over the
+window-flat interior). **Genuinely emergent** — resolved barotropic instability (Rayleigh–Kuo met, jet
+~20 m/s), no imposed stationary wave, no down-gradient closure assumed. **What is banked, and its
+honesty class** (the spike-driven build — see below): **(headline, DIRECTION) the eddy diffusivity is
+STATE-DEPENDENT** — across two climates with the forcing amplitude `α` held **fixed**, a flatter EBM
+gradient (high-obliquity-like, `s₂=−0.32`, jet ~14 m/s) gives `κ_eff ≈ 0.5–0.6×` the steep climate's
+(`s₂=−0.48`, jet ~20 m/s): the loop is a real, right-signed feedback (flatter mean → weaker jet →
+weaker eddies → smaller `κ`), **not** a fixed-`D` re-labelling. (Mechanism, advisor: the gradient
+*cancels* in `−∫F̄/∫θ̄_y`, so `κ_eff ≈ v'·ℓ` tracks climate **only** through the jet — which is exactly
+why `α` must be held fixed; renormalizing to fix the jet speed would make the test cosmetic by
+construction. Warming via `CO₂`/`S₀` was found to barely move the *channel* gradient — the linear OLR
+shifts `T₀` uniformly and the ice retreat is poleward of the channel — so `s₂`/obliquity, which
+genuinely flattens it, is the non-circularity knob.) **(MAGNITUDE — named, NOT banked)** `κ_eff ~ 10³
+m²/s`, ~1000× below rung-0's `2.2×10⁶`: the *instantaneous* `⟨v'θ'⟩` is largely **reversible**
+(oscillates sign with the meander; **irreversible fraction ~0.1**), and the value is **resolution-
+converged** (`nx=80`≈`96`) but suppressed by configuration choices that can't be cleanly separated from
+intrinsic physics (a single coherent seeded wavenumber mixes more reversibly than broadband turbulence;
+the band-bulk estimator smears the jet-centred peak) — so it is **window/forcing/configuration-tuned**,
+the honesty class of Phase 4's jet *speed*; the **sign** and the **climate ordering** carry validation,
+not the number (chasing a bigger number is unbankable regardless). **(the tight reduction — a FINDING,
+not a manufactured match)** the barotropic flux does **not** *tightly* reduce to the EBM operator at
+rung 1: `reduction_to_ebm_operator` **tests** (not assumes) the resolved flux-divergence's *shape*
+against smooth down-gradient diffusion built from the band-bulk **scalar** `κ` (not circular — the
+pointwise `κ` is not reused; only the normalised shape) → a **partial** correlation (`~0.6`), and the
+comparison is itself **near-vacuous** (a uniform-`κ` diffusion of the near-linear midlatitude gradient
+produces ~0 transport-divergence); the tight reduction becomes **non-vacuous only at rung 3** (a strong
+baroclinic flux). **(the geometry correspondence — DELIVERED, the genuinely tight part)**
+`planet/transport.py` gains the **spherical transport operator** `(1/cosφ)∂/∂y[κ·cosφ·∂θ/∂y]` (the EBM
+operator `D·∂/∂x[(1−x²)∂T/∂x]` written in β-plane coordinates), anchored on the **P₂ eigenvalue** (both
+forms → `−6·(κ/a²)·P₂`, the analytic Legendre check — **not** a self-comparison of two finite-difference
+operators), with the flat-vs-spherical `cos φ` metric gap shown **order-unity (~0.6)** over the wide
+channel (`φ≈19°–61°`, `cos φ` varying ~2×): so the bridge's "uniform κ on the sphere" derivation is made
+rigorous — the geometry is **not inherited for free**, and the β-plane tangent across a ~42° band is a
+named scope edge. **(seam) `close_loop`** routes the emergent `D_eff` through the Phase-A-validated
+bridge + re-equilibration: it **converges** with the right sign (weaker transport ⇒ equator-to-pole
+contrast 56→122 °C, steeper), but the degenerate near-radiative-equilibrium climate is **not banked**
+(magnitude). **Build discipline (advisor-gated):** the physics was **de-risked in throwaway spikes
+*before* the module** (`outputs/`, gitignored) — the spikes caught that a *single-transient* diagnosis
+is noisy and that *tracer relaxation during release* **breaks** the climate ordering (a τ-artifact), so
+the settled **pure-release** life-cycle integral over a fixed post-saturation window is what landed
+(flat<steep across every window tried). Tests split by cost: the geometry legs (P₂ eigenvalue +
+order-unity metric) are **fast/always-green** in `test_transport.py`; the eddy-sim legs (unstable +
+down-gradient + mostly-reversible, state-dependence, non-tight reduction, `close_loop` sign) are
+**`slow`** in `test_eddy_flux.py`. No engine edit (planet remains a *consumer* of `engines/fluid` +
+`engines/diffusion`); `uses` unchanged. **Next: step 3** circulation-informed precip.
+
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
 1969 / North 1975 / climlab defaults). Phase 2 pins **`[[whittaker-biome-source]]`** +

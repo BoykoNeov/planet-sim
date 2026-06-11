@@ -128,6 +128,55 @@ def ebm_D_to_kappa(D):
 
 
 # --------------------------------------------------------------------------- #
+# The geometry correspondence — the bridge's "uniform κ on the sphere" caveat made rigorous.
+# --------------------------------------------------------------------------- #
+# The κ→D bridge above is derived (module docstring) by matching the EBM operator to spherical
+# diffusion *for a uniform κ*: ``D·∂/∂x[(1−x²)∂T/∂x] = ∇·(C_atm κ ∇T)``. Phase B diagnoses a
+# latitude-varying ``κ(φ)`` on a **flat β-plane channel** (Cartesian ``y``) and would feed it into
+# the **spherical** EBM operator — so the Cartesian-channel ↔ spherical-EBM geometry must be made
+# explicit, **not inherited for free**. The exact identity (``x = sin φ``, ``y`` poleward with
+# ``∂/∂y = (1/a)∂/∂φ``) is
+#
+#     D·∂/∂x[(1−x²)∂T/∂x] = D·a²·(1/cos φ)·∂/∂y[cos φ·∂T/∂y]
+#                         = D·a²·[∂²T/∂y² − (tan φ / a)·∂T/∂y]      (the spherical-convergence form),
+#
+# so the spherical operator is the flat Cartesian Laplacian ``∂²/∂y²`` **plus** a ``cos φ``
+# meridian-convergence metric. Over Planet's channel (φ ≈ 19°–61°, ``cos φ`` varying ~2×) that
+# correction is **order-unity (~30–60 %)**, not an O(L/a)-small afterthought — and the β-plane
+# tangent-plane idealization is itself stretched across a ~42° band (a named scope edge). The two
+# operator forms below let Phase B (a) anchor the correspondence on the **P₂ eigenvalue**
+# (``∂/∂x[(1−x²)∂P₂/∂x] = −6 P₂`` ⟹ the spherical form returns ``−6·(κ/a²)·P₂``), and (b) quantify
+# the order-unity metric gap (flat vs spherical on the *same* smooth gradient).
+def spherical_transport_tendency(theta, phi_deg, y, kappa):
+    """The EBM **spherical** transport tendency on the β-plane channel: ``(1/cosφ)∂/∂y[κ·cosφ·∂θ/∂y]``.
+
+    The down-gradient diffusion tendency ``∂θ/∂t`` (K/s; ``κ`` in m²/s, ``θ`` in K, ``y`` in m)
+    written in the channel's ``y`` coordinate but carrying the **sphere's ``cos φ`` meridian-convergence
+    metric** — i.e. ``∇·(κ∇θ)`` on the sphere, the per-``C_atm`` form of the EBM operator
+    ``D·∂/∂x[(1−x²)∂T/∂x]`` (see the section comment; ``D = C_atm·κ/a²``). ``kappa`` may be a scalar or
+    a latitude array. This is the operator Phase B's resolved flux-divergence is tested against — the
+    geometry handled explicitly, not inherited from the uniform-κ bridge.
+    """
+    c = np.cos(np.radians(np.asarray(phi_deg, dtype=float)))
+    y = np.asarray(y, dtype=float)
+    k = np.broadcast_to(np.asarray(kappa, dtype=float), np.shape(theta))
+    return (1.0 / c) * np.gradient(k * c * np.gradient(np.asarray(theta, dtype=float), y), y)
+
+
+def cartesian_transport_tendency(theta, y, kappa):
+    """The **flat** β-plane transport tendency ``∂/∂y[κ·∂θ/∂y]`` — the spherical operator *minus its
+    cos φ metric*.
+
+    The naive Cartesian-channel reading of the diffusion tendency (no meridian convergence). It differs
+    from :func:`spherical_transport_tendency` by the **order-unity** ``cos φ`` correction over Planet's
+    wide channel — the quantitative statement of "the geometry is not inherited for free."
+    """
+    y = np.asarray(y, dtype=float)
+    k = np.broadcast_to(np.asarray(kappa, dtype=float), np.shape(theta))
+    return np.gradient(k * np.gradient(np.asarray(theta, dtype=float), y), y)
+
+
+# --------------------------------------------------------------------------- #
 # Diagnosing the down-gradient eddy diffusivity from a meridional flux.
 # --------------------------------------------------------------------------- #
 def bulk_diffusivity(flux, dtheta_dy, mask: Optional[np.ndarray] = None) -> float:

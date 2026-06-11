@@ -33,9 +33,10 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
+from planet import circulation as circ
 from planet import transport as tr
 from planet.albedo import EBMParams, present_day_climate
-from planet.ebm import D_TRANSPORT
+from planet.ebm import D_TRANSPORT, legendre_P2
 
 # A coarse EBM (fewer cells) so the repeated relaxations stay fast; the physics is grid-converged
 # enough for these checks (the reduction is a self-consistency, independent of resolution).
@@ -132,3 +133,41 @@ def test_default_flux_is_net_down_gradient_over_the_interior():
     assert res.kappa_eff > 0.0                       # net down-gradient over the window-flat interior
     assert res.interior.sum() > 0                    # the flat top is a non-empty band
     assert res.interior.sum() < res.phi.size         # but a strict subset (the taper is excluded)
+
+
+# --------------------------------------------------------------------------- #
+# The geometry correspondence (Phase B) — the bridge's uniform-κ-on-sphere caveat made rigorous.
+# These are PURE MATH (no eddy sim): the spherical operator, anchored on the P₂ eigenvalue, and the
+# order-unity cos φ metric gap that proves the geometry is "not inherited for free".
+# --------------------------------------------------------------------------- #
+def test_spherical_operator_anchored_on_the_P2_eigenvalue():
+    """The Phase-B geometry anchor: the spherical transport operator written in β-plane channel
+    coordinates reproduces the EBM operator's **analytic** eigenvalue. Legendre's equation gives
+    ``∂/∂x[(1−x²)∂P₂/∂x] = −6 P₂``, so for a uniform κ the spherical form must return
+    ``−6·(κ/a²)·P₂`` — an analytic check (not a self-comparison of two finite-difference operators)."""
+    phi, y, _dy, _interior = tr.channel_geometry(ny=160)
+    x = np.sin(np.radians(phi))
+    P2 = legendre_P2(x)
+    kappa = 2.0e6
+    got = tr.spherical_transport_tendency(P2, phi, y, kappa)
+    want = -6.0 * (kappa / circ.R_EARTH ** 2) * P2
+    m = slice(6, -6)                                  # drop the FD edges (np.gradient is one-sided there)
+    assert np.max(np.abs(got[m] - want[m])) / np.max(np.abs(want[m])) < 2e-3
+
+
+def test_cos_phi_metric_correction_is_order_unity_not_inherited_for_free():
+    """The headline geometry finding: over Planet's wide channel (φ≈19°–61°, cos φ varying ~2×) the
+    spherical operator differs from the flat β-plane Laplacian by an **order-unity** amount — so a
+    latitude-varying D_eff diagnosed on the flat channel cannot be fed into the spherical EBM operator
+    for free. (Distinct claim from the eigenvalue anchor above, which fixes the spherical form itself.)"""
+    phi, y, _dy, _interior = tr.channel_geometry(ny=160)
+    x = np.sin(np.radians(phi))
+    P2 = legendre_P2(x)
+    kappa = 2.0e6
+    sph = tr.spherical_transport_tendency(P2, phi, y, kappa)
+    flat = tr.cartesian_transport_tendency(P2, y, kappa)
+    m = slice(6, -6)
+    gap = np.max(np.abs(sph[m] - flat[m])) / np.max(np.abs(sph[m]))
+    assert gap > 0.2                                 # order-unity (measured ~0.6), not O(L/a)-small
+    cos = np.cos(np.radians(phi))
+    assert cos.max() / cos.min() > 1.5               # the channel really does span a ~2× cos φ range

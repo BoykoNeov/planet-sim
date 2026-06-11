@@ -132,6 +132,22 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   a **flanking easterly return** (named). Conservation is **reframed** (forced–dissipative): mass
   forced-exact + a **release test** (forcing off → the bare engine conserves + the jet persists).
   One-way, dry single layer (two-way = rung 1, the `tracer` seam). The module docstring is its contract.
+- **To work on the two-way coupler (rung 1, step 2 — close the EBM⇄circulation loop):** `transport.py`
+  + `eddy_flux.py` + `tests/test_transport.py` + `tests/test_eddy_flux.py`. **Phase A** (`transport.py`)
+  is the feedback *machinery*: the **κ→D bridge** `D = C_atm·κ/a²` (`kappa_to_ebm_D`, pinned absolutely),
+  the band-bulk down-gradient diffusivity (`bulk_diffusivity`), `two_way_pass` (re-equilibrate the EBM
+  at a flow-diagnosed `D_eff`), **plus the Phase-B geometry correspondence** — `spherical_transport_tendency`
+  / `cartesian_transport_tendency` (the EBM operator `D·∂/∂x[(1−x²)∂T/∂x]` rewritten in β-plane `y`,
+  anchored on the **P₂ eigenvalue**; the `cos φ` metric gap is **order-unity** over the wide channel —
+  "not inherited for free"). **Phase B** (`eddy_flux.py`) is the *emergent* flux: `eddy_life_cycle`
+  advects a passive `θ` on the **released** barotropically-unstable jet and diagnoses the life-cycle
+  `κ_eff = −∫F̄ dt / ∫θ̄_y dt`; `reduction_to_ebm_operator` **tests** (doesn't assume — it comes out
+  *partial, not tight*) whether the flux reduces to the operator; `close_loop` routes the emergent
+  `D_eff` through the bridge (right sign, degenerate climate not banked). **State-dependence** (a flatter
+  climate → a weaker jet → a smaller `κ_eff`, `α` held fixed) is the non-circularity that makes the loop
+  a real feedback; the **magnitude is named-tuned** (`κ~10³`, ~1000× below rung-0 — the flux is largely
+  reversible). The geometry legs are **fast**; the eddy-sim legs are **`slow`**. The module docstrings
+  are their contracts.
 - **To work on the Phase-4 banked artifact:** `demo_coupler.py` + `tests/test_demo_coupler.py` (`slow`)
   and `plots.coupler_figure` (`[viz]`). The demo forces the present-day climate → emergent jet →
   `docs/figures/planet-coupler.png` (the jet on the geostrophic estimate + the forcing chain + the 2-D
@@ -278,9 +294,22 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   rung-0 *by construction* (re-equilibration re-runs the scalar-`D` EBM) — plumbing, not an independent
   anchor; the *tight* reduction (independent flux-divergence = EBM operator, + the Cartesian↔spherical
   geometry correspondence) needs the emergent flux → **Phase B**. `tests/test_transport.py`.
-  **Next — step 2, Phase B:** the *emergent* eddy flux (advect θ on the unstable jet, diagnose
-  `⟨v'θ'⟩` post-saturation via a life-cycle integral, magnitude named tuned, + a `D_eff`-tracks-climate
-  non-circularity test); then **step 3** circulation-informed precip.
+- **Rung 1 — step 2, Phase B BUILT** (the *emergent* eddy flux; 2026-06-11). `planet/eddy_flux.py`
+  fills Phase A's `flux_fn` seam with the real flux: `eddy_life_cycle` advects a passive `θ` (= the
+  windowed EBM profile) on the **released** barotropically-unstable Phase-4 jet and diagnoses the
+  life-cycle `κ_eff = −∫F̄ dt / ∫θ̄_y dt`. **Banked (DIRECTION): the eddy diffusivity is
+  state-dependent** — a flatter climate (`s₂=−0.32`, jet ~14 m/s) gives `κ_eff ≈ 0.5–0.6×` the steep
+  one's (`s₂=−0.48`, jet ~20 m/s), `α` held fixed: a real, right-signed negative feedback (the loop is
+  not cosmetic). **Magnitude named, NOT banked:** `κ~10³ m²/s`, ~1000× below rung-0 — the instantaneous
+  `⟨v'θ'⟩` is largely **reversible** (irreversible fraction ~0.1), resolution-converged but
+  configuration-tuned. **The tight reduction is a FINDING:** the resolved flux-divergence is only
+  *partially* down-gradient-shaped (`reduction_to_ebm_operator` correlation ~0.6) and the comparison is
+  near-vacuous on the near-linear gradient — it becomes non-vacuous only at **rung 3** (strong baroclinic
+  flux). **The geometry correspondence is DELIVERED** (in `transport.py`): the spherical operator,
+  P₂-eigenvalue-anchored, with the order-unity `cos φ` metric — so the reduction's geometry is rigorous,
+  ready for rung 3. `close_loop` confirms the right sign through the Phase-A bridge (degenerate climate
+  not banked). Tests: geometry **fast** (`test_transport.py`), eddy-sim **`slow`** (`test_eddy_flux.py`).
+  No engine edit; `uses` unchanged. **Next — step 3** circulation-informed precip.
 
 ## Test runner (tiered gate, ADR 0003)
 
