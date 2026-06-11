@@ -6,6 +6,7 @@ Cross-cutting *program* memories (bigsim-program, parallel-dev, test-execution-p
 the notebook-discipline notes, the github-repo pointer) stayed in the BigSim archive store;
 `[[links]]` to those will dangle here by design.
 
+- [Memory vendored in repo](memory-vendored-in-repo.md) — auto-memory now lives in the repo at `docs/memory/` (committed), junctioned to the hardcoded global Claude path; on a fresh clone recreate the junction or recall misses this history
 - [Always push commits](always-push-commits.md) — user wants every commit pushed to the remote immediately, and work committed+pushed at the end of every work batch (push straight to `main`; linear history)
 - [Flatten repo-root gotcha](flatten-repo-root-gotcha.md) — post-flatten `parents[N]` off-by-one (fixed 2026-06-10, 9 spots: tests→parents[2], demos+planetmap→parents[1]); CI's `pip install -e` MASKS the bare-checkout failure, so verify the suite without an editable install
 - [Engines are living contracts](engines-living-contracts.md) — freeze-before-reuse DROPPED 2026-06-10 (ADR 0005): extend engines directly + test + changelog, no per-change ADR/re-seal; older "frozen" memories are superseded go-forward (kept: ADR-0001 array boundary + validation triad)
