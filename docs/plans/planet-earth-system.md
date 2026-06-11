@@ -837,10 +837,11 @@ two throwaway spikes first** (`outputs/rung1_circprecip*`, gitignored — this p
 the spikes set the headline + killed an anchor. **What is banked:** (1) the **seam** (centre ← emergent
 circulation latitude) + (2) the **reduction** (jet at 50° ⇒ rung-0 exactly) + (3) the **migration
 mechanism** — the band tracks a *dynamically-selected* latitude, shown via the coupler's
-synthetic-gradient playbook, **anchored to `jet_lat` not the EBM `gradient_peak_lat`** (the two coincide
-at present-day; the gap opens only off-centre — so it is a *flow* response, not an EBM-gradient
-diagnostic). **The rung-1 FINDING (named, NOT an accuracy gain):** the dry circulation **cannot refine**
-the rain location — it is a **trade, not a ranking**: the model's own jet sits **~6° equatorward** of
+synthetic-gradient playbook, **anchored to `jet_lat` not the EBM `gradient_peak_lat`** (the two nearly
+coincide at present-day, within ~2–3°; the gap opens only off-centre — so it is a *flow* response, not an
+EBM-gradient diagnostic). **The rung-1 FINDING (named, NOT an accuracy gain):** the dry circulation
+**cannot refine** the rain location — it is a **trade, not a ranking**: the model's own jet sits at ~42°,
+**~8° equatorward** of
 Earth's observation-calibrated 50° (the Phase-4 channel's known equatorward bias — it excludes the ice
 cliff), and across *realistic* obliquity/CO₂/S₀ the gradient peak is pinned ~43–46° (spike #1), so
 realistic **migration is mechanism-only** (decisive only under a synthetic gradient). The literal "rain

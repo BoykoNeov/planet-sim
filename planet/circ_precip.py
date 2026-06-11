@@ -27,13 +27,13 @@ gitignored — this project's discipline); the spikes set the headline and kille
   (an off-centre *synthetic* EBM gradient makes the jet follow it): the precip band then follows the
   jet, so the storm-track rain is anchored to the dynamically-selected circulation, not to the channel
   or a constant. Anchoring to ``jet_lat`` (not the EBM ``gradient_peak_lat``) is what makes this a
-  **flow** response: the two coincide at present-day, and the gap only opens for an off-centre gradient
-  (the jet is pulled toward the channel — the circulation content).
+  **flow** response: the two nearly coincide at present-day (within ~2–3°), and the gap only opens for an
+  off-centre gradient (the jet is pulled toward the channel — the circulation content).
 * **(the rung-1 FINDING — named, NOT an accuracy gain) The dry circulation cannot *refine* the rain
   location at rung 1; it is a *trade*.** Two honest edges, both established in the spikes:
   - **It is a trade, not better.** Rung-0's 50° is **observation-calibrated** (the real storm track,
     [[precip-parameterization-source]]); the circulation-informed centre is the model's **own** jet at
-    ~44°, ~6° **equatorward** — because the dry single-layer model's gradient peak (hence its jet) sits
+    ~42°, ~8° **equatorward** — because the dry single-layer model's gradient peak (hence its jet) sits
     equatorward of Earth's observed storm track (the Phase-4 channel's known equatorward bias, which
     *excludes the ice cliff*). So the relocation **trades observational calibration for internal
     consistency**; it does **not** improve the band, and may land slightly worse against observations.
@@ -140,7 +140,7 @@ def relocate(state: ClimateState, jet: CoupledJet) -> Relocation:
     Pairs the prescribed-centre field (:func:`planet.precip.precip_field`) with the circulation-informed
     one (:func:`circulation_informed_precip`) for the same climate, so the **trade** is explicit: the
     storm track moves from the observation-calibrated :data:`planet.precip.MIDLAT_CENTER_DEG` to the
-    model's emergent ``jet_lat`` (~6° equatorward for present-day Earth). For the demo/notebook and the
+    model's emergent ``jet_lat`` (~8° equatorward for present-day Earth). For the demo/notebook and the
     migration test; the signed ``displacement`` is the one quantity the relocation banks.
     """
     center_circ = storm_track_center(jet)

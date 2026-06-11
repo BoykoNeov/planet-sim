@@ -60,7 +60,7 @@ Non-circularity, named scope edge (plan §3)
     (``midlat_center_deg``) the **rung-1 circulation-informed** module :mod:`planet.circ_precip` sets
     from the **emergent jet latitude** — the band then tracks the dynamically-selected flow, not a
     constant (the array-seam the plan names). **Honest scope (see** :mod:`planet.circ_precip` **): a
-    *trade* not an accuracy gain** (the dry single-layer jet sits ~6° equatorward of Earth's
+    *trade* not an accuracy gain** (the dry single-layer jet sits ~8° equatorward of Earth's
     observation-calibrated 50°), and for *realistic* knobs the gradient/jet barely moves, so the
     present demo is the **migration mechanism** (decisive only under a synthetic off-centre gradient),
     not a large realistic shift. The **ITCZ/subtropical** centres stay fixed (the Hadley cell is out of

@@ -319,7 +319,7 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   *dynamically-selected* latitude (shown via the coupler's synthetic-gradient playbook; anchored to
   `jet_lat`, not the EBM `gradient_peak_lat`, so it is a flow response). **The rung-1 FINDING (named, NOT
   an accuracy gain):** the dry circulation can't *refine* the rain location — it's a **trade** (the
-  model's jet sits ~6° equatorward of Earth's observation-calibrated 50°; for realistic knobs the
+  model's jet sits ~8° equatorward of Earth's observation-calibrated 50° (~42° vs 50°); for realistic knobs the
   gradient/jet barely moves, so migration is **mechanism-only**), and the literal "rain where the flow
   converges" anchor was **tested and rejected** (the eddy-flux convergence is near-vacuous + a
   window-edge artifact — the same rung-3 boundary `eddy_flux` found). So rung-0 `precip.py` stays the
