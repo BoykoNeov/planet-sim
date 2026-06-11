@@ -127,6 +127,21 @@ Named scope edges
   approach 0) the convergence is a tiny, sign-flipping residual — physically negligible and not part of
   the banked structure; the benchmark asserts the extratropical convergence as a *mean poleward of 40°*,
   not pointwise into the polar cap.
+* **Transport ``D`` is the rung-0 default unless passed.** ``P − E`` scales **linearly** with the EBM
+  transport coefficient ``D`` (it multiplies the operator), but ``ClimateState`` does not carry the
+  ``D`` that produced it, so :func:`moisture_convergence` / :func:`moisture_budget` default to the
+  **rung-0 ``D = 0.555``** — *not necessarily* the climate's own. For a non-default-``D`` world (the
+  §9.1 exoplanet *size* knob ``D ∝ 1/size²``; a :func:`planet.transport.two_way_pass`-re-equilibrated
+  climate) **pass that ``D``** so moisture diffuses with the coefficient its temperature did. Scalar
+  only: the array-``D(x)`` EBM the rung-1 feedback can drive is a non-goal for the column diagnostic
+  (a callable raises). *Latent* today — no current caller feeds a non-default-``D`` climate here; the
+  param just makes the consistent path reachable and names the edge.
+* **The two opt-ins do not compose.** :func:`energy_constrained_precip_field` (the rung-2 *rate*) and
+  :func:`planet.circ_precip.circulation_informed_precip` (the rung-1 storm-track *position*) are each an
+  **independent diff against rung-0** — each reduces to the rung-0 field on its own. They are
+  **deliberately not fused**: a circulation-set centre × an energy-constrained amplitude is a *trade ×
+  a trade* that nothing validates as better than either alone, so no helper builds it (compose by hand
+  if ever needed — the seam is unbuilt on purpose).
 
 Units — SI internally; P, P−E reported in **cm/yr** (the Whittaker / ``precip.py`` axis)
 ----------------------------------------------------------------------------------------
@@ -283,22 +298,33 @@ def _spherical_flux_divergence(field: np.ndarray, x: np.ndarray) -> np.ndarray:
     return div
 
 
-def moisture_convergence(state: ClimateState, RH: float = RH_DEFAULT) -> np.ndarray:
+def moisture_convergence(state: ClimateState, RH: float = RH_DEFAULT,
+                         D: float = D_TRANSPORT) -> np.ndarray:
     """The moisture convergence ``P − E`` (cm/yr) — down-gradient latent transport off the rung-0 climate.
 
     ``P − E = (D / c_p)·∂/∂x[(1 − x²) ∂q/∂x]`` with ``q = RH·q_sat(T)`` (see the module docstring for
-    the L-cancellation: the latent heat drops out, leaving the EBM's *own* transport coefficient ``D``
-    and the atmospheric ``c_p`` — rung-1's eddy diffusivity reused, no new ``D_q``). Positive where the
+    the L-cancellation: the latent heat drops out, leaving the EBM transport coefficient ``D`` and the
+    atmospheric ``c_p`` — rung-1's eddy diffusivity reused, no new ``D_q``). Positive where the
     column **gains** moisture (``P > E`` — midlatitude/polar convergence), negative where it **loses**
     (``E > P``). Built in conservative flux form, so ``∫(P − E) dx = 0`` to machine precision.
+
+    ``D`` is the EBM transport coefficient (W m⁻² K⁻¹); the result scales **linearly** with it. It
+    defaults to the **rung-0 ``D_TRANSPORT = 0.555``**, *not* the ``D`` that produced ``state`` —
+    ``ClimateState`` does not carry its ``D``. For a non-default-``D`` climate (the §9.1 size knob
+    ``D ∝ 1/size²``; a :func:`planet.transport.two_way_pass`-re-equilibrated climate) **pass that ``D``
+    explicitly** so moisture diffuses with the same coefficient temperature did (the module's "transport
+    ``D``" scope edge). Scalar only — the array-``D(x)`` EBM is a non-goal here (a callable raises).
 
     **The honest reading (the trade):** the **extratropics** are right (poleward ``P > E``), but the
     **deep equator is backwards** (down-gradient diffusion *exports* moisture from the moist equator;
     the real ITCZ is up-gradient Hadley convergence) and the subtropical evaporative belt is mislocated
     — so this is an emergent *budget*, not a better precip *map* (see the module triad).
     """
+    if callable(D):
+        raise TypeError("moisture_convergence takes a scalar transport D (uniform diffusivity); the "
+                        "array-D(x) EBM is a non-goal for the column moisture diagnostic")
     q = specific_humidity(state.T, RH)
-    conv_mass = (D_TRANSPORT / CP_AIR) * _spherical_flux_divergence(q, state.x)   # kg m⁻² s⁻¹
+    conv_mass = (float(D) / CP_AIR) * _spherical_flux_divergence(q, state.x)      # kg m⁻² s⁻¹
     return conv_mass * _KGM2S_TO_CMYR                                             # cm/yr
 
 
@@ -327,18 +353,20 @@ class MoistureBudget:
 
 
 def moisture_budget(state: ClimateState, RH: float = RH_DEFAULT,
-                    slope: float = R_ATM_SLOPE) -> MoistureBudget:
+                    slope: float = R_ATM_SLOPE, D: float = D_TRANSPORT) -> MoistureBudget:
     """Build the :class:`MoistureBudget` — the moisture field, the ``P − E`` convergence, and the rate.
 
     Reads the rung-0 :class:`~planet.ebm.ClimateState` (its temperature and grid) and returns the full
     diagnostic: the fixed-RH moisture field, the down-gradient ``P − E`` convergence
     (:func:`moisture_convergence`), the energy-constrained global mean and rate, and the two banked
     benchmark numbers (equatorial export, extratropical convergence). A **pure diagnostic** — it does
-    not modify ``state`` or the climate, so the Phase-1 triad is untouched.
+    not modify ``state`` or the climate, so the Phase-1 triad is untouched. ``D`` is the EBM transport
+    coefficient threaded to :func:`moisture_convergence` (defaults to rung-0 ``D_TRANSPORT``; pass the
+    climate's own ``D`` for a non-default-``D`` world — the module's "transport ``D``" scope edge).
     """
     phi = state.latitude_deg()
     q = specific_humidity(state.T, RH)
-    pme = moisture_convergence(state, RH)
+    pme = moisture_convergence(state, RH, D)
     # Area integral ∫(P − E) dx on the equal-area (uniform-Δx) grid is the area MEAN — the EBM's own
     # `total` convention (rectangle rule), under which the conservative flux divergence sums to *exactly*
     # zero (Σ div = 0). np.trapezoid would break the telescoping and leave an O(boundary) quadrature

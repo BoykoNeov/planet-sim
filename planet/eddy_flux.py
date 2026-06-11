@@ -195,7 +195,12 @@ def eddy_life_cycle(climate: Optional[ClimateState] = None, params: Optional[EBM
     eta_field, _eta_profile, phi = coupler.height_target(climate, grid, sw, phi_ref_deg, alpha, taper)
     h_target = sw.H + eta_field
 
-    # -- spin up DRY (mirrors planet.coupler.couple_jet; no tracer / no conservation recording) -- #
+    # -- spin up DRY: deliberately re-implements planet.coupler.couple_jet's spin-up (no tracer / no   #
+    #    conservation recording) rather than sharing it — the two diverge here (this needs the bare     #
+    #    jet, the coupler the full coupled state). DRIFT RISK: if coupler's forcing/convergence logic    #
+    #    changes, this loop must be updated in lockstep (it calls coupler._forcing_half/_tukey_window/   #
+    #    THERMAL_RELAX_PERIODS/DRAG_PERIODS/CONVERGE_TOL directly). Not factored into a shared helper:   #
+    #    extracting one touches both delicate sim modules, guarded only by the slow Phase-B test. -- #
     s = SWState(h=sw.H * np.ones((ny, nx)), u=np.zeros((ny, nx)), v=np.zeros((ny, nx)))
     inertial = 2.0 * np.pi / f0
     dt = sw.max_dt(s) * 0.5
