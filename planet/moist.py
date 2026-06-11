@@ -156,7 +156,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from . import precip
-from .ebm import ClimateState, D_TRANSPORT, legendre_P2
+from .ebm import ClimateState, D_TRANSPORT
 from .transport import CP_AIR
 
 # --------------------------------------------------------------------------- #
