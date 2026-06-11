@@ -186,8 +186,9 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   budget is **monotone** in T̄ (a *consistency* check, not a conservation law — named). **No new
   engine** (project-local reuse of the EBM only); 20-test triad added (3 `slow`). Scope edges named:
   Whittaker not Köppen (annual `T,P`, no seasonal precip), prescribed precip not a water cycle, fixed
-  band centres (migration is the rung-1/2 circulation enhancement), the C–C 7 %/K is moisture-capacity
-  not the energy-constrained ~2–3 %/K global precip rate.
+  band centres (the storm-track centre is the rung-1 circulation seam — now wired, `circ_precip.py`,
+  but rung-0 stays the default), the C–C 7 %/K is moisture-capacity not the energy-constrained ~2–3 %/K
+  global precip rate.
 - **The deep-end interactive map — `planetmap.py` v1 + `planet_spec.py`: BUILT** (2026-06-09, plan §9 /
   ADR 0004). The interactive map's **first version is the biome map**: a Plotly 3-D globe painted from a
   **layer registry** (temperature / precipitation / biome scalar fields + the ice-line annotation +
@@ -309,7 +310,22 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   P₂-eigenvalue-anchored, with the order-unity `cos φ` metric — so the reduction's geometry is rigorous,
   ready for rung 3. `close_loop` confirms the right sign through the Phase-A bridge (degenerate climate
   not banked). Tests: geometry **fast** (`test_transport.py`), eddy-sim **`slow`** (`test_eddy_flux.py`).
-  No engine edit; `uses` unchanged. **Next — step 3** circulation-informed precip.
+  No engine edit; `uses` unchanged.
+- **Rung 1 — step 3 BUILT** (circulation-informed precip; 2026-06-11). `planet/circ_precip.py` wires the
+  precip **storm-track band centre** to the **emergent jet** instead of the prescribed constant:
+  `precip.precip_pattern` gains a `midlat_center_deg` (default = the cited 50° → rung-0 **bit-for-bit by
+  construction**, the reduction); `circ_precip.circulation_informed_precip(state, jet)` feeds it
+  `jet_lat`. **Banked: the seam + the reduction + the migration mechanism** — the band tracks a
+  *dynamically-selected* latitude (shown via the coupler's synthetic-gradient playbook; anchored to
+  `jet_lat`, not the EBM `gradient_peak_lat`, so it is a flow response). **The rung-1 FINDING (named, NOT
+  an accuracy gain):** the dry circulation can't *refine* the rain location — it's a **trade** (the
+  model's jet sits ~6° equatorward of Earth's observation-calibrated 50°; for realistic knobs the
+  gradient/jet barely moves, so migration is **mechanism-only**), and the literal "rain where the flow
+  converges" anchor was **tested and rejected** (the eddy-flux convergence is near-vacuous + a
+  window-edge artifact — the same rung-3 boundary `eddy_flux` found). So rung-0 `precip.py` stays the
+  **default**; circ-informed is **opt-in**. De-risked in two throwaway spikes first
+  (`outputs/rung1_circprecip*`). Tests: fast reduction/migration/structure + one `slow` composition
+  (`tests/test_circ_precip.py`). No engine edit; `uses` unchanged.
 
 ## Test runner (tiered gate, ADR 0003)
 

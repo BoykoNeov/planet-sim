@@ -825,7 +825,39 @@ the settled **pure-release** life-cycle integral over a fixed post-saturation wi
 order-unity metric) are **fast/always-green** in `test_transport.py`; the eddy-sim legs (unstable +
 down-gradient + mostly-reversible, state-dependence, non-tight reduction, `close_loop` sign) are
 **`slow`** in `test_eddy_flux.py`. No engine edit (planet remains a *consumer* of `engines/fluid` +
-`engines/diffusion`); `uses` unchanged. **Next: step 3** circulation-informed precip.
+`engines/diffusion`); `uses` unchanged.
+
+**Rung 1, step 3 — BUILT (circulation-informed precip; 2026-06-11). RUNG 1 COMPLETE.**
+`planet/circ_precip.py` wires the precip **storm-track band centre** to the **emergent jet latitude**
+instead of the prescribed constant (the §3 deep-end hook: "rain where the flow puts the storm track,
+still without moisture physics"). `precip.precip_pattern` gains a `midlat_center_deg` (default = the
+cited 50° → the rung-0 field **bit-for-bit by construction**, the `two_way_pass`-style plumbing
+reduction); `circ_precip.circulation_informed_precip(state, jet)` feeds it `jet_lat`. **De-risked in
+two throwaway spikes first** (`outputs/rung1_circprecip*`, gitignored — this project's discipline), and
+the spikes set the headline + killed an anchor. **What is banked:** (1) the **seam** (centre ← emergent
+circulation latitude) + (2) the **reduction** (jet at 50° ⇒ rung-0 exactly) + (3) the **migration
+mechanism** — the band tracks a *dynamically-selected* latitude, shown via the coupler's
+synthetic-gradient playbook, **anchored to `jet_lat` not the EBM `gradient_peak_lat`** (the two coincide
+at present-day; the gap opens only off-centre — so it is a *flow* response, not an EBM-gradient
+diagnostic). **The rung-1 FINDING (named, NOT an accuracy gain):** the dry circulation **cannot refine**
+the rain location — it is a **trade, not a ranking**: the model's own jet sits **~6° equatorward** of
+Earth's observation-calibrated 50° (the Phase-4 channel's known equatorward bias — it excludes the ice
+cliff), and across *realistic* obliquity/CO₂/S₀ the gradient peak is pinned ~43–46° (spike #1), so
+realistic **migration is mechanism-only** (decisive only under a synthetic gradient). The literal "rain
+where the flow **converges**" anchor (centre on the eddy heat-flux convergence `−∂F̄/∂y`) was **tested
+in spike #2 and rejected**: the resolved convergence is **near-vacuous in the channel interior + a
+window-taper edge dipole**, not a physical storm-track convergence — the **same rung-3 boundary**
+`eddy_flux` already found (non-vacuous only under a strong baroclinic flux, where the *shape*-resolving
+precip refinement belongs, with the geometry already delivered in `transport.py`). So rung 1 wires the
+**position** seam; the **shape/amplitude** refinement (wet-get-wetter) stays deferred, the **ITCZ/
+subtropics** stay prescribed (Hadley is out of the midlatitude channel), and **rung-0 `precip.py`
+remains the default** in the biome map/demos (circ-informed is **opt-in** — the relocation trades
+observational calibration for internal consistency, and would regress the calibrated map). Scope edge:
+a large *equatorward* displacement shallows the subtropical trough toward merging with the ITCZ (the
+band-tracking is asserted only where the structure survives, centre ≳ 36°). Tests: fast
+reduction/migration/structure + **one** `slow` composition (band follows the emergent jet on a synthetic
+off-centre gradient — the coupler's own jet-tracks-gradient proof is not re-tested), `test_circ_precip.py`.
+No engine edit; `uses` unchanged.
 
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
