@@ -40,21 +40,29 @@ import pytest
 NOTEBOOK = Path(__file__).resolve().parents[1] / "planet.ipynb"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# planet.ipynb executes clean locally (a few s), but on the GitHub Actions runner the Jupyter
-# kernel wedges at the zmq/asyncio comms layer and a cell hangs past the per-cell timeout — an
-# infra hang, NOT a notebook-content failure (the `demo_snowball.compute()` cell, ~3 s locally,
-# blew past 180 s on the runner; the same wedge the chip notebook hit). The fast lane never runs
-# this `slow` test, and the *local* full gate still does (where it is reliable), so we skip it
+# planet.ipynb runs clean locally, but on the GitHub Actions (Ubuntu) runner the Jupyter kernel
+# wedged: a normally-fast cell (`demo_snowball.compute()`, ~3 s locally) hung past its per-cell
+# timeout — an infra hang, NOT a notebook-content failure. That CI hang is a SEPARATE, unreproduced
+# bug: the original report named a specific cell timing out, which is not the kernel-startup
+# signature ("never reaches cell 1"). Nor is it the Windows lost-`execute_reply` wedge root-caused
+# 2026-06-10 (see the steel-sim handoff `notebook-kernel-wedge.md`): that one is a Windows-Proactor
+# pyzmq/asyncio shim race, and the runner is Linux, which drives zmq on a selector loop natively and
+# cannot hit the shim — so the Windows root cause does not explain the Ubuntu hang. Locally planet
+# is reliable (verified 2026-06-11: clean across ~70 headless runs; the ~24% Windows wedge that bit
+# steel does NOT reproduce here, so no retry mitigation is carried — unlike steel/chip). The fast
+# lane never runs this `slow` test and the local full gate does (where it is reliable), so we skip
 # ONLY in CI to keep the badge meaningful instead of permanently red. REMOVE this gate once the
-# kernel-startup hang is root-caused. See the chip-notebook flake.
+# *Ubuntu* hang is itself reproduced and confirmed cleared.
 _SKIP_IN_CI = os.environ.get("CI", "").lower() in {"true", "1"}
 
 
 @pytest.mark.slow
 @pytest.mark.skipif(
     _SKIP_IN_CI,
-    reason="planet.ipynb kernel wedges on the CI runner (infra hang, not a content failure); "
-    "runs in the local full gate — see the chip-notebook flake",
+    reason="planet.ipynb kernel wedged on the CI (Ubuntu) runner — a separate, unreproduced infra "
+    "hang, NOT the Windows lost-`execute_reply` wedge (Linux uses a selector loop and cannot hit "
+    "the Proactor shim; see the steel-sim handoff notebook-kernel-wedge.md). Runs in the local "
+    "full gate, where it is reliable; skipped only in CI until the Ubuntu hang is reproduced",
 )
 def test_planet_notebook_executes_clean():
     # @slow (ADR 0003): spawns a fresh kernel in a child process — deselected from the
