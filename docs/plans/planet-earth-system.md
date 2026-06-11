@@ -618,7 +618,71 @@ are the ADR 0002 §3 candidates whose third reuse (after steel/chip) would **pro
 the shared `viz/`** by rule-of-three (ARCHITECTURE.md §6); the layer registry is that
 third consumer-in-waiting. Promotion is **not** done pre-emptively (the existing three
 `plots.py` share conventions, not copy-pasted code — the thin-extraction finding,
-2026-06-09).
+2026-06-09). **Building visualization rung A (§9.5) is what finally trips this trigger** —
+the eddy life-cycle animation is the time-animation primitive's first real consumer.
+
+### 9.5 Animated flow — the visualization rungs (decided 2026-06-11; NOT built)
+
+The emergent eddy life cycle (`eddy_flux.eddy_life_cycle`) is the only genuinely
+time-varying, longitudinally-structured 2-D flow the project produces — the instability
+grows, saturates, and stirs the tracer. The user's forward requirement (2026-06-11,
+referencing NASA's *Perpetual Ocean* and Ventusky as *broad* visual references — weather,
+not climate) is to **animate** it. Decision (user, 2026-06-11): **build all three
+visualization rungs, A → B → C** — rising cost, *falling* pedagogical return, *rising*
+overclaim risk, so each is a deliberate step, not an automatic one. (These are
+**visualization** rungs A/B/C; do **not** conflate them with the §5 GCM staircase rungs
+0–6.)
+
+**The shared prerequisite (all three): bank the flow frames.** `eddy_life_cycle` currently
+discards the 2-D state each step, keeping only the scalar diagnostics + the κ life-cycle
+integrals. The one data change every rung needs is an **opt-in `n_frames`** that snapshots
+`(h, u, v, θ)` into an `EddyFrames` side-channel — `h` included (the verification anchors
+need it), on **even *time* thresholds over the full release `[0, t_end]`** (the step `dt`
+is adaptive, and the full span — not the κ window — is where growth→saturation, *the
+mechanism*, lives). It is **diagnostic-pure**: `n_frames=0` leaves the κ result bit-for-bit
+unchanged — the inert-seam discipline (§9.3) applied to motion.
+
+| Viz rung | Renderer | Tech | What it is |
+|---|---|---|---|
+| **A** | matplotlib `FuncAnimation` | in-repo, `[viz]` | the **mechanism artifact** + the repo's first time-animation primitive (`plots.eddy_life_animation` + `demo_eddy_life.py`) |
+| **B** | Plotly globe animation | existing `[webviz]` stack | the **globe view** (frames → play/slider on `planetmap`'s sphere), no new tech |
+| **C** | WebGL particle globe | **new** JS/WebGL stack | the **showcase** — GPU particle advection on an orthographic globe |
+
+- **Rung A is meaningful on its own** (not merely a step to C): it validates the banked
+  frames, builds the §9.4 primitive, and **teaches the mechanism honestly**. It is a
+  **two-panel** artifact — the θ field stirring *beside* a running cumulative `∫F̄dt` vs the
+  `|F̄|` throughput — so that `eddy_flux`'s headline finding, that the instantaneous flux is
+  **~90 % reversible** (`irreversible_fraction ~0.1`), is made *visible*: the swirls rage
+  while the net stays near zero, then settles to the small down-gradient residual. Without
+  the second panel a stirring movie *contradicts* the module's own finding (the overclaim
+  this repo polices). "Visualize the mechanism, not the output" (ADR 0002 §5). GIF via
+  Pillow is the CI-safe default; MP4 via ffmpeg is optional, guarded like the `[viz]`
+  figures. Frame-fidelity tests: `∫hθ` machine-exact across banked frames, `eddy_ke`
+  recomputed-from-a-frame matches the series, `n_frames=0`-vs-`N` bit-for-bit.
+- **Rung B** reuses the existing Plotly globe — a globe view for a fraction of C's cost.
+- **Rung C** vendors **mapbox/webgl-wind (ISC — GPU particles, ~1M/60fps)** for the
+  particle layer + **cambecc/earth (MIT — orthographic projection, D3)** for the globe (both
+  licenses verified, reusable with attribution); webgl-wind is flat/equirectangular, so a
+  three.js sphere or a port of cambecc's projection wraps it onto the globe. It is **reach /
+  delivery, not new teaching**, and the §6 dataset/attribution diligence applies to the
+  vendored libraries.
+
+**Named scope edges — carried through all three, *hardest to preserve at C*.** (1) The flow
+is a **doubly-periodic midlatitude β-plane band patch, not a global field** (the same edge as
+`circulation_layer`): on a globe it is one honest latitude band, not a planet-wide
+circulation. (2) The flux is **~90 % reversible**: particles stream, but the streaming
+mostly *sloshes* — genuine net transport is only the small κ residual. The prettier the
+rung, the louder the medium itself whispers "global ocean currents carrying heat" — exactly
+the two things the model lacks — so **B and C must keep a flux indicator and a band label**
+(the §9.3 inert-honesty discipline, applied to motion). This is *why* the recommended order
+is A first (honest by construction), then judge B-vs-C *after seeing real frames move*.
+
+**Verification answers the user's own screenshot concern.** Judging animation from
+screenshots of a *rotating* globe is unreliable; rung A is a **fixed-camera flat field**
+(frames directly comparable), and the real proof is **numerical** — `∫hθ` machine-exact, θ
+bounded, `eddy_ke` grows→saturates at `saturation_period`, and the cumulative-flux trace
+lands on the diagnosed `kappa_bulk` — not the eye. The banked `(h,u,v,θ)` frames are exactly
+what rung C consumes, so the cheap rung A de-risks the data *before* the WebGL investment.
 
 ---
 
@@ -965,6 +1029,22 @@ full emergent `P` field forces an unphysical evaporation pattern, see below):
    3, the vertical, spike-confirmed); the full MSE-diffusing moist EBM where `T` responds (**rung 2.5** —
    re-opens the `(A,B,D)` calibration). Tests: `planet/tests/test_moist.py` (15, all **fast**); full
    planet gate **179 passed, 1 skip**. No engine edit; `uses` unchanged.
+
+**Visualization rungs A/B/C — DECIDED to build all three (animated eddy flow; 2026-06-11;
+NOT built).** A forward decision (user): animate the emergent eddy life cycle across three
+rising-cost **visualization** rungs (distinct from the §5 GCM staircase) — **A** a matplotlib
+two-panel mechanism animation (the repo's first time-animation primitive, finally the §9.4
+rule-of-three third consumer), **B** a Plotly-globe animation (existing `[webviz]` stack), and
+**C** a WebGL particle globe (`mapbox/webgl-wind` ISC + `cambecc/earth` MIT — the
+Ventusky / *Perpetual-Ocean* showcase). Shared prerequisite: bank `(h,u,v,θ)` frames from the
+`eddy_flux` release loop as a **diagnostic-pure** opt-in side-channel (`n_frames=0`
+bit-for-bit unchanged — the inert-seam discipline). Honesty edges carried through all three
+(hardest at C): the flow is a **doubly-periodic midlatitude band**, not a global field, and
+the instantaneous flux is **~90 % reversible** — so rung A's second panel (cumulative `∫F̄dt`
+vs `|F̄|` throughput) makes the small-net-residual finding *visible* rather than letting a
+stirring movie overclaim transport. Recommended build order is **A first** (honest by
+construction, in-repo, CI-testable), then judge B-vs-C after seeing real frames move. Full
+roadmap, the rungs table, and the named scope edges: **§9.5**.
 
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
