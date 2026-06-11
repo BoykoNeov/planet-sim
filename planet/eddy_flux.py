@@ -96,6 +96,47 @@ PERTURB_WAVENUMBER = 2     # —   — zonal wavenumber of the cos(kx) seed (det
 
 
 @dataclass(frozen=True)
+class EddyFrames:
+    """Banked ``(h,u,v,θ)`` snapshots of the released eddy life cycle — the rung-A viz side-channel.
+
+    **Diagnostic-pure:** produced only when ``eddy_life_cycle(..., n_frames>0)``; ``n_frames=0``
+    leaves the κ diagnosis bit-for-bit unchanged (the inert-seam discipline applied to motion). Frames
+    are snapshotted at even **time** thresholds over the **full** release ``[0, t_end]`` — the adaptive-
+    dt span where growth→saturation, *the mechanism*, lives (not the κ window).
+
+    ``times`` the release time (inertial periods) at each frame; ``h``/``u``/``v``/``theta`` the
+    ``(n_frames, ny, nx)`` C-grid snapshots — ``h,u,v`` carried so the verification anchors recompute
+    (∫hθ, eddy-KE), ``theta`` the stirred tracer the mechanism panel animates. ``x``/``y`` the
+    cell-centre coordinates (m), ``phi`` the channel latitudes (deg), ``interior`` the window-flat band
+    the flux is diagnosed over, ``cell_area`` the grid cell area (m²) the eddy-KE recompute needs,
+    ``window_start`` the κ-window onset (periods) panel 2 marks.
+
+    ``net_cum``/``thru_cum`` (``n_frames``) are the cumulative meridional-transport traces, integrated
+    **per latitude first** over the full release: ``net_cum = Σ_interior|∫F̄ dt|`` and
+    ``thru_cum = Σ_interior∫|F̄| dt`` (K·m, interior-band sums). The abs-after-time-integral kills
+    *temporal* sloshing per latitude while the abs-before-spatial-sum keeps *spatial* structure from
+    cancelling in — so ``thru_cum`` climbs (the swirls rage) while ``net_cum`` stays a small fraction,
+    and their endpoint ratio **lands on** the (full-release) irreversible fraction by construction (the
+    plan's "the real proof is numerical"). The banked, *windowed* :attr:`EddyFlux.irreversible_fraction`
+    is the headline number; panel 2 marks ``window_start`` so the two read consistently.
+    """
+
+    times: np.ndarray
+    h: np.ndarray
+    u: np.ndarray
+    v: np.ndarray
+    theta: np.ndarray
+    x: np.ndarray
+    y: np.ndarray
+    phi: np.ndarray
+    interior: np.ndarray
+    cell_area: float
+    window_start: float
+    net_cum: np.ndarray
+    thru_cum: np.ndarray
+
+
+@dataclass(frozen=True)
 class EddyFlux:
     """One released eddy life cycle and its diagnosed effective diffusivity (plain arrays).
 
@@ -127,15 +168,20 @@ class EddyFlux:
     kappa_bulk: float
     D_eff: float
     irreversible_fraction: float
+    frames: Optional[EddyFrames] = None
 
 
-def _eddy_kinetic_energy(sw: ShallowWater, s: SWState) -> float:
-    """``∫ ½ h[(u−ū)² + (v−v̄)²] dA`` (J) — the eddy KE (deviation from the zonal mean)."""
+def _eddy_kinetic_energy(s: SWState, cell_area: float) -> float:
+    """``∫ ½ h[(u−ū)² + (v−v̄)²] dA`` (J) — the eddy KE (deviation from the zonal mean).
+
+    Takes ``cell_area`` (not the solver) so it can be recomputed from a banked :class:`EddyFrames`
+    snapshot — the frame-fidelity anchor (the banked ``(h,u,v)`` reproduce the eddy-KE series).
+    """
     up = s.u - s.u.mean(axis=1, keepdims=True)
     vp = s.v - s.v.mean(axis=1, keepdims=True)
     u2c = 0.5 * (up ** 2 + np.roll(up, -1, axis=1) ** 2)
     v2c = 0.5 * (vp ** 2 + np.roll(vp, -1, axis=0) ** 2)
-    return float(np.sum(0.5 * s.h * (u2c + v2c)) * sw.grid.cell_area)
+    return float(np.sum(0.5 * s.h * (u2c + v2c)) * cell_area)
 
 
 def eddy_heat_flux(state: SWState) -> np.ndarray:
@@ -157,7 +203,8 @@ def eddy_life_cycle(climate: Optional[ClimateState] = None, params: Optional[EBM
                     n_LR: float = coupler.CHANNEL_N_LR, alpha: float = coupler.HEIGHT_PER_KELVIN,
                     taper: float = coupler.WINDOW_TAPER, spinup_periods: float = coupler.SPINUP_PERIODS,
                     release_periods: float = RELEASE_PERIODS, window_start: float = WINDOW_START,
-                    eps: float = PERTURB_EPS, wavenumber: int = PERTURB_WAVENUMBER) -> EddyFlux:
+                    eps: float = PERTURB_EPS, wavenumber: int = PERTURB_WAVENUMBER,
+                    n_frames: int = 0) -> EddyFlux:
     """Spin up the jet, release it, and diagnose the emergent eddy diffusivity ``κ_eff`` — the Phase-B spine.
 
     Builds the Phase-4 channel + EBM height target, spins the jet up from rest **dry** (Strang-split
@@ -180,6 +227,10 @@ def eddy_life_cycle(climate: Optional[ClimateState] = None, params: Optional[EBM
         The Phase-4 channel embedding + forcing (coupler defaults; ``alpha`` held fixed across climates).
     release_periods, window_start, eps, wavenumber
         Release length, life-cycle integration start (periods), and the deterministic perturbation.
+    n_frames : int
+        ``>0`` banks an :class:`EddyFrames` viz side-channel (``(h,u,v,θ)`` snapshots + the cumulative
+        transport traces) at ``n_frames`` even time thresholds over ``[0, t_end]``. **Diagnostic-pure:**
+        ``0`` (the default) leaves the κ result bit-for-bit unchanged and returns ``frames=None``.
     """
     if params is None:
         params = EBMParams()
@@ -246,23 +297,51 @@ def eddy_life_cycle(climate: Optional[ClimateState] = None, params: Optional[EBM
     t_prev = 0.0
     t_end = release_periods * inertial
     t_window = window_start * inertial
+    # Viz side-channel (rung A) — diagnostic-pure: built only when n_frames>0, so the κ accumulators
+    # above are untouched and n_frames=0 is bit-for-bit. The panel-2 traces integrate the flux per
+    # latitude FIRST over the FULL release (Fint_full/Fabs_full), so temporal sloshing cancels per-y
+    # but spatial structure does not leak in (see EddyFrames). Frames snapshot at even time thresholds.
+    frames = None
+    if n_frames > 0:
+        frame_times = np.linspace(0.0, t_end, n_frames)
+        f_t, f_h, f_u, f_v, f_th, f_net, f_thru = [], [], [], [], [], [], []
+        Fint_full = np.zeros(ny)
+        Fabs_full = np.zeros(ny)
+        next_f = 0
     while t < t_end:
         dt = sw.max_dt(s, safety=0.4)
         s = sw.step(s, dt)
         t += dt
         times.append(t / inertial)
-        eke.append(_eddy_kinetic_energy(sw, s))
+        eke.append(_eddy_kinetic_energy(s, grid.cell_area))
+        F = eddy_heat_flux(s) if (t >= t_window or n_frames > 0) else None
         if t >= t_window:
-            F = eddy_heat_flux(s)
             thy = np.gradient(s.tracer.mean(axis=1), y)
             wdt = t - t_prev
             F_int += F * wdt
             Fabs_int += np.abs(F) * wdt
             G_int += thy * wdt
+        if n_frames > 0:
+            Fint_full += F * dt
+            Fabs_full += np.abs(F) * dt
+            while next_f < n_frames and t >= frame_times[next_f]:
+                f_t.append(t / inertial)
+                f_h.append(s.h.copy()); f_u.append(s.u.copy())
+                f_v.append(s.v.copy()); f_th.append(s.tracer.copy())
+                f_net.append(float(np.sum(np.abs(Fint_full[interior]))))
+                f_thru.append(float(np.sum(Fabs_full[interior])))
+                next_f += 1
         t_prev = t
 
     times = np.array(times)
     eke = np.array(eke)
+    if n_frames > 0:
+        frames = EddyFrames(
+            times=np.array(f_t), h=np.array(f_h), u=np.array(f_u), v=np.array(f_v),
+            theta=np.array(f_th), x=grid.x_centers(), y=y, phi=phi, interior=interior,
+            cell_area=grid.cell_area, window_start=window_start,
+            net_cum=np.array(f_net), thru_cum=np.array(f_thru),
+        )
     kappa_profile = np.full(ny, np.nan)
     nz = G_int != 0.0
     kappa_profile[nz] = -F_int[nz] / G_int[nz]
@@ -275,6 +354,7 @@ def eddy_life_cycle(climate: Optional[ClimateState] = None, params: Optional[EBM
         theta_bar=theta_bar, F_int=F_int, G_int=G_int,
         kappa_profile=kappa_profile, kappa_bulk=kappa_bulk,
         D_eff=float(tr.kappa_to_ebm_D(kappa_bulk)), irreversible_fraction=irr,
+        frames=frames,
     )
 
 

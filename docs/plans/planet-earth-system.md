@@ -621,7 +621,7 @@ third consumer-in-waiting. Promotion is **not** done pre-emptively (the existing
 2026-06-09). **Building visualization rung A (§9.5) is what finally trips this trigger** —
 the eddy life-cycle animation is the time-animation primitive's first real consumer.
 
-### 9.5 Animated flow — the visualization rungs (decided 2026-06-11; NOT built)
+### 9.5 Animated flow — the visualization rungs (decided 2026-06-11; **rung A BUILT 2026-06-11**, B/C pending)
 
 The emergent eddy life cycle (`eddy_flux.eddy_life_cycle`) is the only genuinely
 time-varying, longitudinally-structured 2-D flow the project produces — the instability
@@ -683,6 +683,26 @@ screenshots of a *rotating* globe is unreliable; rung A is a **fixed-camera flat
 bounded, `eddy_ke` grows→saturates at `saturation_period`, and the cumulative-flux trace
 lands on the diagnosed `kappa_bulk` — not the eye. The banked `(h,u,v,θ)` frames are exactly
 what rung C consumes, so the cheap rung A de-risks the data *before* the WebGL investment.
+
+**Built — rung A + the shared frame prerequisite (2026-06-11).** The `n_frames` side-channel is built
+on `eddy_flux.eddy_life_cycle`: an opt-in `EddyFrames` snapshotting `(h, u, v, θ)` (plus the cumulative
+transport traces) at even *time* thresholds over the full release `[0, t_end]`. It is **diagnostic-pure
+— `n_frames=0` is bit-for-bit** (a test asserts `==` on `kappa_bulk`/`F_int`/`G_int`/`jet_speed`/the
+`eddy_ke` series), the inert-seam discipline (§9.3) applied to motion. The two-panel animation
+(`plots.eddy_life_animation` → `demo_eddy_life.py`, banked `docs/figures/planet-eddy-life.gif`, GIF via
+Pillow) is the program's **first time-animation primitive**: left = the θ field stirred by the released
+eddies with the eddy-velocity `(u−ū, v−v̄)` overlaid (fixed colour range + fixed quiver scale so the eye
+reads the *growth*, not autoscale); right = the cumulative meridional transport — the **throughput**
+`Σ∫|F̄|dt` raging upward while the **net** `Σ|∫F̄dt|` stays a small fraction, so `eddy_flux`'s
+~90 %-reversible finding is made *visible* (a bare stirring movie would silently overclaim "ocean
+currents carrying heat" — the two things the channel lacks). **The advisor caught one design error:** the
+net trace must integrate the flux **per latitude first** (then `Σ|·|`), or *spatial* cancellation across
+the band leaks into a curve whose only job is *temporal* reversibility — making the flux look *more*
+reversible than it is; integrating-per-latitude-first makes the endpoint ratio land on the diagnosed
+`irreversible_fraction` by construction, and a marked `window_start` line reconciles the full-release
+curve with the banked windowed number. Frame-fidelity tests: `∫hθ` machine-exact across frames; `eddy_ke`
+recomputed *from a banked frame* reproduces the series exactly; the render is an `importorskip`-gated
+execution smoke-test. **B/C remain pending** — judge B-vs-C after seeing rung A's real frames move.
 
 ---
 

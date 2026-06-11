@@ -26,6 +26,8 @@ outputs/
 *.gif
 *.mp4
 !docs/**/*.png
+# the banked rung-A eddy-life animation (docs/figures/planet-eddy-life.gif)
+!docs/**/*.gif
 
 # Large / licensed datasets — never commit; see plan terms-of-use
 data/

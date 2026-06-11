@@ -27,8 +27,10 @@ and reversibility, the legs that carry validation.
 fixtures) so the gate's default ``-n auto`` (``--dist load``, which does *not* share module-scoped
 fixtures across xdist workers) computes exactly **two** life cycles, never re-running them per worker.
 """
+import numpy as np
 import pytest
 
+from engines.fluid import SWState
 from planet import eddy_flux as ef
 from planet.albedo import EBMParams, present_day_climate
 from planet.ebm import D_TRANSPORT
@@ -69,3 +71,47 @@ def test_emergent_eddy_flux_phase_b():
     out = ef.close_loop(steep)
     assert out["D_eff"] < D_TRANSPORT                # ~1000× below rung-0 — the named magnitude edge
     assert out["steeper"]                            # weaker transport ⇒ steeper contrast (right sign)
+
+
+# A coarser grid for the rung-A frame side-channel: bit-for-bit + frame fidelity are resolution-
+# INDEPENDENT (the same code path ± the n_frames-guarded block), so they need only the smallest grid
+# that still runs the released life cycle — not the NX=64 the physics legs above use.
+NX_FRAMES = 40
+
+
+def test_frame_banking_is_diagnostic_pure():
+    """The rung-A ``n_frames`` side-channel: the κ result is **bit-for-bit** unchanged, and the banked
+    ``(h,u,v,θ)`` frames are **faithful** (∫hθ machine-exact across frames; eddy-KE recomputed from a
+    banked frame reproduces the series). Plus the panel-2 traces carry the reversibility numerically."""
+    clim = present_day_climate(EBMParams(s2=-0.48))
+    framed = ef.eddy_life_cycle(clim, nx=NX_FRAMES, ny=NX_FRAMES, n_frames=24)
+    plain = ef.eddy_life_cycle(clim, nx=NX_FRAMES, ny=NX_FRAMES, n_frames=0)
+
+    # -- diagnostic-pure: n_frames changes NOTHING the diagnosis depends on (deterministic ⇒ exact) -- #
+    assert plain.frames is None
+    assert framed.kappa_bulk == plain.kappa_bulk
+    assert framed.jet_speed == plain.jet_speed
+    assert np.array_equal(framed.F_int, plain.F_int)
+    assert np.array_equal(framed.G_int, plain.G_int)
+    assert np.array_equal(framed.eddy_ke, plain.eddy_ke)
+
+    fr = framed.frames
+    assert fr is not None
+    assert fr.theta.shape == (24, NX_FRAMES, NX_FRAMES)
+
+    # -- ∫hθ is machine-exact across the banked frames (the tracer-mass anchor, frame by frame) -- #
+    hth = (fr.h * fr.theta).sum(axis=(1, 2)) * fr.cell_area
+    assert np.allclose(hth, hth[0], rtol=1e-10)
+
+    # -- eddy-KE recomputed FROM a banked frame reproduces the series exactly (the (h,u,v) are faithful) -- #
+    for k in (0, fr.times.size // 2, fr.times.size - 1):
+        ke_k = ef._eddy_kinetic_energy(SWState(h=fr.h[k], u=fr.u[k], v=fr.v[k]), fr.cell_area)
+        j = int(np.argmin(np.abs(framed.times - fr.times[k])))
+        assert ke_k == framed.eddy_ke[j]
+
+    # -- the panel-2 traces ARE the reversibility, numerically: the throughput climbs monotonically
+    #    while the net stays a small fraction (the ~90%-reversible finding made visible) -- #
+    assert np.all(np.diff(fr.thru_cum) >= 0.0)       # throughput only accumulates
+    assert fr.thru_cum[-1] > 0.0
+    assert 0.0 < fr.net_cum[-1] / fr.thru_cum[-1] < 0.5   # net is a small fraction of throughput
+    assert fr.window_start == ef.WINDOW_START

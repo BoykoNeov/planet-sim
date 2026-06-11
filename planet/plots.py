@@ -618,3 +618,99 @@ def obliquity_figure(eps_grid, s2_grid, s2_earth, climate_states, tilts):
     obliquity_climate_axes(axd["climate"], climate_states, tilts)
     fig.suptitle("Planet §9.1 — the obliquity knob: axial tilt sets the annual-mean-insolation gradient", fontsize=13)
     return fig
+
+
+# --------------------------------------------------------------------------- #
+# Rung A — the animated eddy life cycle (the program's FIRST time-animation primitive; §9.5).
+# The MECHANISM, two panels: the tracer stirred by the released eddies (left) + the cumulative
+# meridional transport (right) — throughput rages while net stays small, so eddy_flux's
+# ~90%-reversible finding is made VISIBLE (the overclaim a bare stirring movie would commit).
+# --------------------------------------------------------------------------- #
+THROUGHPUT_COLOR = "#b3361f"    # the |F̄| throughput — the raging swirls
+NET_COLOR = "#1f6f4a"           # the net ∫F̄ transport — the small down-gradient residual
+WINDOW_COLOR = "#7a7a7a"        # the κ-diagnosis window onset
+SATURATION_COLOR = "#6a4c93"    # the eddy-KE saturation time
+
+
+def eddy_life_animation(eddy, *, interval: int = 120):
+    """The banked rung-A artifact: the emergent eddy life cycle animated — the MECHANISM, two panels.
+
+    Left — **the stirring**: the passive temperature tracer ``θ`` advected by the released,
+    barotropically-unstable jet on the **midlatitude β-plane channel** (a longitude × latitude *band*,
+    NOT a globe — the honest scope), with the **eddy velocity** ``(u−ū, v−v̄)`` overlaid as arrows — the
+    swirls doing the stirring. Right — **the transport budget**: the cumulative meridional eddy heat
+    flux, the **throughput** ``Σ∫|F̄|dt`` climbing steeply while the **net** ``Σ|∫F̄dt|`` (integrated per
+    latitude first) stays a small fraction — so :mod:`planet.eddy_flux`'s headline finding, that the
+    instantaneous flux is **~90 % reversible** (``irreversible_fraction ~0.1``), is made *visible*: the
+    swirls rage, the net barely moves. Without this second panel a stirring movie would *contradict* the
+    module's own finding (ADR 0002 §5: visualize the mechanism, not the output). A dashed line marks
+    where κ is diagnosed from (the window onset), reconciling the full-release curve with the banked
+    windowed number.
+
+    Returns a :class:`matplotlib.animation.FuncAnimation`; save it with a Pillow writer (GIF, CI-safe)
+    or ffmpeg (MP4). Requires the frames side-channel — raises :class:`ValueError` if ``eddy.frames``
+    is ``None`` (recompute with ``eddy_life_cycle(..., n_frames=N)``).
+    """
+    fr = eddy.frames
+    if fr is None:
+        raise ValueError("eddy.frames is None — recompute with eddy_life_cycle(..., n_frames=N)")
+    from matplotlib.animation import FuncAnimation
+
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=(13, 5.2), constrained_layout=True)
+
+    # -- left: the tracer field stirred by the eddies. Colour range AND quiver scale are fixed across
+    #    frames so the eye reads the genuine GROWTH, not matplotlib's per-frame autoscale. -- #
+    xk = fr.x / 1e3                                          # km
+    lat = fr.phi                                             # deg
+    tmin, tmax = float(fr.theta.min()), float(fr.theta.max())
+    mesh = axL.pcolormesh(xk, lat, fr.theta[0], cmap="RdBu_r", vmin=tmin, vmax=tmax, shading="nearest")
+    fig.colorbar(mesh, ax=axL, fraction=0.046, pad=0.04, label="tracer θ (°C)")
+    si = max(1, fr.x.size // 16)
+    sj = max(1, fr.phi.size // 16)
+    up0 = fr.u[0] - fr.u[0].mean(axis=1, keepdims=True)
+    vp0 = fr.v[0] - fr.v[0].mean(axis=1, keepdims=True)
+    eddy_max = float(max(np.abs(fr.u - fr.u.mean(axis=2, keepdims=True)).max(),
+                         np.abs(fr.v - fr.v.mean(axis=2, keepdims=True)).max(), 1e-6))
+    q = axL.quiver(xk[::si], lat[::sj], up0[::sj, ::si], vp0[::sj, ::si], color="#222222", alpha=0.7,
+                   scale_units="width", scale=eddy_max / 0.07, width=0.004)
+    axL.set_xlabel("x (km)")
+    axL.set_ylabel("latitude φ (°)")
+    axL.set_title("θ stirred by the released eddies\n(midlatitude β-plane channel — a band, not a globe)",
+                  fontsize=9)
+    tlabel = axL.text(0.02, 0.96, "", transform=axL.transAxes, fontsize=9, va="top", color="#222222",
+                      bbox=dict(boxstyle="round", fc="white", ec="#cccccc", alpha=0.8))
+
+    # -- right: the cumulative transport budget — throughput rages, net stays small -- #
+    axR.plot(fr.times, fr.thru_cum, color=THROUGHPUT_COLOR, lw=2.0,
+             label="throughput  Σ∫|F̄| dt  (the swirls rage)")
+    axR.plot(fr.times, fr.net_cum, color=NET_COLOR, lw=2.0,
+             label="net transport  Σ|∫F̄ dt|  (the small residual)")
+    ytop = axR.get_ylim()[1]
+    axR.axvline(fr.window_start, ls="--", color=WINDOW_COLOR, lw=1.2)
+    axR.text(fr.window_start, ytop, " κ diagnosed →", rotation=90, va="top", ha="left",
+             fontsize=7, color=WINDOW_COLOR)
+    if eddy.saturation_period > fr.times[0]:
+        axR.axvline(eddy.saturation_period, ls=":", color=SATURATION_COLOR, lw=1.2)
+        axR.text(eddy.saturation_period, ytop, " eddy-KE peak", rotation=90, va="top", ha="right",
+                 fontsize=7, color=SATURATION_COLOR)
+    cursor = axR.axvline(fr.times[0], color="#222222", lw=1.0)
+    pt_thru, = axR.plot([fr.times[0]], [fr.thru_cum[0]], "o", color=THROUGHPUT_COLOR, ms=6)
+    pt_net, = axR.plot([fr.times[0]], [fr.net_cum[0]], "o", color=NET_COLOR, ms=6)
+    axR.set_xlabel("release time (inertial periods)")
+    axR.set_ylabel("cumulative meridional transport  (K·m, interior-band sum)")
+    axR.set_title(f"Throughput rages, net stays small  "
+                  f"(irreversible fraction ≈ {eddy.irreversible_fraction:.2f})", fontsize=9)
+    axR.legend(fontsize=7, loc="upper left")
+
+    def update(k):
+        mesh.set_array(fr.theta[k].ravel())
+        upk = fr.u[k] - fr.u[k].mean(axis=1, keepdims=True)
+        vpk = fr.v[k] - fr.v[k].mean(axis=1, keepdims=True)
+        q.set_UVC(upk[::sj, ::si], vpk[::sj, ::si])
+        tlabel.set_text(f"t = {fr.times[k]:.0f} periods")
+        cursor.set_xdata([fr.times[k], fr.times[k]])
+        pt_thru.set_data([fr.times[k]], [fr.thru_cum[k]])
+        pt_net.set_data([fr.times[k]], [fr.net_cum[k]])
+        return mesh, q, tlabel, cursor, pt_thru, pt_net
+
+    return FuncAnimation(fig, update, frames=fr.times.size, interval=interval, blit=False)

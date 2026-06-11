@@ -1,6 +1,6 @@
 ---
 name: planet-viz-animation-rungs
-description: "Animated eddy-flow visualization decided as 3 rungs A/B/C (all to be built, not yet); shared prerequisite = bank (h,u,v,θ) frames from eddy_flux; honesty edges = channel-not-globe + ~90% reversible"
+description: "Animated eddy-flow visualization, 3 rungs A/B/C: rung A + the shared (h,u,v,θ) frame side-channel BUILT 2026-06-11 (diagnostic-pure, two-panel mechanism anim), B/C pending; honesty edges = channel-not-globe + ~90% reversible"
 metadata: 
   node_type: memory
   type: project
@@ -10,8 +10,22 @@ metadata:
 **Decided 2026-06-11 (user): build all three visualization rungs A→B→C** to animate the
 emergent eddy life cycle (`eddy_flux.eddy_life_cycle` — the only time-varying,
 longitudinally-structured 2-D flow the project produces). Recorded in plan **§9.5** + the
-§10 running log. **NOT built yet** — this is the decision + the design, not code. These are
-**visualization** rungs A/B/C — do NOT conflate with the §5 GCM staircase rungs 0–6.
+§10 running log. **Rung A + the shared frame side-channel BUILT 2026-06-11; B/C pending.**
+These are **visualization** rungs A/B/C — do NOT conflate with the §5 GCM staircase rungs 0–6.
+
+**BUILT (2026-06-11) — rung A + the shared prerequisite:** `n_frames` side-channel on
+`eddy_flux.eddy_life_cycle` (opt-in `EddyFrames` snapshotting `(h,u,v,θ)` + cumulative
+transport traces over the full release), **diagnostic-pure** (`n_frames=0` bit-for-bit, test
+asserts `==` on `kappa_bulk`/`F_int`/`G_int`/`jet_speed`/`eddy_ke`); `plots.eddy_life_animation`
+(two-panel `FuncAnimation` — θ-stir+eddy-quiver beside the throughput-vs-net transport budget,
+fixed colour range + fixed quiver scale); `demo_eddy_life.py` banks `docs/figures/planet-eddy-life.gif`
+(Pillow, `dpi=90`/48 frames to bound size). **Advisor caught the one design error:** the net trace
+must integrate the flux **per latitude FIRST** then `Σ|·|` — `mean_interior(signed F̄)` leaks
+*spatial* cancellation into a *temporal*-reversibility curve (makes flux look MORE reversible than
+it is = overclaim). Per-latitude-first makes the endpoint ratio land on `irreversible_fraction` by
+construction; a marked `window_start` line reconciles full-release curve vs windowed banked number.
+Tests green (3 new + fast lane 208). §9.4 rule-of-three NOT yet acted on (still project-local in
+`plots.py`; promotion-to-`viz/` is a future call).
 
 **Why:** user wants the NASA *Perpetual Ocean* / Ventusky "flowing" look (named as *broad*
 references — weather, not climate). The rungs rise in cost, *fall* in pedagogical return,
