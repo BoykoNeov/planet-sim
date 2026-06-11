@@ -8,8 +8,11 @@ free for the rest of the system and the slow kernel/subprocess tests don't pile
 onto a saturated box.
 
 The hook fires only while xdist is resolving `-n auto` / `-n logical`; a serial
-`pytest -p no:xdist` run never calls it. `optionalhook=True` keeps that serial
-path from erroring on the (then-unregistered) xdist hookspec.
+`pytest -n0` run (the documented escape hatch — it keeps xdist loaded, so the
+inherited `-n auto` still parses) sets numprocesses to 0 and never calls it.
+`optionalhook=True` is belt-and-suspenders: it lets this conftest load without
+error even in an environment where xdist is absent entirely (e.g. a minimal env
+that also clears addopts), where the hookspec would otherwise be unregistered.
 """
 
 import os

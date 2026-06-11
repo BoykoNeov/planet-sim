@@ -66,7 +66,9 @@ climate = ["climlab>=0.8"]
 # test run doesn't saturate the box (and bounding contention for the slow kernel/subprocess
 # tests). The suite is xdist-safe: every file-writing test uses the per-test `tmp_path`
 # fixture, and there is no mutating module/session state shared across tests. To run serial
-# (e.g. to bisect a suspected ordering flake), override with `pytest -p no:xdist`.
+# (e.g. to bisect a suspected ordering flake), use `pytest -n0` — that keeps xdist loaded so
+# the inherited `-n auto` still parses, but runs in-process. (Plain `-p no:xdist` does NOT work
+# here: unloading xdist turns the addopts `-n auto` into an unrecognized argument.)
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["engines", "planet"]
