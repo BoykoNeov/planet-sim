@@ -1,8 +1,11 @@
 # Build config exists for ONE consumer: full-gate CI (`pip install -e .[…]` to pull the
-# optional stacks). Local dev never installs — pytest's `pythonpath = ["."]` (below) puts
-# the repo root on sys.path, so `engines.*` / `planet.*` import without a build step. The
-# flat layout has top-level packages setuptools won't auto-discover, so name them explicitly
-# here (else `pip install -e .` fails with "Multiple top-level packages discovered").
+# optional stacks). Local dev never installs the PACKAGE — pytest's `pythonpath = ["."]`
+# (below) puts the repo root on sys.path, so `engines.*` / `planet.*` import without a build
+# step. (One caveat since the suite went parallel: `addopts` now defaults to `-n auto`, so the
+# pytest-xdist PLUGIN must be present in whatever env runs pytest — `pip install pytest-xdist`,
+# or `.[test]`, which now pulls it. The package itself still needs no install.) The flat layout
+# has top-level packages setuptools won't auto-discover, so name them explicitly here (else
+# `pip install -e .` fails with "Multiple top-level packages discovered").
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
@@ -21,7 +24,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=7.0"]
+test = ["pytest>=7.0", "pytest-xdist>=3.0"]
 # Visualization is opt-in (ADR 0002): the compute core and the test suite stay
 # headless/matplotlib-free; only the render layer (planet/plots.py, demos, the notebook)
 # needs this. Install with `pip install -e .[viz]`.
@@ -56,10 +59,18 @@ climate = ["climlab>=0.8"]
 #   `pytest -m "not slow"`   — the always-on suite
 #   `pytest`                 — the full suite, incl. the slow live-climlab + notebook tests (CI / release)
 # `slow` marks the handful of tests that drive a live external solver / kernel / subprocess.
+#
+# `-n auto` runs the suite in parallel via pytest-xdist on every gate (local inner loop AND
+# CI, which inherits these addopts). The worker count is capped at half the machine's logical
+# cores by the root conftest's `pytest_xdist_auto_num_workers` hook — leaving headroom so a
+# test run doesn't saturate the box (and bounding contention for the slow kernel/subprocess
+# tests). The suite is xdist-safe: every file-writing test uses the per-test `tmp_path`
+# fixture, and there is no mutating module/session state shared across tests. To run serial
+# (e.g. to bisect a suspected ordering flake), override with `pytest -p no:xdist`.
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["engines", "planet"]
-addopts = "-q"
+addopts = "-q -n auto"
 markers = [
     "slow: drives a live external solver / kernel / subprocess; deselect in the inner loop with -m 'not slow' (ADR 0003)",
 ]
