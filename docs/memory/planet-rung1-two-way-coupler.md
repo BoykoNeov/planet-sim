@@ -128,5 +128,4 @@ where the structure survives, centre ≳ 36°). Tests: fast reduction/migration/
 `test_circ_precip.py`. Full repo gate **214 passed, 1 skip**; no engine edit; `uses` unchanged. See
 [[precip-parameterization-source]], [[planet-phase4-coupler]].
 
-**NEXT — rung 2 (moist dynamics):** a moisture variable + evap/condense/latent heat → **emergent precipitation**
-(global E=P, C–C scaling), the first sub-grid closure. See [[planet-plan]] §5.
+**NEXT — rung 2 (moist dynamics):** now **SCOPED (not built), 2026-06-11** → see [[planet-rung2-scoped]].

@@ -860,6 +860,65 @@ reduction/migration/structure + **one** `slow` composition (band follows the eme
 off-centre gradient — the coupler's own jet-tracks-gradient proof is not re-tested), `test_circ_precip.py`.
 No engine edit; `uses` unchanged.
 
+**Rung 2 — SCOPED (design + fork settled; NOT built), 2026-06-11.** The next staircase rung (moist
+dynamics → emergent precipitation) is **scoped and its central fork settled empirically**, ahead of any
+code (the project's spike-first discipline; advisor-pressure-tested twice). **The fork — *where moisture
+lives* — is decided: a *column moist budget*, not fluid-channel moisture transport.** A throwaway spike
+(`outputs/rung2_moisture_convergence_spike.py`, gitignored) advected a steep, C–C-shaped **moisture**
+tracer on the *same* released barotropically-unstable Phase-4 jet that :mod:`planet.eddy_flux` uses, and
+measured its meridional flux **convergence** ``−∂⟨v'q'⟩/∂y`` over the window-flat interior: it is
+**near-vacuous in the interior + dominated by the window-taper edge artifact** (interior/edge RMS ratio
+**0.32**, *worse* than the temperature tracer's 0.50 — the steeper moisture gradient does **not** rescue
+it), and the **mean** balanced-jet flow is near-nondivergent (eddy/mean convergence 11–23×, since
+``∇·(hu)=−∂h/∂t≈0``). This **corroborates** rung-1 step-3's rigorous `reduction_to_ebm_operator` finding:
+the single layer has no genuine ascent→condensation, so a *resolved storm-track precip pattern* is **rung
+3** (the vertical), **not rung 2** — confirmed, not just predicted (one realization suffices given the
+convergent evidence; no further spikes — "don't gold-plate the spike", advisor).
+
+**So the bankable rung-2 core is a column moist budget — a moist-EBM *diagnostic* that reuses the
+diffusion spine a 4th time and does NOT perturb the validated Phase-1 climate.** Design: a diagnostic
+moisture field ``q(φ)=RH·q_sat(T)`` (fixed relative humidity over the rung-0 temperature; ``q_sat`` from
+Clausius–Clapeyron) with a **down-gradient latent transport** whose diffusivity is **tied to rung-1's
+eddy ``κ`` through the existing :mod:`planet.transport` κ→D bridge** (the *same* eddies stir heat and
+moisture — reuse + a consistency check, **not** a new free ``D_q``), and a precipitation ``P``
+**diagnosed** from the atmospheric water budget ``P = E − ∇·(moisture transport)``. **The headline unlock
+(the banked physics) is the RATE, not the pattern:** it replaces :mod:`planet.precip`'s prescribed global
+Clausius–Clapeyron **7 %/K** amplitude with the **energy-constrained ~2–3 %/K** global precipitation rate
+— closing the gap `precip.py` *already names in its own scope-edge #3* (moisture-capacity 7 %/K vs the
+slower energy-constrained global rate). **The first sub-grid closure (the staircase's named rung-2 wall)
+is the atmospheric-energy closure that sets that rate** — an atmospheric radiative-cooling term
+``R_atm(T)`` with ``L⟨P⟩ ≈ R_atm − SH`` — **not** the benign fixed-RH assumption; the rate claim's honesty
+lives there, named explicitly. **``P`` is a pure diagnostic — it does *not* enter the temperature equation
+— so the Phase-1 climate and its triad stay green** ("energy-limited evaporation" would *overstate* it:
+this is an atmospheric-cooling *constraint* on ``⟨P⟩``, **not** a closed surface energy budget, which would
+change ``T``).
+
+**The honest emergent-pattern finding (named, NOT a win):** down-gradient moisture diffusion captures the
+**extratropical** budget (midlat/polar ``P>E`` convergence, subtropical ``E>P`` evaporative source) but
+gets the **deep-tropical ITCZ backwards** — diffusion *exports* moisture from the moist equator, whereas
+the real ITCZ is *up-gradient* Hadley convergence (a mean-circulation feature, deferred). So Phase A is
+again a **trade**: emergent + rate-correct in the extratropics, but the prescribed `precip.py` ITCZ is
+*better* in the deep tropics — Phase A banks the moist **energetics + extratropical budget + the global
+rate**, not a wholesale-better precip map (rung-0 `precip.py` stays the default, as with circ-informed
+precip). **Triad (re-classed for honesty):** *tight* — ``q_sat`` = the **exact Clausius–Clapeyron
+function** (the Whittaker-partition precedent: an exact testable function, not a fit); *the real-but-loose
+physics result (the unlock)* — the energy-constrained ~2–3 %/K rate; *consistency / plumbing (named as
+such)* — global ``∫E=∫P`` (falls out of moisture-mass conservation in steady state) and the reduction to
+rung-0 as ``L·q→0`` (a vanishing moisture layer — **by-construction** plumbing, the rung-1 Phase-A
+`two_way_pass` honesty class, **not** an independent test); *benchmark (loose)* — the observed
+extratropical ``E−P`` belts. **Named scope edges:** ITCZ/Hadley deferred (mean circulation); the spatial
+storm-track precip pattern is rung 3 (spike-confirmed above); the ``R_atm`` atmospheric-cooling closure is
+the sub-grid wall. **A fuller moist EBM — diffuse *moist static energy* ``m=c_pT+L·q`` so ``T`` itself
+responds (emergent polar amplification via moisture) — is a named rung-2.5 extension, NOT Phase A:** it
+re-opens the Phase-1 ``(A,B,D)`` calibration (rung-0's ``D=0.555`` is an *effective* diffusivity already
+absorbing latent transport — explicit MSE diffusion double-counts the latent heat implicit in the linear
+OLR ``A+B·T``), so it is deferred behind the clean diagnostic. **Sources to pin at build** (the
+``[[…-source]]`` discipline — named now, pinned when Phase A is built, **not** carried from memory): the
+energy-constrained ~2–3 %/K-vs-moisture-capacity-7 %/K rate → **Held & Soden 2006 / Allen & Ingram 2002**
+(extending `[[precip-parameterization-source]]`, which already cites the gap); the diffusive-moist-EBM
+formulation (MSE / latent diffusion, fixed RH) → **Flannery 1984 / Hwang & Frierson 2010 /
+Siler–Roe–Armour 2018**.
+
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
 1969 / North 1975 / climlab defaults). Phase 2 pins **`[[whittaker-biome-source]]`** +
