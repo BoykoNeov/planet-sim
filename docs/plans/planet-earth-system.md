@@ -919,6 +919,53 @@ energy-constrained ~2–3 %/K-vs-moisture-capacity-7 %/K rate → **Held & Soden
 formulation (MSE / latent diffusion, fixed RH) → **Flannery 1984 / Hwang & Frierson 2010 /
 Siler–Roe–Armour 2018**.
 
+**Rung 2, Phase A — BUILT (the column moist-EBM diagnostic; `planet/moist.py`, 2026-06-11).** Built
+spike-first (`outputs/rung2_phaseA_moistebm_spike.py`, gitignored) and advisor-pressure-tested, which
+**reshaped the deliverable and overturned one scoped claim** (see below). Sources pinned at build (the
+`[[…-source]]` discipline, **not** carried from memory): C–C `q_sat` (integrated form + `e₀, L_v, R_v,
+ε`) → **Hartmann *GPC* / Bohren & Albrecht**; the energy-constrained rate → **Held & Soden 2006 /
+Allen & Ingram 2002**; the diffusive moist EBM (fixed RH, latent diffusion) → **Flannery 1984 / Hwang &
+Frierson 2010 / Siler–Roe–Armour 2018**. **The advisor split the deliverable in two** (do not fuse — a
+full emergent `P` field forces an unphysical evaporation pattern, see below):
+1. **The RATE — the headline unlock, robust, opt-in.** `energy_constrained_factor(T̄)` replaces
+   `precip.py`'s C–C **7 %/K** amplitude with the **energy-constrained ~2.5 %/K** (`L⟨P⟩ = R_atm − SH`,
+   normalised by `⟨P⟩₀≈100 cm/yr`) — closing `precip.py`'s own scope-edge #3. The energy budget is
+   **linear** in `T̄` (so the factor is **linear**, *not* a smaller C–C exponent — the honest functional
+   difference), `= 1` at the present reference (present map unchanged, **bit-for-bit**), floored ≥ 0.
+   **Opt-in** (`energy_constrained_precip_field`); rung-0 `precip.py` stays the default. `precip.py` is
+   **untouched** — its warmed-climate 7 %/K tests stay green.
+2. **The emergent budget `P − E` — the trade, a diagnostic, NOT the default.** `P − E = (D/c_p)·∂/∂x[(1−
+   x²)∂q/∂x]` with `q=RH·q_sat(T)` over the rung-0 `T`. **The latent heat `L` CANCELS** (the same eddies
+   stir heat and moisture → the latent transport is the EBM operator on `L·q` with the **same `D`** via
+   the rung-1 κ→D bridge; converting the latent-energy convergence back to a moisture mass flux divides
+   out `L`) → **no new free `D_q`**, rung-1's eddy diffusivity reused. Built in **conservative face-flux
+   form** on the EBM `x`-grid (the diffusion spine's structure, a **4th** reuse) → `∫(P−E)=0` machine-
+   exact (the `∫E=∫P` plumbing leg, under the area-mean rule — *not* `np.trapezoid`, which breaks the
+   telescoping). A **pure diagnostic** — does NOT enter the T-equation, so Phase-1 stays green
+   (asserted). **Why P−E not full-P (advisor catch):** equatorial export is ~−2.4 m/yr but `⟨P⟩~1` m/yr,
+   so *no* honest zonal `E` keeps `P≥0` (uniform `E`→`P(eq)<0`; `E∝q_sat`→absurd ~6 m/yr equatorial
+   evaporation) → report `P−E`, skip full-P. **THE OVERTURNED CLAIM (the spike corrected the scope):**
+   the budget is **extratropical-ONLY**, not "extratropics good + subtropics good". The deep equator is
+   **backwards** (diffusion *exports* from the moist equator; real ITCZ is up-gradient Hadley, deferred)
+   **AND the subtropical evaporative belt is NOT reproduced** — the steep equator–pole contrast
+   hyper-peaks C–C `q` at the equator, pushing the moisture-flux maximum equatorward (~20° zero-crossing)
+   so the subtropics come out **`P>E`** (production: eq export ≈ −267 cm/yr, subtropics 25–35° ≈ +83,
+   midlat 40–60° ≈ +101, polar ≈ +28). Only the **extratropics (poleward ~40°) are right**. So the
+   benchmark test asserts **only** equatorial export + extratropical `P>E` convergence, and **one test
+   pins the subtropical mislocation** as the honest limitation (guarding against a silent "fix"). Same
+   "trade, not a win" the staircase keeps banking; rung-0 `precip.py` stays the default map.
+   **The sub-grid WALL = the prescribed `R_atm` slope** (`R_ATM_SLOPE = 2 W m⁻² K⁻¹`, cited Held & Soden;
+   the rate is a *cited-closure* result, **not derived** — and explicitly **not** `B_OLR`, a different
+   2 W m⁻² K⁻¹ quantity). **Triad (re-classed):** *tight* — `q_sat` exact C–C (textbook values + ~7 %/K
+   log-slope) + the operator reproduces the **P₂ eigenvalue `−6`** (it *is* the EBM transport operator,
+   the `transport.py` anchor); *real-but-loose (unlock)* — the ~2–3 %/K rate, slower than C–C, doubling
+   with the closure slope; *plumbing* — `∫(P−E)=0` machine-exact + `q→0` reduction + unity-at-reference;
+   *benchmark (loose)* — equatorial export + extratropical convergence (the named extratropical-only
+   trade). **Deferred:** ITCZ/Hadley (mean circulation); the resolved storm-track precip *pattern* (rung
+   3, the vertical, spike-confirmed); the full MSE-diffusing moist EBM where `T` responds (**rung 2.5** —
+   re-opens the `(A,B,D)` calibration). Tests: `planet/tests/test_moist.py` (15, all **fast**); full
+   planet gate **179 passed, 1 skip**. No engine edit; `uses` unchanged.
+
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
 1969 / North 1975 / climlab defaults). Phase 2 pins **`[[whittaker-biome-source]]`** +

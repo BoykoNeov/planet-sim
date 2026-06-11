@@ -46,3 +46,9 @@ rung-1/2 (needs circulation-set moisture convergence). v1 intensifies bands unif
 min is a *local* trough between the ITCZ and storm track, NOT the global floor which is the pole) +
 **monotone** ⟨P⟩(T̄) (a *consistency* check, not a conservation law — prescribed field has no water
 budget). *Loose:* band amplitudes/centres + the 7 %/K rate.
+
+**Rung-2 update (2026-06-11):** the named **2–3 %/K energy-constrained** rate is now BUILT as an opt-in
+in `planet/moist.py` (`energy_constrained_factor`, a **linear** factor) — closing this module's
+scope-edge #3. `precip.py` itself is **unchanged** (the C–C 7 %/K stays the default); the energy rate is
+opt-in. Sources for the rate pinned there: Held & Soden 2006 / Allen & Ingram 2002. See
+[[moist-ebm-source]], [[planet-rung2-scoped]].
