@@ -656,7 +656,15 @@ def eddy_life_animation(eddy, *, interval: int = 120):
         raise ValueError("eddy.frames is None — recompute with eddy_life_cycle(..., n_frames=N)")
     from matplotlib.animation import FuncAnimation
 
-    fig, (axL, axR) = plt.subplots(1, 2, figsize=(13, 5.2), constrained_layout=True)
+    irr = eddy.irreversible_fraction
+    rev_pct = round(100 * (1 - irr))     # the share of the stirring that cancels out (≈90%)
+    res_pct = round(100 * irr)           # the residual that survives as net κ transport (≈10%)
+
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=(13, 6.6), constrained_layout=True)
+    # reserve the bottom band of the figure for the plain-language caption: constrained_layout lays the
+    # two panels into the top ~83%, leaving the lower ~17% for fig.text — so the standalone GIF stands on
+    # its own (a standing preference; planet memory: viz-prose-novice-intermediate).
+    fig.get_layout_engine().set(rect=(0.0, 0.17, 1.0, 0.83))
 
     # -- left: the tracer field stirred by the eddies. Colour range AND quiver scale are fixed across
     #    frames so the eye reads the genuine GROWTH, not matplotlib's per-frame autoscale. -- #
@@ -675,16 +683,19 @@ def eddy_life_animation(eddy, *, interval: int = 120):
                    scale_units="width", scale=eddy_max / 0.07, width=0.004)
     axL.set_xlabel("x (km)")
     axL.set_ylabel("latitude φ (°)")
-    axL.set_title("θ stirred by the released eddies\n(midlatitude β-plane channel — a band, not a globe)",
+    axL.set_title("temperature θ stirred by the eddies\n(one midlatitude band — a β-plane channel, not a globe)",
                   fontsize=9)
     tlabel = axL.text(0.02, 0.96, "", transform=axL.transAxes, fontsize=9, va="top", color="#222222",
                       bbox=dict(boxstyle="round", fc="white", ec="#cccccc", alpha=0.8))
 
     # -- right: the cumulative transport budget — throughput rages, net stays small -- #
+    # plain-language legend (novice→intermediate): "back-and-forth stirring" / "net heat moved" carry the
+    # meaning, the technical term (throughput / κ residual) rides parenthetically — the cryptic "swirls
+    # rage" / "small residual" editorializing + the raw formulas drop to the caption (where each is glossed).
     axR.plot(fr.times, fr.thru_cum, color=THROUGHPUT_COLOR, lw=2.0,
-             label="throughput  Σ∫|F̄| dt  (the swirls rage)")
+             label="back-and-forth stirring (throughput)")
     axR.plot(fr.times, fr.net_cum, color=NET_COLOR, lw=2.0,
-             label="net transport  Σ|∫F̄ dt|  (the small residual)")
+             label="net heat moved poleward (κ residual)")
     ytop = axR.get_ylim()[1]
     axR.axvline(fr.window_start, ls="--", color=WINDOW_COLOR, lw=1.2)
     axR.text(fr.window_start, ytop, " κ diagnosed →", rotation=90, va="top", ha="left",
@@ -697,10 +708,29 @@ def eddy_life_animation(eddy, *, interval: int = 120):
     pt_thru, = axR.plot([fr.times[0]], [fr.thru_cum[0]], "o", color=THROUGHPUT_COLOR, ms=6)
     pt_net, = axR.plot([fr.times[0]], [fr.net_cum[0]], "o", color=NET_COLOR, ms=6)
     axR.set_xlabel("release time (inertial periods)")
-    axR.set_ylabel("cumulative meridional transport  (K·m, interior-band sum)")
-    axR.set_title(f"Throughput rages, net stays small  "
-                  f"(irreversible fraction ≈ {eddy.irreversible_fraction:.2f})", fontsize=9)
+    axR.set_ylabel("cumulative heat transport  (interior-band sum, K·m)")
+    axR.set_title(f"Total stirring races up, net transport stays small\n"
+                  f"(only ~{res_pct}% survives as real poleward heat)", fontsize=9)
     axR.legend(fontsize=7, loc="upper left")
+
+    # The one piece of NEW prose: a plain-language caption (novice→intermediate) so the standalone GIF
+    # stands on its own — the same de-jargoning + formula-with-gloss the eddy-globe exemplar carries
+    # (planet memory: viz-prose-novice-intermediate). matplotlib fig.text can't tint spans like the Plotly
+    # globe, so the legend's curve colours carry the colour cue; the formulas use mathtext ($\bar F$)
+    # rather than a combining-macron unicode char that fonts render poorly. Wrapped by hand to the figure
+    # width; the %s are driven off the same `irreversible_fraction` as the panel so they agree.
+    caption = (
+        "How to read it.  Left: temperature (θ) stirred by swirling eddies on one midlatitude band — a flat "
+        "β-plane channel, not a\n"
+        f"whole globe. The eddies push heat poleward one moment and back the next, so most of it cancels: "
+        f"about {rev_pct}% is reversible.\n"
+        r"Right: total stirring (throughput, $\Sigma\!\int\!|\bar{F}|\,dt$ — the flux size summed over time "
+        r"and latitude, ignoring direction)" "\n"
+        r"races up, while net transport ($\Sigma|\!\int\!\bar{F}\,dt|$ — what's left once the poleward and "
+        r"equatorward parts cancel) barely moves." "\n"
+        f"Only that surviving ~{res_pct}% — the eddy diffusivity κ — is real poleward heat transport."
+    )
+    fig.text(0.5, 0.095, caption, ha="center", va="center", fontsize=10.5, color="#33373b")
 
     def update(k):
         mesh.set_array(fr.theta[k].ravel())

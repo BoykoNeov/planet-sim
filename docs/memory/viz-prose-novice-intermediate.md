@@ -47,7 +47,36 @@ gatekeeping to a novice and as ambiguous to an intermediate.
 
 **How to apply / status:** wired 2026-06-12 on the Rung-B eddy globe (`eddy_globe.eddy_globe_figure`)
 as the **exemplar**; pinned by `test_eddy_globe.test_demo_eddy_globe_renders` (asserts a caption
-annotation containing both "β-plane" and "reversible"). **Follow-up sweep still owed** (not done this
-batch): `planetmap.render`, `planetmap.render_comparison` (the A·B·Δ triptych), and the matplotlib
-GIFs (`plots.py`) each need the same labels+caption pass. Any NEW Plotly/matplotlib figure must carry
-it from the start. Related: [[planet-viz-animation-rungs]], [[planet-interactive-map-design]].
+annotation containing both "β-plane" and "reversible"). **The owed sweep is now DONE (2026-06-12):**
+`planetmap.render` (banks BOTH `planet-map.html` biome + `planet-coupler-map.html` temp+circulation),
+`planetmap.render_comparison` (the A·B·Δ triptych), and the Rung-A GIF `plots.eddy_life_animation`
+(`planet-eddy-life.gif`) all carry the relabel+caption pass; each pinned by a caption assertion. The
+**six static Phase PNGs** (snowball/biomes/shallowwater/coupler/exoplanet/obliquity) were deliberately
+NOT swept — they're the notebook-embedded matplotlib floor (deep pedagogy stays in the notebook, already
+richly labelled); revisit only if the user asks. Any NEW Plotly/matplotlib figure must carry the pass.
+
+**Lessons from the sweep (apply going forward):**
+- **A globe with no formula = relabel-only.** The biome/temperature globes carry no formula, so the
+  "formulas welcome but explained" rule simply has nothing to restore — the caption is pure plain-prose
+  (`planetmap._field_caption`). Don't manufacture a formula to gloss; the rule is "keep+explain existing
+  formulas", not "add formulas everywhere".
+- **Layer-adaptive caption ⇒ sync it on every redraw.** `planetmap.render` builds a caption keyed by the
+  active layer; `interactive_map`'s live `update()` synced only `data`+`title`, so a slider layer-switch
+  would leave the PREVIOUS field's caption stale under the new globe (untested reach — nothing flags it).
+  The advisor caught this; fix is one line: `fig.layout.annotations = new.layout.annotations`.
+- **Test-pin the LAYER-INVARIANT edge, not a field word.** Pin "latitude bands" (on the caption for every
+  active layer) in the biome-specific test — a "biome" word only holds for the biome render. For the Δ
+  triptych pin "differs from"+"latitude bands" (wording that covers BOTH the continuous diff and the
+  biome changed-mask — the advisor's catch: don't write a temperature-only "warmer/cooler").
+- **`_wrap_html(text, width)` helper** (planetmap): inserts `<br>` at word boundaries counting VISIBLE
+  chars only (regex-strips `<b>`/`<span>` tags) so a bold run can straddle a break — replaces the
+  hand-placed `<br>`s of the exemplar for the longer/variable-length globe captions.
+- **matplotlib caption ≠ Plotly caption.** `fig.text` can't tint inline spans, so the LEGEND's curve
+  colours carry the colour cue (not the caption). Use **mathtext `$\bar{F}$`** for the F-bar, NOT the
+  combining-macron unicode (fonts render it poorly). Reserve the bottom band for the figtext with the
+  constrained-layout engine: `fig.get_layout_engine().set(rect=(0, 0.17, 1, 0.83))` (left,bottom,w,h) —
+  verified empirically by rendering a frame to PNG (the slow GIF test only proves it doesn't crash).
+- **Drive the % off the figure's OWN `irreversible_fraction`** in every caption — the banked GIF lands on
+  irr≈0.081→92/8, matching the globe (truthful-to-its-own-figure; they agree because both sims converge).
+
+Related: [[planet-viz-animation-rungs]], [[planet-interactive-map-design]].

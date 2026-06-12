@@ -274,6 +274,12 @@ def test_render_builds_the_biome_globe():
     assert np.isclose(z[0, 0], -1.0) and np.isclose(z[-1, 0], 1.0)        # south pole down, north pole up — closed
     assert np.allclose(z[1:-1, 0], np.sin(np.radians(view.grid.lat)))     # the interior rows are the grid latitudes
 
+    # the standing preference: a plain-language caption (novice→intermediate) so the standalone HTML stands
+    # on its own. Pin the LAYER-INVARIANT honesty edge — "latitude bands, not east-west geography" is on the
+    # caption for every active layer (a "biome" word would only hold for this render), the robust anchor.
+    caps = [a.text for a in fig.layout.annotations if a.text]
+    assert any("latitude bands" in c for c in caps)
+
 
 @pytest.mark.parametrize("active", ["temperature", "precipitation", "biome", "elevation"])
 def test_render_switches_the_active_scalar_layer(active):
@@ -358,6 +364,11 @@ def test_render_comparison_builds_three_globes(active):
     ice = [t for t in fig.data if type(t).__name__ == "Scatter3d"]
     assert len(ice) == 2 and {t.name for t in ice} == {"Earth ice line", "exo ice line"}
     assert fig.layout.legend.x == 0.0 and fig.layout.legend.xanchor == "left"
+    # the standing preference: a plain-language caption explains the Δ globe (worded to cover BOTH the
+    # continuous diff and the biome changed-mask) + the band-honesty edge — layer-invariant, so it holds
+    # for both the biome and temperature parametrizations.
+    caps = [a.text for a in fig.layout.annotations if a.text]
+    assert any("differs from" in c and "latitude bands" in c for c in caps)
 
 
 def test_save_comparison_html_writes_a_standalone_triptych(tmp_path):

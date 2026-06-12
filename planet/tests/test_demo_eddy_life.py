@@ -40,6 +40,11 @@ def test_demo_eddy_life_renders(tmp_path):
     anim = eddy_life_animation(r.eddy)
     assert len(anim._fig.axes) >= 2                       # the two panels (+ the θ colorbar)
 
+    # the standing preference: a plain-language caption (novice→intermediate) defines the domain jargon
+    # (β-plane band, "reversible" + the %) so the standalone GIF stands on its own.
+    caps = [t.get_text() for t in anim._fig.texts]
+    assert any("β-plane" in c and "reversible" in c for c in caps)
+
     out = tmp_path / "eddy-life.gif"
     anim.save(out, writer=PillowWriter(fps=4))
     assert out.exists() and out.stat().st_size > 0

@@ -25,7 +25,14 @@ must integrate the flux **per latitude FIRST** then `Σ|·|` — `mean_interior(
 it is = overclaim). Per-latitude-first makes the endpoint ratio land on `irreversible_fraction` by
 construction; a marked `window_start` line reconciles full-release curve vs windowed banked number.
 Tests green (3 new + fast lane 208). §9.4 rule-of-three NOT yet acted on (still project-local in
-`plots.py`; promotion-to-`viz/` is a future call).
+`plots.py`; promotion-to-`viz/` is a future call). **Prose pass 2026-06-12:** the GIF got the
+novice→intermediate relabel+caption sweep — de-jargoned legend (`back-and-forth stirring (throughput)` /
+`net heat moved poleward (κ residual)`, the old "swirls rage"/"small residual" + raw formulas gone from
+the legend), a plain-language `fig.text` caption (β-plane band / reversible-% / κ residual, with the
+formulas restored as **mathtext** `$\bar{F}$` and glossed in words), the constrained-layout engine
+`rect=(0,0.17,1,0.83)` reserving the bottom band, %s off `irreversible_fraction` (banked GIF irr≈0.081 →
+92/8, agrees with the globe); pinned by a caption assertion. This **completes the owed sweep** (planetmap
+biome + coupler globes + the A·B·Δ triptych also done same day) — see [[viz-prose-novice-intermediate]].
 
 **Why:** user wants the NASA *Perpetual Ocean* / Ventusky "flowing" look (named as *broad*
 references — weather, not climate). The rungs rise in cost, *fall* in pedagogical return,

@@ -93,6 +93,7 @@ string so the exported state is self-describing.
 """
 from __future__ import annotations
 
+import re
 import sys
 from dataclasses import dataclass, field
 from enum import Enum
@@ -327,7 +328,7 @@ def build_view(result, n_lon: int = N_LON, elevation: np.ndarray | None = None, 
         Layer("biome", LayerKind.SCALAR_FIELD, _broadcast_field(result.codes, n_lon).astype(int),
               "Whittaker biome code", style=_biome_style(), z_order=1),
         Layer("ice_line", LayerKind.ANNOTATION, _iceline_annotation(state.ice_line_lat, lon), "degrees",
-              style={"color": "#c0392b", "label": "ice line (T = T_freeze)"}, z_order=3),
+              style={"color": "#c0392b", "label": "ice line — where the surface freezes (0 °C)"}, z_order=3),
         Layer("elevation", LayerKind.SCALAR_FIELD, elevation_field, "m",
               style={"colorscale": "Earth"}, z_order=-1, inert=True),
     ]
@@ -536,6 +537,69 @@ def _overlay_traces(go, grid: Grid, view: PlanetView) -> list:
     return traces
 
 
+def _wrap_html(text: str, width: int = 104) -> str:
+    """Insert ``<br>`` breaks at word boundaries so a Plotly annotation fits a fixed pixel width.
+
+    Plotly annotations never auto-wrap (they break only on ``<br>``), so a long caption overflows the
+    figure unless it is pre-wrapped. Length is counted in **visible** characters only — inline ``<b>`` /
+    ``<span>`` tags don't count toward the width — so a bold run can straddle a line break without
+    throwing the wrap off (Plotly carries the styling across the ``<br>``). The same novice→intermediate
+    caption discipline the eddy-globe exemplar set (planet memory: viz-prose-novice-intermediate).
+    """
+    tag = re.compile(r"<[^>]+>")
+    lines, cur, cur_vis = [], [], 0
+    for word in text.split(" "):
+        vis = len(tag.sub("", word))
+        if cur and cur_vis + 1 + vis > width:
+            lines.append(" ".join(cur))
+            cur, cur_vis = [word], vis
+        else:
+            cur_vis += (1 if cur else 0) + vis
+            cur.append(word)
+    if cur:
+        lines.append(" ".join(cur))
+    return "<br>".join(lines)
+
+
+# Plain-language glosses of the active scalar field — the opening clause of the bottom caption, keyed by
+# layer name. The band-honesty edge + ice line + (when painted) the jet note are appended in
+# :func:`_field_caption`, so each banked globe stands on its own (a standing preference, planet memory).
+_FIELD_GLOSS = {
+    "biome": "Each colour is a <b>biome</b> — a life-zone (tundra, desert, forest, rainforest…) the model "
+             "reads off each band's temperature and rainfall (the <b>Whittaker</b> scheme).",
+    "temperature": "Colour is the <b>mean-annual temperature</b> (°C) of each latitude band.",
+    "precipitation": "Colour is the <b>annual rainfall</b> (cm/yr) of each latitude band.",
+    "elevation": "Colour is surface <b>elevation</b> (m) — carried but <b>inert</b>: at this rung it does "
+                 "not yet feed back on the climate.",
+}
+
+
+def _field_caption(view: PlanetView, active: str) -> str:
+    """The plain-language bottom caption for a rendered globe (novice→intermediate — a standing preference).
+
+    Opens with a one-clause gloss of the active field, then the two edges *every* Planet globe must carry
+    so the standalone HTML stands on its own: the **zonal-mean honesty edge** (latitude bands, not
+    east-west geography — the §9.3 scope edge, present for every layer, so it is the test-pinned anchor)
+    and the **ice line** (only when one is actually drawn); plus the emergent **jet** note when a
+    circulation overlay is painted (the coupler map). These globes carry no formula, so this is pure
+    relabel-don't-append (the eddy-globe exemplar's formula-gloss rule simply has nothing to restore here).
+    """
+    parts = ["<b>How to read it.</b> " + _FIELD_GLOSS.get(active, f"Colour is the <b>{active}</b> field.")]
+    parts.append("This globe is <b>zonal-mean</b>, so it paints <b>latitude bands, not east-west "
+                 "geography</b> — every point on a circle of latitude shares one climate (continents and "
+                 "oceans arrive at a later rung).")
+    try:
+        has_ice = view.layer("ice_line").data.size > 0
+    except KeyError:
+        has_ice = False
+    if has_ice:
+        parts.append("The red ring is the <b>ice line</b>: poleward of it the surface stays frozen (0 °C).")
+    if any(ly.kind is LayerKind.VECTOR_OVERLAY for ly in view.layers):
+        parts.append("Arrows trace the emergent <b>jet</b> — the west-to-east wind band the temperature "
+                     "gradient drives.")
+    return _wrap_html(" ".join(parts), width=104)
+
+
 def render(view: PlanetView, active: str = "biome"):
     """Paint a :class:`PlanetView` as an interactive Plotly globe — the generic, kind-dispatching renderer.
 
@@ -560,16 +624,24 @@ def render(view: PlanetView, active: str = "biome"):
     traces = [_scalar_surface(go, grid, surface_layer)] + _overlay_traces(go, grid, view)
 
     title = (f"Planet — {surface_layer.name} ({surface_layer.units})"
-             if not surface_layer.style.get("categorical") else "Planet — biome map")
+             if not surface_layer.style.get("categorical") else "Planet — the biome map (life zones)")
     # showspikes=False: no hover crosshair/projection lines tracking the pointer (3-D scene spikes
     # default ON) — a standing preference across every visualization.
     no_axis = dict(showbackground=False, showticklabels=False, showgrid=False, zeroline=False,
                    visible=False, showspikes=False)
     fig = go.Figure(data=traces)
+    # A deep bottom margin parks the plain-language caption in the empty space below the globe (a static
+    # globe — no play/slider to clear), so the standalone HTML stands on its own (a standing preference,
+    # planet memory: viz-prose-novice-intermediate). Height grows with it so the globe stays prominent.
     fig.update_layout(
-        title=title, width=820, height=720, margin=dict(l=0, r=0, t=40, b=0),
+        title=title, width=900, height=940, margin=dict(l=0, r=0, t=50, b=260),
         scene=dict(xaxis=no_axis, yaxis=no_axis, zaxis=no_axis,
                    aspectmode="data", camera=dict(eye=dict(x=1.4, y=1.4, z=0.9))),
+    )
+    fig.add_annotation(
+        xref="paper", yref="paper", x=0.5, y=-0.14, xanchor="center", yanchor="top",
+        showarrow=False, align="left", font=dict(size=14, color="#33373b"),
+        text=_field_caption(view, active),
     )
     return fig
 
@@ -634,13 +706,28 @@ def render_comparison(view_a: PlanetView, view_b: PlanetView, view_delta: Planet
                    visible=False, showspikes=False)
     scene = dict(xaxis=no_axis, yaxis=no_axis, zaxis=no_axis, aspectmode="data",
                  camera=dict(eye=dict(x=1.5, y=1.5, z=0.9)))
-    fig.update_layout(title=f"Two worlds compared — {labels[0]} · {labels[1]} · Δ",
-                      width=1000, height=900, margin=dict(l=0, r=0, t=60, b=0),
+    fig.update_layout(title=f"Two worlds compared — {labels[0]} vs {labels[1]}, and their difference (Δ)",
+                      # a deep bottom margin parks the plain-language caption below the three globes (a
+                      # standing preference, planet memory: viz-prose-novice-intermediate).
+                      width=1000, height=1050, margin=dict(l=0, r=0, t=60, b=170),
                       # the ice-line legend in the empty bottom-left corner — off the right-side colorbars
                       # it used to overlap (the Δ globe is centred, so the corner is free).
                       legend=dict(x=0.0, y=0.46, xanchor="left", yanchor="top",
                                   bgcolor="rgba(255,255,255,0.65)", font=dict(size=11)),
                       scene=scene, scene2=scene, scene3=scene)
+    # The caption covers BOTH readings of the Δ globe (continuous diff for a number field, changed-mask
+    # for the categorical biome) — "where world B differs from world A" is true of both — plus the
+    # band-honesty edge + ice line every Planet globe carries.
+    caption = (
+        f"<b>How to read it.</b> The left two globes show the same field for <b>{labels[0]}</b> and "
+        f"<b>{labels[1]}</b>; the third — <b>Δ</b> — shows <b>where {labels[1]} differs from {labels[0]}</b> "
+        "(for a number field, by how much: blue→red = lower→higher; for the biome map, which bands changed "
+        "their life-zone). Like every Planet globe these are <b>latitude bands, not east-west geography</b> "
+        "(a zonal-mean world); the red rings are each world's <b>ice line</b>, where its surface freezes."
+    )
+    fig.add_annotation(xref="paper", yref="paper", x=0.5, y=-0.05, xanchor="center", yanchor="top",
+                       showarrow=False, align="left", font=dict(size=14, color="#33373b"),
+                       text=_wrap_html(caption, width=124))
     return fig
 
 
@@ -730,6 +817,9 @@ def interactive_map(n_tau: float = LIVE_N_TAU):
             for tr in new.data:
                 fig.add_trace(tr)
             fig.layout.title = new.layout.title
+            # sync the caption too (it is layer-adaptive) — otherwise a layer switch would leave the
+            # previous field's caption stale under the new globe (annotations aren't carried by `data`).
+            fig.layout.annotations = new.layout.annotations
 
     for w in (s0, a, d, t_star, size, obliquity, layer):
         w.observe(update, names="value")
