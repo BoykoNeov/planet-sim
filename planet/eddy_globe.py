@@ -216,8 +216,10 @@ def eddy_globe_figure(eddy, *, frame_ms: int = 120):
                  f"and back, and ~{rev_pct:.0f}% of it is reversible — so only the small remainder is net "
                  "transport</sub>",
             x=0.5, xanchor="center", font=dict(size=15)),
-        # b margin holds the plain-language caption below the play/slider controls (which hang at y≈0).
-        width=1180, height=640, margin=dict(l=0, r=0, t=84, b=150),
+        # a deep bottom margin parks the explanation in the empty space WELL BELOW the play/slider
+        # controls (they hang at y≈0..-0.24) — the caption sits lower still, so it can't collide with the
+        # slider's "… periods" labels (the overlap the user hit), and there's room for bigger text.
+        width=1180, height=860, margin=dict(l=0, r=0, t=84, b=360),
         scene=dict(xaxis=no_axis, yaxis=no_axis, zaxis=no_axis, aspectmode="data",
                    camera=dict(eye=dict(x=1.5, y=0.5, z=0.95))),
         updatemenus=[play], sliders=[slider],
@@ -237,20 +239,29 @@ def eddy_globe_figure(eddy, *, frame_ms: int = 120):
                        font=dict(size=9, color=WINDOW_COLOR), row=1, col=2)
 
     # The one piece of NEW prose: a plain-language caption (novice→intermediate) so the standalone HTML
-    # stands on its own. It defines the domain jargon the labels can't carry — β-plane band, "reversible",
-    # the κ residual — seated in the expanded bottom margin BELOW the play/slider controls (xref/yref=
-    # "paper", y<0) so it adds explanation without re-cluttering the plot.
+    # stands on its own. It defines the domain jargon the labels can't carry — β-plane band, "reversible"
+    # + the %, the κ residual — and KEEPS the formulas (Σ∫|F̄|dt, Σ|∫F̄dt|) but GLOSSES each in words
+    # (the user is fine with formulas as long as they're explained). Bigger font (the user asked), and it
+    # sits in the deep bottom margin well below the slider's "… periods" labels so it can't overlap them.
+    # Manual <br> wraps keep each line ≲108 visible chars so nothing overflows the figure width.
     fig.add_annotation(
-        xref="paper", yref="paper", x=0.5, y=-0.20, xanchor="center", yanchor="top",
-        showarrow=False, align="left", font=dict(size=11, color="#444444"),
+        xref="paper", yref="paper", x=0.5, y=-0.40, xanchor="center", yanchor="top",
+        showarrow=False, align="left", font=dict(size=14, color="#33373b"),
         text=(
-            "<b>How to read it.</b>  The coloured patch is <b>one midlatitude band</b> — a rectangular slice "
-            "of a single latitude zone (a “β-plane”), <b>not</b> the whole planet.<br>"
-            "An unstable jet sheds swirling eddies that stir the temperature θ poleward one moment and back "
-            f"the next; about <b>{rev_pct:.0f}% of that stirring cancels out</b> (it is “reversible”).<br>"
-            f"Only the ~{res_pct:.0f}% that survives — bundled as the eddy diffusivity <b>κ</b> — is net "
-            "poleward heat transport. Right panel: total stirring (throughput) races up while the net "
-            "(the κ residual) barely lifts off the floor."
+            "<b>How to read it.</b>  The coloured patch is <b>one midlatitude band</b> — a flat slice of a single "
+            "latitude zone<br>"
+            "(a “β-plane”), <b>not</b> a planet-wide flow; the rest of the globe is left bare, as the model resolves "
+            "only this band.<br>"
+            "An unstable jet sheds swirling <b>eddies</b> that stir the temperature θ poleward one moment and back "
+            "the next — the<br>"
+            f"<b>instantaneous flux F̄</b>. Because it keeps reversing, most of it cancels: about <b>{rev_pct:.0f}% is "
+            "reversible</b>.<br>"
+            "<b>Right panel:</b> <span style='color:#b3361f'><b>total stirring</b></span> (throughput, Σ∫|F̄|dt — the "
+            "flux size summed over time and latitude, ignoring<br>"
+            "direction) races up, while <span style='color:#1f6f4a'><b>net transport</b></span> (Σ|∫F̄dt| — what "
+            "survives after the poleward and equatorward parts cancel)<br>"
+            f"barely leaves the floor. Only that surviving ~<b>{res_pct:.0f}%</b> — the eddy diffusivity <b>κ</b> (the "
+            "“κ residual”) — is real poleward heat transport."
         ),
     )
     return fig

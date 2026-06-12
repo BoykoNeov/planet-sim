@@ -77,7 +77,11 @@ references — weather, not climate). The rungs rise in cost, *fall* in pedagogi
   (de-jargoned legend/subtitle, technical term parenthetical) + ONE plain-language caption (β-plane band
   / "reversible" + the % / κ residual) seated below the controls — the Rung-B figure is the **exemplar**
   for the new standing rule [[viz-prose-novice-intermediate]] (sweep of planetmap globes + triptych +
-  GIFs still owed).
+  GIFs still owed). **Third pass (2026-06-12):** user confirmed legend OK but caption overlapped the
+  slider's "… periods" labels + wanted it bigger + the formulas BACK (explained, not stripped) → caption
+  reseated low (`y=-0.40`, `b=360`/`height=860`), font 11→14, formulas `Σ∫|F̄|dt`/`Σ|∫F̄dt|` restored
+  with word-glosses + curve-coloured `<span>` tints — these refinements folded into
+  [[viz-prose-novice-intermediate]].
 - **Rung C** = WebGL particle globe; vendor **mapbox/webgl-wind (ISC, GPU particles)** +
   **cambecc/earth (MIT, orthographic projection)** (licenses verified). webgl-wind is
   flat/equirectangular → needs a three.js sphere or a port of cambecc's projection. New

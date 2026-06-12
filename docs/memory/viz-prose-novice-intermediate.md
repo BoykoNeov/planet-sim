@@ -19,10 +19,22 @@ overlapping text" request — see [[no-pointer-spike-lines]] for that one). Two 
    *existing* text legible instead of adding new elements. (Eddy globe: `throughput Σ∫|F̄|dt (the swirls
    rage)` → `back-and-forth stirring (throughput)`; `net … (the small residual)` → `net heat moved
    poleward (κ residual)`; subtitle de-jargoned but KEEPS the words the test pins.)
-2. **ONE compact caption** (2–3 plain sentences) for what can't be inlined — the genuinely domain terms
-   (β-plane, "reversible" + the %, κ). Seat it in an **expanded bottom margin BELOW the play/slider
-   controls** (`xref/yref="paper"`, `y<0`) so it adds explanation without re-cluttering the plot. Drive
-   the % off `irreversible_fraction` so caption + subtitle stay in sync.
+2. **ONE caption** (a handful of plain sentences) for what can't be inlined — the genuinely domain terms
+   (β-plane, "reversible" + the %, κ). Seat it in a **deep bottom margin WELL below the play/slider
+   controls** (`xref/yref="paper"`, `y` ≈ −0.40, big `b` margin) so it adds explanation without
+   re-cluttering the plot. Drive the % off `irreversible_fraction` so caption + subtitle stay in sync.
+
+**Two corrections the user made on the 2026-06-12 follow-up pass (apply going forward):**
+- **Formulas & coefficients are WELCOME — they just must be EXPLAINED, not stripped.** The first pass
+  over-corrected by deleting `Σ∫|F̄|dt` etc.; the user pushed back. KEEP the formula and gloss it in
+  words right there (eddy globe caption: "throughput, Σ∫|F̄|dt — the flux size summed over time and
+  latitude, ignoring direction"; "net, Σ|∫F̄dt| — what survives after the poleward/equatorward parts
+  cancel"). Plain-language label in the legend, formula+gloss in the caption.
+- **Placement & size:** the caption must clear the slider's "… periods" tick labels (they hang to
+  ≈ `y=-0.24`) — park it lower (`y≈-0.40`) in plenty of empty space below the figure, not crammed just
+  under the controls. And **make the caption text BIGGER** (eddy globe: 11 → **14 px**). Manual `<br>`
+  wraps (Plotly doesn't auto-wrap annotations) keep each line ≲108 visible chars so nothing overflows;
+  inline `<span style='color:…'>` can tint a term to match its curve.
 
 **NOT "a glossary on every figure."** It's a per-figure judgment call, not a one-line sweep like the
 spike toggle. **Skip hover as the definition vehicle** (poor discoverability + it would overload the
