@@ -657,7 +657,7 @@ unchanged — the inert-seam discipline (§9.3) applied to motion.
 |---|---|---|---|
 | **A** | matplotlib `FuncAnimation` | in-repo, `[viz]` | the **mechanism artifact** + the repo's first time-animation primitive (`plots.eddy_life_animation` + `demo_eddy_life.py`) |
 | **B** ✅ | Plotly globe animation | existing `[webviz]` stack | the **globe view** (frames → play/slider on `planetmap`'s sphere), no new tech — **BUILT 2026-06-12** |
-| **C** | original Canvas2D particle globe | self-contained inline HTML (no CDN) | the **showcase** — a general flow-on-a-globe renderer; *honest-by-disclosure* (decided 2026-06-12, below) |
+| **C** | three.js / WebGL perspective globe | self-contained inline HTML (three.js vendored, no CDN) | the **showcase** — a general flow-on-a-globe **particle-streaming** renderer; *honest-by-disclosure* (decided 2026-06-12, amended same day to a true 3-D sphere, below) |
 
 - **Rung A is meaningful on its own** (not merely a step to C): it validates the banked
   frames, builds the §9.4 primitive, and **teaches the mechanism honestly**. It is a
@@ -671,12 +671,16 @@ unchanged — the inert-seam discipline (§9.3) applied to motion.
   figures. Frame-fidelity tests: `∫hθ` machine-exact across banked frames, `eddy_ke`
   recomputed-from-a-frame matches the series, `n_frames=0`-vs-`N` bit-for-bit.
 - **Rung B** reuses the existing Plotly globe — a globe view for a fraction of C's cost. **(BUILT — see below.)**
-- **Rung C** is the **showcase** — build approach **decided (2026-06-12, below):** an *original*
-  Canvas2D orthographic particle globe, architected as a general flow-on-a-globe renderer and governed
-  by the *honest-by-disclosure* carve-out. The provisional plan — vendoring **mapbox/webgl-wind (ISC —
-  GPU particles)** + **cambecc/earth (MIT — orthographic projection)** — is **superseded** there
-  (reimplementing their *techniques* sidesteps the §6 attribution burden; webgl-wind's GPU advection
-  returns only as the named WebGL upgrade seam). It is **reach / delivery, not new teaching**.
+- **Rung C** is the **showcase** — build approach **decided (2026-06-12), amended the same day to a true
+  3-D sphere (below):** a **three.js / WebGL perspective globe** with particles streaming on a *real*,
+  rotatable sphere, architected as a general flow-on-a-globe renderer and governed by the
+  *honest-by-disclosure* carve-out. **B and C are now both 3-D globes, so their roles — not their
+  dimensionality — separate them:** rung B paints the one true band as a faithful **scalar field**
+  (honest-by-construction); rung C is the **immersive particle-streaming** view (illustrative, global-
+  looking, honest-by-disclosure). It is **reach / delivery, not new teaching**. (Two earlier renderer
+  ideas are superseded: first, vendoring **mapbox/webgl-wind** + **cambecc/earth**; then an *original
+  Canvas2D orthographic* globe — the latter now demotes to a lighter considered-alternative / fallback,
+  see the Tech bullet.)
 
 **Named scope edges — carried through all three, *hardest to preserve at C*.** (1) The flow
 is a **doubly-periodic midlatitude β-plane band patch, not a global field** (the same edge as
@@ -739,30 +743,46 @@ The one thing not self-verifiable headlessly (no kaleido/browser here) is the ac
 to the user to eyeball. Geometry pin (always-green): the band is a bounded midlat sector, never
 pole-to-pole / 360°.
 
-**Rung C — the showcase: decided 2026-06-12 (original Canvas2D; *honest-by-disclosure*).** The build
-approach is now locked, and the provisional plan above (vendored libraries; band-label honesty) is
-**revised** by this decision. Rung C is what §9.5 already calls it — *reach / delivery, not new teaching* —
-and the user's forward framing (2026-06-12) widens it into a **general-purpose flow-on-a-globe renderer**:
-its design aim is to *one day* animate a full **GCM / ESM** wind-or-current field; until (and after) then it
-renders whatever lesser model we have — today, the one eddy band. The renderer is therefore architected
-around the *data*, not the eddy.
+**Rung C — the showcase: decided 2026-06-12; amended the same day to a true 3-D sphere (three.js / WebGL
+perspective; *honest-by-disclosure*).** The build approach is locked. Rung C is what §9.5 already calls
+it — *reach / delivery, not new teaching* — and the user's forward framing (2026-06-12) widens it into a
+**general-purpose flow-on-a-globe renderer**: its design aim is to *one day* animate a full **GCM / ESM**
+wind-or-current field; until (and after) then it renders whatever lesser model we have — today, the one eddy
+band. The renderer is therefore architected around the *data*, not the eddy. **The amendment touches only
+the renderer.** The renderer-agnostic data contract (below) was built to *"commit to nothing about
+projection or particle representation"* — so swapping the originally-planned Canvas2D-orthographic globe for
+a three.js perspective sphere changes nothing in the contract, the honest-by-disclosure carve-out, §9.3, or
+the ADR 0002 note. That the swap is *local* is the proof the boundary was drawn in the right place.
 
-- **Tech — an *original* Canvas2D orthographic globe (not vendored).** CPU particle advection — the
-  *cambecc/earth* architecture (orthographic projection + fading particle trails, ~5–10 k particles),
-  **reimplemented original**, on a Canvas2D globe — emitted as a **self-contained, inline-data, no-CDN**
-  HTML artifact (the existing `interactive.py` pattern: works straight off `file://`, deterministic,
-  golden-able). **Original, not vendored, decided:** reimplementing the *techniques* (GPU-free particle
-  advection; orthographic projection) sidesteps the §6 attribution burden that vendoring
-  `mapbox/webgl-wind` (ISC) + `cambecc/earth` (MIT) would pull in (no `NOTICE` file exists in the repo),
-  and it matches the repo's existing vanilla-canvas, agent-fluent, dependency-free idiom. Their licenses
-  stay compatible if a future session prefers to vendor; the techniques are the references either way.
+- **Tech — a three.js / WebGL perspective globe (three.js vendored inline).** Particles stream on a
+  *real* 3-D sphere — three.js `PerspectiveCamera` + an orbit control (rotate / zoom / tilt) with correct
+  back-face occlusion — fed by the banked `(u, v)` frames: the immersive *Perpetual-Ocean* look the user
+  is after, now on an actual planet rather than an orthographic disk. The **particle technique stays
+  original** (our own advection updating a three.js `BufferGeometry`, CPU-side to start); three.js itself
+  is the only vendored piece — the WebGL scene/camera framework we build *on*, not a particle library we
+  copy.
+   - **§6 reverses from *sidestepped* to *owed* — the real cost of this choice.** The prior
+     original-Canvas2D plan existed precisely to avoid vendoring; three.js is a **library** (you vendor it,
+     you do not reimplement it), and its MIT licence **requires attribution** — so a `NOTICE` file
+     (currently absent in the repo) becomes a **named build deliverable**, not an afterthought. Forgetting
+     attribution in a published artifact is exactly the kind of thing that bites later.
+   - **Vendor three.js *inline*, not via CDN — decided.** Inlining the minified three.js into the emitted
+     HTML preserves the `interactive.py` property the repo relies on: **self-contained, works straight off
+     `file://`, deterministic, golden-able, shareable offline**. A CDN `<script src>` is the **rejected**
+     alternative — lighter to write, but it breaks offline self-containment (the file would silently need
+     the network), the one property that pattern exists to guarantee. The artifact grows by three.js'
+     bundle weight; that is the accepted price of the real 3-D sphere.
+   - **The original Canvas2D orthographic globe demotes to a lighter considered-alternative / fallback** —
+     a no-dependency, §6-free renderer kept in reserve (e.g. if a future build wants a zero-vendor floor),
+     no longer the v1.
 
 - **The renderer-agnostic data contract — the "one day a GCM" hook.** The renderer consumes a generic
   **vector-field-on-a-globe** layer, *not* the eddy band specifically. The contract carries only: a
   lat×lon **grid**, per-cell `(u, v)` components, an optional **scalar field** for colour, optional **time
   frames**, a **coverage-extent**, and a **provenance / honesty label** (the disclaimer text). It commits
-  to **nothing** about projection or particle representation — those stay renderer-side, so a later WebGL
-  swap (below) reuses the contract unchanged. The **coverage-extent carries the band-vs-globe truth into
+  to **nothing** about projection or particle representation — those stay renderer-side, which is exactly
+  why *this very amendment* (original-Canvas2D → three.js / WebGL sphere) touches it not at all, and why a
+  later GPU-advection swap (below) will reuse it unchanged. The **coverage-extent carries the band-vs-globe truth into
   the data itself**: the same renderer *labels the band* today (coverage = the ~55° NH sector measured in
   rung B) and *illustrates the globe with disclosure* tomorrow (coverage = global, fed by GCM
   winds/currents). This is a new **layer type** for the §9.1 registry / planet-spec schema (§9.3) — a
@@ -795,19 +815,26 @@ around the *data*, not the eddy.
   inert-honesty discipline re-expressed as **disclosure** (a caption) rather than **geometry** (a literal
   band).
 
-- **WebGL upgrade seam + a concrete trigger.** Canvas2D CPU particles are the v1 renderer; a **WebGL / GPU
-  ping-pong** integrator (the *webgl-wind* technique) is the documented upgrade **behind the same data
-  contract** — swap the integrator, keep the contract and the disclaimer test. **Trigger (named, not
-  "someday"):** when grid resolution × particle count pushes the interactive frame-rate below ~30 fps —
-  the GCM-resolution regime — move advection onto the GPU. Until then, CPU particles on Canvas2D stay
-  responsive, self-contained, and golden-friendly.
+- **GPU-advection upgrade seam + a concrete trigger (the seam shifted down one level).** WebGL is no
+  longer the *future* upgrade — three.js makes it the v1 renderer — so the named seam moves *inside* it:
+  **CPU-side particle advection** (updating the `BufferGeometry` each frame) is v1; a **GPU ping-pong**
+  integrator (the *webgl-wind* technique, run in a fragment shader) is the documented upgrade **behind the
+  same data contract** — swap the integrator, keep the contract and the disclaimer test. **Trigger (named,
+  not "someday"):** when grid resolution × particle count pushes the interactive frame-rate below ~30 fps —
+  the GCM-resolution regime — move advection onto the GPU. Until then, CPU advection on the three.js sphere
+  stays responsive, self-contained (inline three.js, no CDN), and golden-friendly.
 
 - **Deliverables for the build session (not executed this session).** A generic renderer module
-  (`planet/flow_globe.py` — named for the role, the eddy being its first consumer), a demo
-  (`planet/demo_eddy_particles.py`) banking a self-contained `docs/figures/planet-eddy-particles.html`, a
-  `catalog.py` `DEMOS` entry + the drift-guarded `python -m planet site` regenerate, and **structural +
+  (`planet/flow_globe.py` — named for the role, the eddy being its first consumer) emitting a three.js
+  scene with **three.js vendored inline**; a demo (`planet/demo_eddy_particles.py`) banking a
+  self-contained `docs/figures/planet-eddy-particles.html`; a `catalog.py` `DEMOS` entry + the
+  drift-guarded `python -m planet site` regenerate; a **`NOTICE` / attribution file** carrying three.js'
+  MIT licence (the §6 deliverable this renderer now *owes* — see the Tech bullet); and **structural +
   disclaimer-presence tests** (mirroring `test_eddy_globe.py` *minus* the byte-golden, *plus* the caption
-  assertion). Browser play-through is the one thing handed to the user to eyeball.
+  assertion). The disclaimer is now a **DOM overlay element** over the WebGL canvas — *easier* to
+  machine-check in the HTML source than canvas-drawn text would have been — so the disclaimer-presence
+  test asserts that overlay's honesty text is present. Browser play-through is the one thing handed to the
+  user to eyeball.
 
 ---
 
@@ -1171,22 +1198,30 @@ stirring movie overclaim transport. Recommended build order is **A first** (hone
 construction, in-repo, CI-testable), then judge B-vs-C after seeing real frames move. Full
 roadmap, the rungs table, and the named scope edges: **§9.5**.
 
-**Rung C — build approach decided; not yet built (2026-06-12).** A forward decision (user): build the
-showcase as a **general-purpose flow-on-a-globe renderer** aimed at *one day* visualizing a full
-**GCM / ESM** field — rendering lesser models (today, the one eddy band) in the meantime. Locked: an
-**original Canvas2D** orthographic particle globe (reimplemented *cambecc/earth* technique — **not**
-vendored, sidestepping the §6 attribution burden; no `NOTICE` file exists), emitted as a self-contained
-no-CDN HTML artifact (the `interactive.py` pattern); a **renderer-agnostic data contract** (grid +
-`(u,v)` + scalar + frames + **coverage-extent** + **provenance/honesty label**, nothing about
-projection/particles) so a later **WebGL/GPU** swap reuses it unchanged (trigger: frame-rate < ~30 fps at
-GCM resolution). The one **policy change**: a scoped honesty carve-out — rungs A/B stay
-*honest-by-construction*; **Rung C is *honest-by-disclosure*** (user, 2026-06-12: illustrate freely *"if
-documented … currents carry heat, when they do not"*). Asymmetric verification: **physics-fidelity relaxes**
-(approximate is fine, no byte-golden — the figure was never in the correctness path, ADR 0002 #2) but
-**documentation tightens** — a test machine-checks the on-screen disclaimer is present, *because the
-disclaimer is the entire license*. Carve-out is narrow (showcase renderer only; science + A/B untouched).
-Doctrine recorded in **§9.5** + **§9.3** + ADR 0002 status note; build deliverables listed in §9.5. **Plan
-only this session — not executed.**
+**Rung C — build approach decided, then amended to a true 3-D sphere; not yet built (2026-06-12).** A
+forward decision (user): build the showcase as a **general-purpose flow-on-a-globe renderer** aimed at
+*one day* visualizing a full **GCM / ESM** field — rendering lesser models (today, the one eddy band) in
+the meantime. The renderer was first locked as an *original Canvas2D orthographic* globe, then **amended the
+same day (user) to a true 3-D sphere — a `three.js` / WebGL perspective globe with particles streaming on a
+real, rotatable sphere.** The pivot **touches only the renderer**: the **renderer-agnostic data contract**
+(grid + `(u,v)` + scalar + frames + **coverage-extent** + **provenance/honesty label**, nothing about
+projection/particles) was built to absorb exactly this, so the contract, the honesty carve-out, §9.3, and
+the ADR 0002 note are unchanged — the locality of the change is the proof the boundary was right. **B and C
+are now both 3-D globes; their *roles* separate them** — B is the faithful **scalar field** on the one true
+band (honest-by-construction), C the **immersive particle-streaming** showcase (honest-by-disclosure). The
+choice **reverses the §6 stance**: three.js is a *library* (vendored, not reimplemented), so its MIT licence
+now **owes a `NOTICE`/attribution file** (a named build deliverable), and it is **vendored inline** (not
+CDN) to keep the artifact offline-self-contained off `file://`; the original Canvas2D globe demotes to a
+lighter §6-free fallback. The **GPU-advection seam shifts down a level** (CPU `BufferGeometry` advection v1
+→ GPU ping-pong upgrade *within* WebGL; same <~30 fps @ GCM-resolution trigger). The one **policy change**
+is unchanged by the amendment: rungs A/B stay *honest-by-construction*; **Rung C is *honest-by-disclosure***
+(user, 2026-06-12: illustrate freely *"if documented … currents carry heat, when they do not"*).
+Asymmetric verification: **physics-fidelity relaxes** (approximate is fine, no byte-golden — the figure was
+never in the correctness path, ADR 0002 #2) but **documentation tightens** — a test machine-checks the
+on-screen disclaimer (now a DOM overlay over the WebGL canvas) is present, *because the disclaimer is the
+entire license*. Carve-out is narrow (showcase renderer only; science + A/B untouched). Doctrine recorded in
+**§9.5** + **§9.3** + ADR 0002 status note; build deliverables listed in §9.5. **Plan only this session —
+not executed.**
 
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko

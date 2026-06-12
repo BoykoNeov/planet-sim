@@ -1,6 +1,6 @@
 ---
 name: planet-viz-animation-rungs
-description: "Animated eddy-flow visualization, 3 rungs A/B/C: rung A (matplotlib two-panel) + shared (h,u,v,θ) frame side-channel BUILT 2026-06-11; rung B (Plotly-globe anim, planet/eddy_globe.py) BUILT 2026-06-12; rung C build-approach DECIDED 2026-06-12 = original Canvas2D flow-globe + honest-by-disclosure carve-out (NOT built); honesty edges = channel-not-globe + ~90% reversible"
+description: "Animated eddy-flow visualization, 3 rungs A/B/C: rung A (matplotlib two-panel) + shared (h,u,v,θ) frame side-channel BUILT 2026-06-11; rung B (Plotly-globe anim, planet/eddy_globe.py) BUILT 2026-06-12; rung C build-approach DECIDED 2026-06-12, AMENDED same day to a three.js/WebGL true-3D-sphere particle flow-globe (was original Canvas2D) + honest-by-disclosure carve-out (NOT built); honesty edges = channel-not-globe + ~90% reversible"
 metadata: 
   node_type: memory
   type: project
@@ -90,23 +90,37 @@ references — weather, not climate). The rungs rise in cost, *fall* in pedagogi
   reseated low (`y=-0.40`, `b=360`/`height=860`), font 11→14, formulas `Σ∫|F̄|dt`/`Σ|∫F̄dt|` restored
   with word-glosses + curve-coloured `<span>` tints — these refinements folded into
   [[viz-prose-novice-intermediate]].
-- **Rung C** = the showcase — **build approach DECIDED 2026-06-12 (user), PLAN-ONLY (not built this
-  session).** User reframed it as a **general-purpose flow-on-a-globe renderer** aimed at *one day*
-  visualizing a full **GCM/ESM** field; renders lesser models (today: the one eddy band) meanwhile. LOCKED:
-  (1) **original Canvas2D** orthographic particle globe — reimplement the *cambecc/earth* technique
-  (orthographic projection + fading CPU particle trails ~5–10k), **NOT vendored** (sidesteps §6 attribution
-  burden + no `NOTICE` file exists; `webgl-wind`/`cambecc` are the design references only), self-contained
-  inline-data **no-CDN** HTML (the `interactive.py` pattern). (2) **Renderer-agnostic data contract** = a
-  generic **vector-field-on-a-globe** layer: grid + per-cell `(u,v)` + optional scalar (colour) + optional
-  frames + **coverage-extent** + **provenance/honesty label** — and NOTHING about projection/particles
-  (renderer-side), so the **WebGL/GPU ping-pong** upgrade (the webgl-wind technique) reuses the contract
-  unchanged. **Coverage-extent carries the band-vs-globe truth into the data** (label-the-band today,
+- **Rung C** = the showcase — **build approach DECIDED 2026-06-12 (user), AMENDED the same day to a true
+  3-D sphere, PLAN-ONLY (not built this session).** User reframed it as a **general-purpose
+  flow-on-a-globe renderer** aimed at *one day* visualizing a full **GCM/ESM** field; renders lesser models
+  (today: the one eddy band) meanwhile. **First locked as an *original Canvas2D orthographic* globe, then
+  amended (user) to a `three.js` / WebGL *perspective* globe — particles streaming on a REAL rotatable
+  sphere (PerspectiveCamera + orbit control, back-face occlusion).** LOCKED: (1) **Tech = three.js / WebGL
+  3-D sphere; particle technique stays ORIGINAL** (our own advection updating a `BufferGeometry`, CPU-side
+  to start); three.js is the only **vendored** piece — the scene/camera framework, not a particle lib we
+  copy. **§6 REVERSES from sidestepped → owed:** three.js is a *library* (vendored, not reimplemented) so
+  its MIT licence **requires a `NOTICE`/attribution file** (currently absent → a NAMED build deliverable);
+  **vendor three.js INLINE, not CDN** (CDN rejected — breaks offline self-containment; inline keeps the
+  `interactive.py` file:// / deterministic / golden-able property). Original Canvas2D demotes to a lighter
+  §6-free **fallback**. (2) **Renderer-agnostic data contract UNCHANGED** = a generic
+  **vector-field-on-a-globe** layer: grid + per-cell `(u,v)` + optional scalar (colour) + optional frames +
+  **coverage-extent** + **provenance/honesty label** — NOTHING about projection/particles (renderer-side).
+  **This is the WIN: the contract was built to absorb exactly this swap → the amendment touches ONLY the
+  renderer** (contract, §9.3, honesty carve-out, ADR note all unchanged = proof the boundary was right).
+  **Coverage-extent carries the band-vs-globe truth into the data** (label-the-band today,
   illustrate-the-globe-with-disclosure tomorrow). Joins the §9.1 layer registry / planet-spec as a new
-  layer TYPE. WebGL swap **trigger (named):** interactive frame-rate < ~30 fps at GCM resolution. (3) The
-  one **policy change = honest-by-disclosure** (see below). Deliverables (future build): `planet/flow_globe.py`
-  (generic renderer) + `demo_eddy_particles.py` → `docs/figures/planet-eddy-particles.html` + catalog entry
-  + drift-guarded site regen + structural & **disclaimer-presence** tests (mirror `test_eddy_globe.py` minus
-  byte-golden, plus the caption assertion). Doctrine recorded in plan §9.5 + §9.3 + ADR 0002 status note.
+  layer TYPE. (3) **GPU-advection seam SHIFTED DOWN a level** — WebGL is the v1 renderer now (not the future
+  upgrade), so the seam is CPU `BufferGeometry` advection v1 → **GPU ping-pong** (webgl-wind technique, frag
+  shader) upgrade *within* WebGL; same **trigger:** frame-rate < ~30 fps at GCM resolution. (4) The one
+  **policy change = honest-by-disclosure** (see below), UNCHANGED by the amendment. **B vs C now both 3-D
+  globes → ROLES separate them** (not dimensionality): B = faithful **scalar field** on the one true band
+  (honest-by-construction); C = **immersive particle-streaming** showcase (honest-by-disclosure).
+  Deliverables (future build): `planet/flow_globe.py` (generic renderer, three.js vendored inline) +
+  `demo_eddy_particles.py` → `docs/figures/planet-eddy-particles.html` + a **`NOTICE`/attribution file** +
+  catalog entry + drift-guarded site regen + structural & **disclaimer-presence** tests (disclaimer now a
+  **DOM overlay** over the WebGL canvas → easier to machine-check than canvas-drawn text; mirror
+  `test_eddy_globe.py` minus byte-golden, plus the caption assertion). Doctrine recorded in plan §9.5 +
+  §9.3 + ADR 0002 status note.
 
 **Two honesty edges carried through all three (hardest to preserve at C):** (1) the flow is a
 **doubly-periodic midlatitude β-plane band patch, NOT a global field** (same edge as
