@@ -1253,6 +1253,87 @@ backbone** (recorded below).
   `planet/tests/test_moist_ebm.py` (12, all **fast**, incl. a `.converged` guard); full planet gate
   **261 passed, 1 skip**. No engine edit; `uses` unchanged.
 
+**Rung 3 — SCOPED + spike-validated (vertical structure → baroclinic instability; 2026-06-12).** The
+biggest jump on the §5 staircase: the **first *structural* edit to a shared engine** since Phase 3 (so it
+triggers the full-repo gate + the import-drift guard, ADR 0003) and the **first compute wall**. A
+single-layer model *categorically cannot* be baroclinically unstable (no available potential energy, no
+vertical shear), so the rung adds the **minimal honest vertical structure: a two-layer free-surface
+shallow-water model (Phillips 1954)** — two stacked SW layers of slightly different density, coupled only
+through pressure. The table's "multi-level / 3-D" is realized minimally as **2 layers**; **N-layer is the
+within-rung upgrade**, not a separate rung (no cleaner anchor above 2, just more cost). The interface
+displacement *is* the dynamical temperature/buoyancy — so heat transport becomes **intrinsic to the
+dynamics**, the qualitative leap past the passive rung-1 tracer (the CONTRACT already names "an active
+buoyancy tracer feeding `h` = a two-layer model"). Scoped advisor-pressure-tested **and de-risked
+spike-first** (`outputs/rung3_baroclinic_spike.py`, gitignored) — the spike **answered all three of the
+advisor's load-bearing risks** before any build:
+- **The tight anchor = the two-layer SW equations' OWN linear stability, NOT QG Phillips (advisor).** Making
+  QG Phillips primary would import an approximation gap (ageostrophy, free-surface coupling) into what
+  should be the tight leg — so the rung-appropriate move (matching Phase 3's Poincaré/Rossby anchor and rung
+  2.5's exact `dq_sat/dT`) is to **linearize the two-layer SW equations and root the 6×6 dispersion matrix
+  for the growing mode** (built from the equations, **not a recalled quartic**). The spike's solver is
+  **first-principles-validated**: at zero shear it is **neutral to machine precision** (`max|Im ω|≈3e-20`)
+  and **recovers the two-layer Poincaré dispersions** (external `ω²=f₀²+gH_tot k²`, internal
+  `ω²=f₀²+g'H_e k²`). It gives σ(k) with a **short-wave cutoff**, a most-unstable wavelength **~6.8× the
+  layer deformation radius** (`λ*≈680 km` at idealized params), and (with β) a finite critical shear.
+- **QG Phillips = the LOOSE cross-check that confirms the tight leg.** Derived as a 2×2 and compared to the
+  SW solver: in the **rigid-lid limit (`g→∞`, the external mode infinitely fast) they converge to <0.5%**
+  (`σ_SW/σ_Phillips→1.004`), mutually validating both; at the actual free-surface params the gap is a clean
+  **~4%** (SW slightly *more* unstable — the extra free-surface degree of freedom). **The spike caught +
+  fixed exactly the recalled-coefficient trap the advisor flagged** (the β=0 cutoff is `K²=2F`,
+  `F=f₀²/(g'H)` — *not* `2F`, which was √2 too short and is what first surfaced the gap).
+- **The external-mode CFL is the real cost (advisor's #1 risk) — quantified, and AFFORDABLE.** A
+  free-surface two-layer model carries a fast **barotropic** gravity wave at `√(gH_tot)` that sets the
+  explicit RK3 step while the **slow baroclinic mode** is all we care about. The spike measures the penalty
+  `c_ext/c_int≈14×` at idealized params, but **4 e-folds cost only ~3–16 s wall** (nx=32→128) on the C-grid
+  route → **GO on the free-surface engine extension**; the **rigid-lid fork** (a barotropic *elliptic solve*
+  = a structural change to the explicit engine — "a different animal") is the **named within-rung upgrade**
+  if Phase-B's saturated, higher-resolution, many-life-cycle runs make the penalty bite. **Idealized
+  `(g, H, Δρ/ρ)`** chosen so `√(gH)` is modest and the internal `L_d` is resolvable — **honest at rung 3**
+  (validates the *mechanism + growth rate*, not Earth jet speeds; the same "config-tuned, not Earth-
+  calibrated" honesty banked at rungs 1–2).
+- **The route is sound: the C-grid engine reproduces the analytic σ.** A linearized two-layer C-grid SSP-RK3
+  solver (mirroring `engines/fluid`'s discretization) integrating a single growing mode lands the measured
+  growth rate **within ~4 % of the analytic σ, monotonically converging with resolution** (5.2→4.1→3.8 % at
+  nx=32→64→128). The stacked-layer advection + coupled-pressure + Coriolis + SSP-RK3 all behave.
+
+**The A/B split (advisor — the same machinery-vs-emergent split as rungs 1 & 2):**
+- **Phase A = the linear baroclinic growth rate (tight, the current energy-conserving engine).** Extend
+  `engines/fluid` to **N layers** (the CONTRACT's promised leading-axis seam): layers couple *only* through
+  the Montgomery/Bernoulli pressure term (`P₁=g(h₁+h₂)`, `P₂=g(h₁+h₂)+g'h₂`); the vector-invariant momentum
+  generalizes per-layer; **single-layer `tracer=None` stays bit-for-bit** (the by-construction rung-0
+  reduction held every rung). Anchor: a small perturbation on a thermal-wind-balanced two-layer basic state
+  grows at the **analytic two-layer SW linear rate** (the spike's eigenvalue solver), within a few %. Clean
+  on the current engine (small amplitude, early time, before saturation).
+- **Phase B = the nonlinear saturated eddy field → THE HEADLINE PAYOFF (loose magnitude; needs
+  dissipation).** This is the staircase's long-promised closure: rung 1 found the eddy-flux→EBM "tight
+  reduction" **near-vacuous** (barotropic eddies ~1000× too weak, ~90 % reversible) and named that it
+  becomes "**non-vacuous only at rung 3 (a strong baroclinic flux)**." So Phase B integrates the unstable
+  two-layer flow to saturation and measures the **emergent, irreversible, down-gradient baroclinic eddy heat
+  flux** `⟨v'·(interface)'⟩` — now genuine — and re-runs the rung-1 reduction-to-EBM, expecting a
+  **non-vacuous `D_eff` near a realistic magnitude**. The energy-conserving engine has **no hyperviscosity /
+  no limiter** (the CONTRACT warns turbulent runs cascade enstrophy to the grid), so Phase B needs **(a)** a
+  long post-saturation run, **(b)** the named-but-unbuilt **hyperviscosity** dissipation operator, and
+  **(c)** the external-mode cost over many life cycles. Phase A's engine extension is designed to **leave
+  room for the Phase-B dissipation operator**.
+
+**Anchor classification (the triad, projected):** *tight* — the two-layer SW linear growth rate (eigenvalue
+solver, Poincaré-validated) reproduced by the engine within a few %; the single-layer bit-for-bit
+reduction. *real-but-loose (the unlock)* — the **emergent baroclinic eddy heat flux** + the now-non-vacuous
+reduction-to-EBM (Phase B; magnitude loose / config-tuned). *loose cross-check* — QG Phillips (most-unstable
+λ ~ L_d, cutoff, critical shear), rigid-lid-convergence-validated. **Held–Suarez is DEFERRED, not the
+rung-3 anchor** — it is a **3-D sphere primitive-equation** benchmark (Newtonian relaxation + Rayleigh
+friction → a statistically-steady storm track) that belongs at **rung 5** (the idealized GCM); naming it at
+rung 3 would over-reach a 2-layer β-plane laptop model. **Named walls / deferrals:** the **hyperviscosity**
+dissipation operator (Phase B's prerequisite; would break the energy-conserving symmetry — a deliberate
+CONTRACT non-goal now forced); the **rigid-lid / external-mode fork**; **rigid channel walls in y** (the
+classic baroclinic-lifecycle geometry — the spike used the doubly-periodic `l=0` mode to sidestep them, but
+the saturated nonlinear field may want a channel = the named BC extension); the **sphere** (rung 5).
+**Sources to pin at build** (the `[[…-source]]` discipline — extending `[[shallow-water-source]]`):
+baroclinic instability → **Phillips 1954 / Eady 1949 / Charney 1947**; the two-layer SW formulation →
+**Vallis 2017 (*AOFD*) / Cushman-Roisin & Beckers**; Held–Suarez (named-deferred) → **Held & Suarez 1994**.
+No code shipped yet — this entry is the **de-risked plan of record**; the engine extension (Phase A) is the
+first build increment.
+
 **Visualization rungs A/B/C — DECIDED to build all three (animated eddy flow; 2026-06-11;
 rungs A+B BUILT — A 2026-06-11, B 2026-06-12; C pending — build detail in §9.5).** A forward decision (user): animate the emergent eddy life cycle across three
 rising-cost **visualization** rungs (distinct from the §5 GCM staircase) — **A** a matplotlib
