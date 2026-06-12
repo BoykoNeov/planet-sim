@@ -64,6 +64,14 @@ references — weather, not climate). The rungs rise in cost, *fall* in pedagogi
   per frame (no colour-autoscale) + `redraw=True` on play/slider (force gl3d repaint) + a structural
   test pinning each frame's `surfacecolor`/`traces`/that-the-band-changes. Browser play-through is the
   ONE thing not headlessly self-verifiable (no kaleido) → handed to the user to eyeball.
+  **Post-eyeball polish (2026-06-12):** user confirmed the globe animates (a/b/c) but flagged the
+  flux panel + overlapping text. Fixed: the "κ diagnosed" annotation's hardcoded `xref="x2"/yref="y2"`
+  spawned a **phantom overlaid axis** (the xy subplot is on `x`/`y` — a 3-D scene consumes no cartesian
+  axis number), producing the double x-axis + collapsed ~33.2M y-range — re-anchored via `row/col`;
+  dropped the redundant "Throughput rages" annotation; **normalized the panel to a fraction of total
+  throughput** (throughput→1.0, net plateaus at ~`irr`) so it reads 0..1 not ~3e7 K·m; dropped the
+  floating `t=N` marker; reseated the legend. Also removed hover spike lines per the new standing
+  preference → [[no-pointer-spike-lines]].
 - **Rung C** = WebGL particle globe; vendor **mapbox/webgl-wind (ISC, GPU particles)** +
   **cambecc/earth (MIT, orthographic projection)** (licenses verified). webgl-wind is
   flat/equirectangular → needs a three.js sphere or a port of cambecc's projection. New

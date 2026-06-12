@@ -260,6 +260,10 @@ def test_render_builds_the_biome_globe():
     assert "Surface" in kinds                        # the painted scalar field
     assert "Scatter3d" in kinds                      # the ice-line annotation overlay
     assert isinstance(fig, go.Figure)
+    # standing preference: NO hover crosshair/spike lines tracking the pointer (3-D spikes default ON).
+    assert fig.layout.scene.xaxis.showspikes is False
+    assert fig.layout.scene.yaxis.showspikes is False
+    assert fig.layout.scene.zaxis.showspikes is False
     # geometry guard: the globe must be parametrized lat→rows / lon→cols (a lat/lon transpose renders
     # without error, so assert it explicitly). z = sin(lat): the first column tracks the grid latitudes.
     surface = next(t for t in fig.data if type(t).__name__ == "Surface")

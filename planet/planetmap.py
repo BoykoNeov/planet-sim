@@ -561,7 +561,10 @@ def render(view: PlanetView, active: str = "biome"):
 
     title = (f"Planet — {surface_layer.name} ({surface_layer.units})"
              if not surface_layer.style.get("categorical") else "Planet — biome map")
-    no_axis = dict(showbackground=False, showticklabels=False, showgrid=False, zeroline=False, visible=False)
+    # showspikes=False: no hover crosshair/projection lines tracking the pointer (3-D scene spikes
+    # default ON) — a standing preference across every visualization.
+    no_axis = dict(showbackground=False, showticklabels=False, showgrid=False, zeroline=False,
+                   visible=False, showspikes=False)
     fig = go.Figure(data=traces)
     fig.update_layout(
         title=title, width=820, height=720, margin=dict(l=0, r=0, t=40, b=0),
@@ -625,7 +628,10 @@ def render_comparison(view_a: PlanetView, view_b: PlanetView, view_delta: Planet
                 tr.name = f"{world} ice line"                 # which globe the line marks
             fig.add_trace(tr, row=row, col=col)
 
-    no_axis = dict(showbackground=False, showticklabels=False, showgrid=False, zeroline=False, visible=False)
+    # showspikes=False: no hover crosshair/projection lines tracking the pointer (3-D scene spikes
+    # default ON) — a standing preference across every visualization.
+    no_axis = dict(showbackground=False, showticklabels=False, showgrid=False, zeroline=False,
+                   visible=False, showspikes=False)
     scene = dict(xaxis=no_axis, yaxis=no_axis, zaxis=no_axis, aspectmode="data",
                  camera=dict(eye=dict(x=1.5, y=1.5, z=0.9)))
     fig.update_layout(title=f"Two worlds compared — {labels[0]} · {labels[1]} · Δ",

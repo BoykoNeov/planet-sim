@@ -198,7 +198,10 @@ def eddy_globe_figure(eddy, *, frame_ms: int = 120):
                          for k in range(fr.times.size)])
 
     irr = eddy.irreversible_fraction
-    no_axis = dict(showbackground=False, showticklabels=False, showgrid=False, zeroline=False, visible=False)
+    # showspikes=False kills the hover crosshair/projection lines that track the pointer (3-D scene spikes
+    # default ON) — a standing preference: no pointer-following spike lines on any visualization.
+    no_axis = dict(showbackground=False, showticklabels=False, showgrid=False, zeroline=False,
+                   visible=False, showspikes=False)
     fig.update_layout(
         title=dict(
             text="Planet §9.5 — the emergent eddy life cycle, on the globe<br>"
@@ -215,9 +218,9 @@ def eddy_globe_figure(eddy, *, frame_ms: int = 120):
         legend=dict(x=0.635, y=0.80, xanchor="left", yanchor="top", font=dict(size=10),
                     bgcolor="rgba(255,255,255,0.7)", bordercolor="#cccccc", borderwidth=1),
     )
-    fig.update_xaxes(title_text="release time (inertial periods)",
+    fig.update_xaxes(title_text="release time (inertial periods)", showspikes=False,
                      range=[float(fr.times[0]), float(fr.times[-1])], row=1, col=2)
-    fig.update_yaxes(title_text="cumulative transport (fraction of total throughput)",
+    fig.update_yaxes(title_text="cumulative transport (fraction of total throughput)", showspikes=False,
                      range=[0.0, ymax], row=1, col=2)
     # row/col resolves to the panel's real x/y axes — NOT a hardcoded "x2"/"y2", which would spawn a
     # phantom overlaid axis (the bug that produced the double x-axis + the collapsed 33.2M range).

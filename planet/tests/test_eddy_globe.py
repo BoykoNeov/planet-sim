@@ -112,6 +112,13 @@ def test_demo_eddy_globe_renders(tmp_path):
     assert not np.allclose(np.asarray(fig.frames[0].data[0].surfacecolor),
                            np.asarray(fig.frames[-1].data[0].surfacecolor))
 
+    # the standing preference: NO hover crosshair/spike lines tracking the pointer (3-D scene spikes
+    # default ON in plotly) — on the globe AND the 2-D flux panel.
+    assert fig.layout.scene.xaxis.showspikes is False
+    assert fig.layout.scene.yaxis.showspikes is False
+    assert fig.layout.scene.zaxis.showspikes is False
+    assert fig.layout.xaxis.showspikes is False and fig.layout.yaxis.showspikes is False
+
     # the two honesty edges are ON the figure, not just in the demo's prose.
     assert "reversible" in fig.layout.title.text              # the ~90%-reversible edge
     assert "band" in fig.layout.title.text.lower()            # the band-not-globe edge
