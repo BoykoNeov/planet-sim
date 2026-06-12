@@ -43,10 +43,19 @@ straight to one?
 ```powershell
 python -m planet snowball     # run one demo (prints its validation table + banks a figure)
 python -m planet list         # print the full catalogue of demos
+python -m planet interactive  # drag two knobs in your browser — a live what-if + plain-language "why"
 python -m planet notebook     # open the teaching notebook in JupyterLab (opens your browser for you)
 python -m planet globes       # just open a saved interactive globe — no compute
 python -m planet site         # build & open the landing page — a clickable gallery of everything
 ```
+
+**Turn a knob, build a climate — no install.** `python -m planet interactive` opens
+[`docs/interactive/index.html`](docs/interactive/index.html): drag the Sun and the greenhouse and the
+planet's temperature, polar ice, and bands of life respond instantly, with a plain-language
+explanation of *what changed and why* (`planet/explain.py`). It's a lookup over a precomputed grid of
+the real `planet.demo_biomes.compute` runs — instant, deterministic, and **self-contained** (the data
+is inlined, so it opens straight off disk and serves from GitHub Pages alike). Want continuous knobs,
+live re-runs, and the Snowball's two stable states? That lives in the notebook.
 
 **Browse it as a webpage.** `python -m planet site` (re)generates [`docs/index.html`](docs/index.html)
 — a self-contained, clickable gallery linking every demo figure, the three interactive globes, and
@@ -64,11 +73,11 @@ extra to install rather than erroring. The notebook also hosts the live-slider g
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow"     # routine fast lane — 254 tests
-./run_tests.ps1                   # full suite — 283 tests (adds slow live-solver + notebook)
+./run_tests.ps1 -m "not slow"     # routine fast lane — 269 tests
+./run_tests.ps1                   # full suite — 299 tests (adds slow live-solver + notebook)
 ```
 
-The suite is **283 tests**, all green. The one **live-climlab** cross-check needs the
+The suite is **299 tests**, all green. The one **live-climlab** cross-check needs the
 `[climate]` extra and otherwise skips — it is an opt-in bonus on top of the EBM's analytic +
 frozen-table validation, so it skips in CI by design. The Plotly map render smoke-tests need
 `[webviz]`; the planet-spec round-trip-identity test (the deep end's one real correctness

@@ -51,6 +51,13 @@ def test_rel_href_strips_docs_prefix():
     assert site._rel_href("docs/figures/planet-map.html") == "figures/planet-map.html"
 
 
+def test_interactive_what_if_is_linked():
+    """The headline no-install what-if must be linked with a relative (offline + Pages) href."""
+    page = site.build_index_html()
+    assert 'href="interactive/index.html"' in page
+    assert "what changed and why" in page.lower()
+
+
 def test_notebook_is_linked_not_run():
     """The notebook gets a GitHub-render link + the local command — never a fake in-page 'run'."""
     page = site.build_index_html()

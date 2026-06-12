@@ -7,6 +7,7 @@ menu to explore from — not a scavenger hunt across nine ``python -m planet.dem
 
     python -m planet                # interactive menu (pick a number or a name)
     python -m planet snowball       # run one demo straight off
+    python -m planet interactive    # drag two knobs in your browser — a live what-if + explanation
     python -m planet notebook       # open the teaching notebook in JupyterLab (opens the browser)
     python -m planet globes         # just open a saved interactive globe (no compute)
     python -m planet list           # print the catalogue and exit
@@ -213,6 +214,16 @@ def _build_and_open_site() -> None:
     _open_in_browser(path, "the planet-sim landing page")
 
 
+def _open_interactive() -> None:
+    """Open the no-install browser what-if. Opens the committed page; rebuilds only if it's missing
+    (the rebuild reruns the model over the knob grid — tens of seconds — so we don't force it)."""
+    from planet.interactive import APP_PATH, write_app   # local import: keeps start-up lean
+    if not APP_PATH.exists():
+        print("  building the interactive page (running the model over the knob grid — a moment)…")
+        write_app()
+    _open_in_browser(APP_PATH, "the interactive what-if — drag the knobs")
+
+
 def _run_all() -> None:
     """Run every demo in catalogue order (banks every figure). Never auto-opens — that'd be 9 tabs."""
     for demo in DEMOS:
@@ -236,6 +247,7 @@ def print_catalog() -> None:
         print(f"    {i:>2}  {demo.key:<13} {demo.title}  {_extras_tag(demo)}")
         print(f"        {demo.blurb}")
     print("\n  Open a saved result (no compute):")
+    print("     i  interactive   drag two knobs in your browser — a live what-if + explanation")
     print("     g  globes        open a banked interactive globe (biome / coupler / eddy)")
     print("     s  site          build & open the landing page (links to every demo & globe)")
     print("     n  notebook      open the teaching notebook in JupyterLab          [notebook]")
@@ -265,6 +277,8 @@ def _menu_loop() -> None:
             _launch_notebook()
         elif cmd in ("g", "globe", "globes"):
             _open_banked_globe()
+        elif cmd in ("i", "interactive", "whatif", "what-if"):
+            _open_interactive()
         elif cmd in ("s", "site", "page", "web"):
             _build_and_open_site()
         elif cmd.isdigit() and 1 <= int(cmd) <= len(DEMOS):
@@ -303,6 +317,8 @@ def _dispatch_one(token: str) -> int:
         _launch_notebook()
     elif tok in ("globes", "globe"):
         _open_banked_globe()
+    elif tok in ("interactive", "whatif", "what-if"):
+        _open_interactive()
     elif tok in ("site", "page", "web"):
         _build_and_open_site()
     elif tok in _BY_KEY:

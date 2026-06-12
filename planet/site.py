@@ -94,6 +94,20 @@ def _header() -> str:
 <main>"""
 
 
+def _interactive_hero() -> str:
+    """The headline call-to-action: the no-install browser what-if (docs/interactive/index.html)."""
+    return ('<section>\n  <h2>Turn a knob, build a climate</h2>\n'
+            '  <p class="sub">No install, no notebook — drag the Sun and the greenhouse and watch the '
+            'planet respond, with a plain-language explanation of <em>what changed and why</em>. '
+            'Every number is the real model.</p>\n'
+            '  <a class="globe" href="interactive/index.html" '
+            'style="display:block;max-width:42rem;text-decoration:none">\n'
+            '    <span class="orb">🛠</span>\n'
+            '    <span class="t">Build a climate — the interactive what-if</span>\n'
+            '    <span class="cta">Open it in your browser ↗</span>\n'
+            '  </a>\n</section>')
+
+
 def _hero_globes(demos: tuple[Demo, ...]) -> str:
     cards = []
     for d in demos:
@@ -212,6 +226,7 @@ def build_index_html(demos: tuple[Demo, ...] = DEMOS) -> str:
     return "\n".join([
         head,
         _header(),
+        _interactive_hero(),
         _hero_globes(demos),
         _gallery(demos),
         _notebook_section(),
