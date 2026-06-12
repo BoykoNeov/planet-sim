@@ -244,7 +244,11 @@ def print_catalog() -> None:
 def _menu_loop() -> None:
     print_catalog()
     while True:
-        raw = _read("planet> ")
+        try:
+            raw = _read("planet> ")
+        except KeyboardInterrupt:             # Ctrl-C at the prompt = quit cleanly, not a traceback
+            print("\n(quit)")
+            return
         if raw is None:                       # EOF (Ctrl-D / closed stdin)
             print()
             return

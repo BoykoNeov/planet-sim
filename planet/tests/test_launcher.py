@@ -77,3 +77,54 @@ def test_notebook_url_from_a_real_server_log_line():
 
 def test_notebook_url_ignores_non_server_lines():
     assert launcher._notebook_url_from_log("[I jupyterlab | extension was successfully linked.") is None
+
+
+# --- the interactive menu (the headline `python -m planet` surface) --------- #
+def test_menu_loop_dispatches_by_number_name_and_quits(monkeypatch):
+    """Drive _menu_loop with scripted input: a number, a name, the globe & notebook verbs, then quit."""
+    calls: list = []
+    inputs = iter(["1", "biomes", "g", "n", "q"])
+    monkeypatch.setattr(launcher, "_read", lambda prompt="": next(inputs))
+    monkeypatch.setattr(launcher, "_run_demo", lambda demo, offer_open: calls.append(("demo", demo.key)))
+    monkeypatch.setattr(launcher, "_open_banked_globe", lambda *a, **k: calls.append(("globes",)))
+    monkeypatch.setattr(launcher, "_launch_notebook", lambda: calls.append(("notebook",)))
+    launcher._menu_loop()
+    assert calls == [("demo", "snowball"), ("demo", "biomes"), ("globes",), ("notebook",)]
+
+
+def test_menu_loop_reports_bad_choice_then_continues(monkeypatch, capsys):
+    inputs = iter(["nope", "q"])
+    monkeypatch.setattr(launcher, "_read", lambda prompt="": next(inputs))
+    launcher._menu_loop()
+    assert "not a choice" in capsys.readouterr().out
+
+
+def test_menu_loop_survives_ctrl_c_at_prompt(monkeypatch):
+    """Ctrl-C at `planet>` must quit cleanly, not blow up the loop with a traceback."""
+    def interrupt(prompt=""):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(launcher, "_read", interrupt)
+    launcher._menu_loop()  # returns rather than raising
+
+
+@pytest.mark.parametrize("answer,default,expected", [
+    ("", True, True), ("", False, False),
+    ("y", False, True), ("yes", False, True),
+    ("n", True, False), ("no", True, False),
+])
+def test_prompt_yes_no(monkeypatch, answer, default, expected):
+    monkeypatch.setattr(launcher, "_read", lambda prompt="": answer)
+    assert launcher._prompt_yes_no("?", default=default) is expected
+
+
+def test_open_banked_globe_by_choice(monkeypatch):
+    opened: list = []
+    monkeypatch.setattr(launcher, "_open_in_browser", lambda path, label="": opened.append(path.name))
+    launcher._open_banked_globe("2")                       # 2 = the coupler globe
+    assert opened == ["planet-coupler-map.html"]
+
+
+def test_open_banked_globe_rejects_out_of_range(monkeypatch, capsys):
+    monkeypatch.setattr(launcher, "_open_in_browser", lambda *a, **k: pytest.fail("should not open"))
+    launcher._open_banked_globe("99")
+    assert "no such globe" in capsys.readouterr().out

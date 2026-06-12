@@ -56,11 +56,11 @@ extra to install rather than erroring. The notebook also hosts the live-slider g
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow"     # routine fast lane — 143 tests
-./run_tests.ps1                   # full suite — 167 tests (adds slow live-solver + notebook)
+./run_tests.ps1 -m "not slow"     # routine fast lane — 247 tests
+./run_tests.ps1                   # full suite — 276 tests (adds slow live-solver + notebook)
 ```
 
-The suite is **167 tests**, all green. The one **live-climlab** cross-check needs the
+The suite is **276 tests**, all green. The one **live-climlab** cross-check needs the
 `[climate]` extra and otherwise skips — it is an opt-in bonus on top of the EBM's analytic +
 frozen-table validation, so it skips in CI by design. The Plotly map render smoke-tests need
 `[webviz]`; the planet-spec round-trip-identity test (the deep end's one real correctness
