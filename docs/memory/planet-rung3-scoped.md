@@ -1,6 +1,6 @@
 ---
 name: planet-rung3-scoped
-description: "Planet rung 3 (vertical structure → baroclinic instability) — SCOPED + spike-validated 2026-06-12, NOT built. Minimal model = two-layer free-surface SW (Phillips). First STRUCTURAL engine edit + first compute wall. Tight anchor = the two-layer SW linear-stability eigenvalue solver (Poincaré-validated), NOT QG Phillips (loose cross-check). A/B split: Phase A linear growth rate / Phase B the nonlinear saturated eddy heat flux = the headline payoff (rung-1 reduction-to-EBM finally non-vacuous)."
+description: "Planet rung 3 (vertical structure → baroclinic instability) — Phase A BUILT 2026-06-12 (linear growth rate). N-layer SIBLING engine LayeredShallowWater + TwoLayerStability anchor; single-layer untouched → nl=1 reduction BYTE-IDENTICAL. Periodicity resolved (advisor): basic state enters as constant BACKGROUND COEFFICIENTS, fields are perturbations, full nonlinear engine default-off background. Engine σ matches the 6×6 dispersion matrix within ~4% converging. Phase B (saturated irreversible flux = the headline payoff) STILL the open bet, needs unbuilt hyperviscosity."
 metadata:
   node_type: memory
   type: project
@@ -8,11 +8,69 @@ metadata:
 ---
 
 Planet **rung 3** (vertical structure → **baroclinic instability** = real storms, the §5 staircase's
-biggest jump). **SCOPED + de-risked spike-first 2026-06-12, NOT built** — this is the *de-risked plan of
-record*. Full plan `docs/plans/planet-earth-system.md` §10 "Rung 3 — SCOPED". Continues
+biggest jump). **PHASE A BUILT 2026-06-12** (the linear growth rate); the scoping below remains the plan of
+record for Phase B. Full plan `docs/plans/planet-earth-system.md` §10. Continues
 [[planet-rung1-two-way-coupler]] (which named the payoff: the eddy-flux→EBM reduction is "non-vacuous only
 at rung 3"). Advisor-pressure-tested (3 load-bearing refinements) + spike (`outputs/rung3_baroclinic_spike.py`,
 gitignored) that answered all three risks BEFORE any build.
+
+**PHASE A BUILT 2026-06-12 — `engines/fluid/layered.py` (`LayeredShallowWater` + `LayeredState` +
+`ThermalWindBackground`) + `engines/fluid/stability.py` (`TwoLayerStability`), 22 tests
+(`test_layered.py`/`test_stability.py`).** Headline: a full nonlinear N-layer vector-invariant C-grid
+SSP-RK3 engine whose unstable two-layer mode **grows at the analytic linear rate within ~4%, converging
+with resolution** (5.4→4.2→3.9% at nx 32→64→128, matching the spike's 5.2→4.1→3.8%). **THE ARCHITECTURE
+FORK (advisor): a SIBLING engine, `ShallowWater`/`SWState` left UNTOUCHED — NOT an in-place restructure of
+`SWState`.** Reason: the single-layer tests are all loose (`rel=2e-3`), so a shared-kernel refactor that
+shifted the trajectory a few ULP would pass SILENTLY → no byte-exact guard; untouched = zero-risk AND makes
+the `nl=1` reduction a *meaningful cross-engine* check, not a near-vacuous same-kernel one. Duplicate the
+~25-line C-grid stencil vectorized over a **leading layer axis** (`np.roll` on `axis=-1/-2`); the **only**
+inter-layer coupling is the **Montgomery pressure stack** (`M₀=g·η_top`, `M_k=M_{k-1}+g'_k·η_{k-1}`). The
+**single-layer reduction is BYTE-IDENTICAL** (`np.array_equal`, max|Δh|=0.0 over 60 steps incl. topography)
+— `M₁=g(h_b+h)` is IEEE-bit-commutative with the single-layer Bernoulli pressure, a length-1 leading axis is
+the same float ops.
+
+**THE PERIODICITY RESOLUTION (advisor, the one load-bearing blocker — was: nonlinear engine vs the
+thermal-wind basic state that breaks y-periodicity).** A doubly-periodic domain **categorically cannot carry
+a uniform meridional gradient as a field** (it seams at the wrap — physics, not an engine limit). So the
+unstable basic state `(U_k, G_k)` enters as **constant BACKGROUND COEFFICIENTS** (Doppler `−U_k ∂_x` +
+baroclinic `−G_k v'` in continuity), with the **prognostic fields being the PERTURBATIONS** — exactly the
+spike's `TwoLayerLinear`. **NOT "linearized instead of nonlinear":** the engine is the FULL nonlinear
+vector-invariant solver with an **optional, default-off** `background`; `background=None` → plain nonlinear
+→ the bit-for-bit reduction; `background` set → the spike's linear terms PLUS the engine's O(ε²) eddy-eddy
+nonlinearity (grows at the linear rate at ε~1e-3 = Phase A; saturates at large ε = Phase B). This "fixed
+mean shear + prognostic eddies on a doubly-periodic plane" is *the* standard two-layer geostrophic-turbulence
+setup (Held–Larichev/Salmon) = **the exact substrate Phase B needs** (the background feature is in-scope, not
+a Phase-A hack). `thermal_wind(U)` derives `G` so the engine injects exactly the `G_k` the analytic rate
+assumes (pinned: `bg.G == TwoLayerStability.basic_state_gradients`). f-PLANE only (β=0, matching the f-plane
+operator; finite critical shear = the named β-capable extension).
+
+**THE ANCHOR — `TwoLayerStability` (ported from the spike, first-principles validated as tests).** Roots the
+**6×6 dispersion matrix** built from the linearized eqs. Self-validation pinned: zero-shear **neutral to
+machine precision** (`max|Im ω|≈3e-20`); **recovers BOTH two-layer Poincaré dispersions** (external
+`√(gH_tot)`, internal `√(g'H_e)`) — but only to **~0.2% (free-surface coupling, NOT exact** → assert
+`rel=1e-2`; the spike *printed* these side-by-side, never asserted tight equality; the decisive exact check
+is the neutrality); **short-wave cutoff** (`K²=2F`); **Eady coefficient 0.304 vs 0.310** — *load-bearing
+gotcha: use the LAYER-depth radius `L_d=√(g'H₁)/f₀`, NOT the equivalent-depth `√(g'H_e)/f₀`* (the latter gives
+0.215 — `Ld_int` on the class is the gravity-wave radius, a DIFFERENT quantity); **f-plane no-critical-shear**
+(σ/U_s ≈ const). The ENGINE also reproduces both two-layer Poincaré dispersions to 0.06%/0.01% (the tight
+Montgomery-coupling check) — these + the growth test are `@pytest.mark.slow` (the external-mode CFL = the
+first compute wall; ~3–13s each).
+
+**Two gotchas BANKED (advisor):** (1) conservation tests **only** on the `background=None` path — a background
+extracts APE so perturbation energy *grows* (that IS the signal), and per-layer mass `∫h_k` is machine-exact
+only there (the `−G_k v'` source breaks it when `∫v≠0`; the `l=0` mode has `∫v=0`). (2) **no passive tracer**
+in the layered engine — the interface displacement IS the buoyancy now (the leap past the rung-1 *passive*
+tracer). **Gate: full fast lane 295 passed; the standalone repo has NO `tools/`/`GATES` import-drift guard
+(it stayed in the BigSim monorepo) → the "full-repo gate" here = the whole pytest suite.**
+
+**PHASE B IS STILL THE OPEN BET (unchanged by Phase A — exactly the advisor's done-check hedge).** Phase A
+de-risked BUILDABILITY (textbook-guaranteed) at high confidence; it moves the *quantitative payoff* risk
+**zero**. The saturated, irreversible, down-gradient baroclinic eddy heat flux `⟨v'·interface'⟩` at a
+**realistic magnitude → the rung-1 reduction-to-EBM finally non-vacuous** is untouched, and is exactly the
+claim class downgraded@rung1 / overturned@rung2. Needs the **named-but-unbuilt hyperviscosity** (a turbulent
+layered run cascades enstrophy to the grid — the inherited no-limiter behaviour, now load-bearing), long
+post-saturation runs, + the external-mode cost over many cycles. The Phase-A RHS is structured to leave room
+for that dissipation operator.
 
 **The model (the fork, settled): a two-layer free-surface shallow-water model (Phillips 1954).** A single
 layer **categorically cannot** be baroclinically unstable (no available potential energy, no vertical

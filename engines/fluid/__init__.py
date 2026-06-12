@@ -13,5 +13,21 @@ from .shallowwater import (
     SWState,
     uniform_grid,
 )
+from .layered import (
+    LayeredShallowWater,
+    LayeredState,
+    ThermalWindBackground,
+)
+from .stability import TwoLayerStability
 
-__all__ = ["Grid2D", "ShallowWater", "SWState", "uniform_grid"]
+__all__ = [
+    "Grid2D",
+    "ShallowWater",
+    "SWState",
+    "uniform_grid",
+    # N-layer baroclinic extension (rung 3)
+    "LayeredShallowWater",
+    "LayeredState",
+    "ThermalWindBackground",
+    "TwoLayerStability",
+]

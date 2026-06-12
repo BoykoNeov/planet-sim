@@ -1,8 +1,9 @@
 # `engines.fluid` — 2-D rotating shallow-water solver — CONTRACT
 
 > **Status: LIVING CONTRACT — versioned; the test suite *is* the contract.** Built
-> in Planet Phase 3, extended for the GCM climb (the advected tracer, rung 1 — see
-> below + the Changelog). Guarded by its passing validation suite
+> in Planet Phase 3, extended for the GCM climb (the advected tracer, rung 1; **N vertical
+> layers → baroclinic instability, rung 3** — see below + the Changelog). Guarded by its passing
+> validation suite
 > (`engines/fluid/tests/`, run via `./run_tests.ps1`); this one page is the unit of
 > context downstream code loads — Planet's circulation coupler and the documented
 > GCM climb depend on *this*, never on `planet/` internals. **Extend it directly
@@ -86,6 +87,42 @@ sw.gravity_wave_speed           # √(gH);   sw.rossby_radius  √(gH)/|f0|
   stability promise — here *conditional*, so enforced). A set **`tracer`** is advected as a
   **passive** scalar (below); `tracer=None` runs the dry dynamics bit-for-bit.
 
+### N-layer baroclinic API (rung 3 — the leading-axis seam, built)
+
+A **sibling** engine for the vertical structure that single-layer SW categorically cannot carry
+(no APE, no shear ⇒ no baroclinic instability). The single-layer `ShallowWater`/`SWState` are
+**untouched** — existing consumers are unaffected.
+
+```python
+from engines.fluid import (LayeredShallowWater, LayeredState,
+                           ThermalWindBackground, TwoLayerStability)
+
+lay = LayeredShallowWater(grid, g, mean_depth, reduced_gravities,   # mean_depth: per-layer H_k (len nl)
+                          f0=0.0, beta=0.0, y_ref=None, bottom=None, #  reduced_gravities: nl-1 internal g'_k
+                          background=None)                           #  default-off basic state
+bg    = lay.thermal_wind([U0, U1, ...])         # per-layer mean zonal flow → ThermalWindBackground(U, G)
+state = LayeredState(h, u, v)                    # stacked (nl, ny, nx) arrays, layer 0 = top
+state = lay.step(state, dt)                       # one SSP-RK3 step; layers couple ONLY via Montgomery pressure
+dt    = lay.max_dt(state, safety=0.3)             # CFL on the fast EXTERNAL wave √(g·H_tot)
+
+lay.layer_mass(state)            # ∫h_k dA per layer — machine-precision conserved (background=None)
+lay.perturbation_energy(state)   # Σ_k ∫(u²+v²+h'²) dA — the linear-growth diagnostic (grows as e^{2σt})
+lay.stability()                  # the matching TwoLayerStability analytic operator (nl==2)
+TwoLayerStability(f0,g,gp,H1,H2).growth_rate(k, l, Us)   # σ = max Im ω from the 6×6 dispersion matrix
+```
+
+- **Leading layer axis.** `LayeredState` stacks the same C-grid fields with a leading axis
+  `(nl, ny, nx)` — the GCM-climb seam, *not* a new per-step boundary. `h` is the **total**
+  thickness `H_k + h'`; with a `background`, `(u, v)` are the **perturbation** velocities (the
+  mean `U_k` rides in the engine's Doppler coefficient, not the field).
+- **Coupling is pressure-only.** Per-layer stencils are *identical* to the single-layer engine
+  (vectorized over the layer axis); the only inter-layer term is the **Montgomery pressure stack**
+  `M₀ = g·η_top`, `M_k = M_{k-1} + g'_k·η_{k-1}`.
+- **The background is default-off** and injects an unstable thermal-wind basic state as **constant
+  coefficients** (a doubly-periodic domain cannot carry a meridional gradient *as a field*): a
+  Doppler `−U_k ∂_x` and a baroclinic `−G_k v'` in continuity, with the prognostic fields the
+  perturbations. `None` → the plain nonlinear dynamics (and the bit-for-bit single-layer reduction).
+
 ### The stable data boundary (ADR 0001)
 
 `state` is an `SWState` of plain 2-D arrays — and only it crosses the per-step boundary:
@@ -102,9 +139,14 @@ extension (rung 3 — baroclinic), and an **advected tracer** (a temperature/moi
 for rungs 1–2) is one more field. The **tracer is built (rung 1):** when `state.tracer` is
 set, `step` advects the tracer mass `h·θ` in flux form (conserving `∫hθ` to machine
 precision), strictly **passively** — no back-reaction on `(h, u, v)` (an *active* buoyancy
-tracer feeding `h` would be a different reduced-gravity / two-layer model). **N vertical
-layers** remain a named, unbuilt extension. Adding either is a contract *extension* that does
-not change the per-step array boundary (ADR 0005 — engines are living contracts).
+tracer feeding `h` would be a different reduced-gravity / two-layer model). **N vertical layers
+are built (rung 3, Phase A):** the sibling `LayeredShallowWater` stacks the fields on a leading
+layer axis, coupled *only* through the Montgomery pressure, with the **interface displacement now
+the active dynamical buoyancy** (the leap past the *passive* tracer — exactly the "active buoyancy
+tracer feeding `h` = a two-layer model" this contract named). The single-layer engine is left
+untouched (it is a sibling), so the `nl=1` reduction is byte-identical and existing consumers are
+unaffected. Adding either is a contract *extension* that does not change the per-step array
+boundary (ADR 0005 — engines are living contracts).
 
 ## Guaranteed invariants (what the test suite enforces — = the contract)
 
@@ -136,6 +178,18 @@ not change the per-step array boundary (ADR 0005 — engines are living contract
    a near-invariant held to a small, **bounded** drift (the enstrophy honesty class — round-off for
    smooth fields, cascading toward the grid only under strong filamentation) — **not** monotone
    (no flux limiter → over/undershoot on sharp gradients).
+8. **N-layer baroclinic (rung 3, Phase A): the linear growth rate + the byte-identical reduction**
+   (`test_layered.py`, `test_stability.py`). The single-layer reduction (`nl=1`, no background) is
+   **`np.array_equal`** to `ShallowWater` over many steps (the by-construction rung-0 reduction; the
+   single-layer engine is untouched, so this is a *meaningful cross-engine* check). Per-layer mass
+   `∫h_k` is **machine-precision** conserved on the `background=None` path (flux-form telescoping).
+   The **tight anchor**: with a supercritical thermal-wind background, a small `l=0` perturbation at
+   the analytic most-unstable wavenumber grows at the **two-layer SW linear rate** — `σ = max Im ω`
+   from the 6×6 dispersion matrix (`TwoLayerStability`, itself validated by zero-shear neutrality to
+   machine precision, two-layer Poincaré recovery, the Eady coefficient `≈0.31`, and the f-plane
+   no-critical-shear law) — within **a few %, converging with resolution** (slow). The two-layer
+   **Poincaré dispersions** (external `√(gH_tot)`, internal `√(g'H_e)`) are reproduced too (slow) —
+   the tight check on the Montgomery coupling.
 
 ## Validation boundary (what Phase 3 does *not* claim)
 
@@ -155,17 +209,31 @@ not change the per-step array boundary (ADR 0005 — engines are living contract
   energy-conserving symmetry — a deliberate non-goal).
 - The *physical constants* (`g, H, f₀, β`, planetary values) are the **consumer's** to supply
   and validate (Planet `circulation.py`, against geostrophic balance + the jet benchmark).
+- **N-layer Phase A is the *linear* growth rate, not the saturated flux.** `LayeredShallowWater`
+  validates that baroclinic instability **exists and grows at the analytic rate** at small
+  amplitude. The **saturated, irreversible eddy heat flux** (Phase B — the headline payoff: the
+  rung-1 reduction-to-EBM made non-vacuous) is **not** claimed here: it needs the named-but-unbuilt
+  **hyperviscosity** (a turbulent layered run cascades enstrophy to the grid — the inherited
+  no-limiter behaviour, now load-bearing) and long post-saturation integrations. The background
+  basic state is **f-plane** (`β=0`, matching the f-plane stability operator); a *finite* critical
+  shear needs a β-capable PV-gradient treatment (named, not built). The layered engine carries **no
+  passive tracer** (the interface displacement *is* the buoyancy at this rung) and is **not**
+  energy-conserving *with a background* (it extracts APE — that growth is the signal). The free
+  surface's fast **external** mode `√(g·H_tot)` sets the explicit step (the named compute cost; the
+  rigid-lid elliptic-solve fork is the named within-rung upgrade).
 
 ## Units & scope
 
 - **SI throughout** (`h, H` m; `u, v` m/s; `g` m/s²; `f₀` 1/s; `β` 1/(m·s); time s).
-- **v1 scope (named rungs on the §5 staircase, not built):** single layer (dry — no
-  thermodynamic variable, *the* fact making Phase-4 coupling one-way); **doubly-periodic
-  β-plane** (rigid channel walls in y are a named BC extension); **explicit** (CFL-limited);
-  no vertical structure (multi-layer = rung 3); a **passive** scalar tracer *is* advected
-  (rung 1, built) but there is no **active/moist** thermodynamics (the tracer does not feed
-  back); no sphere (rung 5 — the pole problem). The `SWState` array boundary is the seam where
-  each is slotted without touching consumers.
+- **Scope (named rungs on the §5 staircase):** the single-layer engine is dry (no thermodynamic
+  variable — *the* fact making Phase-4 coupling one-way); a **passive** scalar tracer *is* advected
+  (rung 1, built); **vertical structure is built** as the sibling `LayeredShallowWater` (rung 3,
+  Phase A — *active* buoyancy via the interface displacement), with the **saturated eddy flux**
+  (Phase B) and **hyperviscosity** named-but-unbuilt. Still unbuilt: **rigid channel walls in y**
+  (the classic baroclinic-lifecycle geometry — both engines are doubly-periodic β-plane; the layered
+  growth test uses the `l=0` mode to sidestep them), the **rigid-lid / external-mode** fork, and the
+  **sphere** (rung 5 — the pole problem). The stacked-field array boundary is the seam where each is
+  slotted without touching consumers.
 
 ## Changelog
 
@@ -175,3 +243,11 @@ not change the per-step array boundary (ADR 0005 — engines are living contract
   advects `h·θ` through the same SSP-RK3, with `tracer_mass` / `tracer_variance` diagnostics and
   `test_tracer.py`. Additive — dry dynamics bit-for-bit unchanged; `step` no longer raises on a set
   tracer.
+- **2026-06-12 — rung 3, Phase A (baroclinic).** Added the **N-layer** sibling engine
+  `LayeredShallowWater` + `LayeredState` (`layered.py`) and the analytic anchor `TwoLayerStability`
+  (`stability.py`), with `test_layered.py` / `test_stability.py`. Layers couple **only** through the
+  Montgomery pressure; an optional default-off thermal-wind `background` injects the unstable basic
+  state as Doppler `−U_k∂_x` + baroclinic `−G_k v'` coefficients. The single-layer `ShallowWater` /
+  `SWState` are **untouched** (sibling design), so the `nl=1` reduction is **byte-identical**. Phase A
+  validates the **linear growth rate** against the 6×6 dispersion matrix; the saturated Phase-B eddy
+  flux + hyperviscosity are named-but-unbuilt (above).
