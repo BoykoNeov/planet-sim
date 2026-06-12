@@ -1232,3 +1232,129 @@ spectrum-as-albedo-modifier knob, a **`[[obliquity-insolation-source]]`** for th
 daily-mean-insolation formula — Hartmann *GPC* §2.7 / Berger 1978 / Rose's climlab notes — and the
 mean-annual Legendre context, Nadeau & McGehee 2017 / North 1975), and (rung 4) a radiative-transfer
 source if spectral radiation is ever computed rather than parameterized.
+
+## 11. Spin-out roadmap — the editable-ocean GPU project (born here, across a contract seam)
+
+**The decision (recorded, not yet acted on).** A *separate* future project — an **editable land/ocean
+world with 3-D GPU visualization**, driven by a real ocean engine (**ClimaOcean.jl**) — is **born from
+this repo across a documented contract seam**, *not* built inside it and *not* cold-started. Rejected:
+*stay-within* (planet-sim stays Python/pedagogical/atmosphere-only — a different language, stack, and
+audience) and *cold-start* (throws away the emergent atmosphere this repo already produces). The spin-out
+is a **consumer** of planet-sim's output, the same "consume-don't-vendor" relationship planet-sim has with
+its shared `engines/` — the seam is the product boundary, the language boundary (Python ↔ Julia), **and**
+the physical boundary (atmosphere ↔ ocean), all the same line.
+
+**The collapsed-seam insight (why this is cheap).** ClimaOcean runs the ocean + sea-ice with the
+**atmosphere *prescribed* as forcing** (its default is the JRA55 reanalysis). planet-sim **is** an
+atmosphere — EBM temperature + the emergent shallow-water jet + rung-2 moisture/`P−E`. So the spin-out's
+one-way coupling is a **substitution**: *planet-sim's emergent atmosphere replaces JRA55.* One-way coupling
+this way needs **neither ClimaAtmos nor ClimaCoupler** — only ClimaOcean. ClimaCoupler (the full coupled-ESM
+orchestrator) is owed **only** for the deferred two-way loop (S5). The GPU-native 3-D path on the Julia side
+is **Makie.jl** (GL/WGL) — the synergistic renderer the new repo gets for free in its own language; on the
+planet-sim side the same fields render through the §9.5 globe stack already built.
+
+**The honesty ceiling (carried from the staircase, hardened here).** A custom world's ocean output **cannot
+be validated** — there is no observation of a planet that doesn't exist. So Earth is the **only** anchor:
+ECCO (below) is the ocean's `[[ebm-radiation-source]]`-class ground truth. The discipline is **anchor on
+Earth, then trust the delta** for edited worlds — *honest-by-construction* on Earth, *honest-by-disclosure*
+off it (the §9.5 Rung C carve-out, now load-bearing for an entire project). And it is **not real-time** for
+a custom world (the expensive engine is the truth; a cheap learned emulator for instant editing is a named,
+deferred layer, not in this roadmap).
+
+### 11.1 The two seams — do not fuse them
+
+The single most important correction baked into this roadmap (advisor-caught): "the seam" is **two** seams,
+in opposite directions. Conflating them silently drops the atmosphere→ocean forcing direction, which is the
+actual engine-coupling value of the whole spin-out.
+
+| | **Viz / output seam** | **Forcing / input seam** |
+|---|---|---|
+| **Direction** | model → screen | atmosphere → ocean engine |
+| **Payload** | grid + `(u,v)` **velocity** + scalar + frames + **coverage-extent** + **provenance/honesty label** | wind **stress** + surface heat-flux components + `P−E` (+ optional SST-restoring) |
+| **Purpose** | *display* a field | *drive* an ocean |
+| **Consumer** | a renderer (§9.5 globe; Makie; the Rung C showcase) | ClimaOcean's forcing API |
+| **Where designed** | **in planet-sim, now** (§9.3/§9.5 — already mostly built) | **at the boundary, later** — once ClimaOcean's input API is *seen*, not guessed |
+| **Status** | the near-term planet-sim work (R1) | the spin-out's first physics deliverable (S2/S4) |
+
+They share a backbone — *pin a schema, not a format* (§9.3): one schema, two encodings (**JSON + `.npz`**
+browser-friendly, **NetCDF** Julia/ClimaOcean-friendly), with `import(export(s)) == s` round-trip-identity
+as the real correctness test — but they carry different physical quantities for different ends, and the
+forcing seam is **deliberately not designed until ClimaOcean's API is known** (designing an input contract
+against an unseen API is the classic over-fit). Note: **neither ECCO-ingest nor ClimaOcean-vs-ECCO validation
+needs the forcing seam at all** — those run on JRA55. The forcing seam only goes live at S4.
+
+### 11.2 planet-sim rungs — before & at the seam (R1–R3, with Rung C in parallel)
+
+These finish *in this repo*, and bank the viz/output seam so the spin-out has something stable to consume.
+planet-sim stays **atmosphere-only** throughout — it never ships an ocean visual.
+
+- **R1 — materialize & serialize the viz contract (this is what the spin-out binds on).** Today the
+  circulation field is *computed-then-viewed* (§9.1 `vector_overlay`, the Phase-4 jet) — R1 **serializes**
+  it: pin the §9.3 planet-spec schema to carry a **vector-field layer** (grid + `(u,v)` + scalar + frames +
+  coverage-extent + provenance), in both encodings, with the **round-trip-identity test** extended to cover
+  it. The decisive move: **add a second, *synthetic global-coverage* producer** and read **both** the real
+  eddy band **and** the synthetic field back through the **already-built Rung B renderer** (`eddy_globe.py`)
+  — proving **producer-agnosticism** (the renderer/serialization does not care *what* generated the field).
+  *Producer-agnosticism is the exact property ClimaOcean later relies on* — an ocean engine's `(u,v)` + SST
+  flows through the same contract as the eddy band. **Not** Rung C — this rung — is what the spin-out depends
+  on. *Retarget-when-done:* the serialized schema's shape is the first input to S1's ECCO ingest; revisit it
+  after seeing a real ocean field's dimensions.
+- **R2 — toolkit promotion (§9.4 rule-of-three, the natural co-rung).** With the frame side-channel, the
+  flow-globe renderer, and the serialization now serving a **third** consumer (the synthetic producer / the
+  spin-out), the rule-of-three is met: promote the viz+serialization machinery to a documented, shared
+  contract. *Retarget-when-done:* whatever the promotion reveals as "still planet-specific" is a candidate
+  cut before the seam freezes.
+- **R-parallel — Rung C (the three.js/WebGL particle showcase), OFF the critical path.** Rung C proves
+  **renderer-agnosticism** (a *different* axis from R1's producer-agnosticism) and is the immersive
+  *honest-by-disclosure* showcase. It is a planet-sim viz deliverable (§9.5) that **does not gate the
+  spin-out** — it can land during or after R1–R3. If it slips, the split still proceeds.
+- **R3 — bank planet-sim (the clean hand-off).** The atmosphere-only capstone: the viz/output seam is
+  documented + tested, the schema is round-trip-pinned, Rung C ideally landed. This is the point at which the
+  new repo is worth starting — *not before R1 is banked.*
+
+### 11.3 The spin-out repo — after the split (S1–S5)
+
+Numbered by *logical grouping*; the **execution order** has S3 teach the API that S2 needs, so it runs
+**S1, then S3 → S2 → S4**, then decide S5.
+
+- **S1 — ECCO ingest + viz, pure Python (the new repo's first rung; no Julia engine yet).** Ingest the
+  **ECCO** ocean state estimate and render it as a globe (the *Perpetual-Ocean* visual) through the viz
+  seam. **Dual role, which is why it earns its own rung:** (i) a striking **real-data** deliverable that
+  stands up the data pipeline cheaply, and (ii) the **validation anchor** for S3. Independent of all the
+  Julia work. *Retarget-when-done:* the ECCO field's real dimensions/coverage retarget the viz-seam schema
+  inherited from R1.
+- **S2 — design the forcing/input seam (NetCDF encoding, at the boundary).** The atmosphere→ocean contract:
+  wind stress + heat-flux components + `P−E` (+ optional SST-restoring), encoded as NetCDF (the Julia-friendly
+  encoding of the §9.3 schema). **Designed against ClimaOcean's *seen* input API** — which is why it follows,
+  not precedes, S3. *Retarget-when-done:* the seam shape is provisional until a real ClimaOcean run accepts it.
+- **S3 — ocean-1: ClimaOcean + JRA55, validated against ECCO (no planet-sim seam).** Stand up ClimaOcean on
+  its default JRA55 forcing and **reproduce ECCO** — the Earth anchor, and the rung where ClimaOcean's input
+  API is *learned* (the knowledge S2 consumes). Runs entirely on JRA55; the planet-sim forcing seam is **not
+  involved** here. *Retarget-when-done:* the validation gap (where ClimaOcean+JRA55 misses ECCO) sets the
+  honesty floor for every custom-world claim downstream.
+- **S4 — swap JRA55 → planet-sim's emergent atmosphere (the forcing seam goes live; the payoff).** Replace
+  JRA55 with planet-sim's EBM+jet+moisture forcing through the S2 seam; the ocean response flows **back**
+  through the viz seam to the renderer. This is the actual engine-coupling win: *an edited world's emergent
+  atmosphere drives a GPU ocean, rendered in 3-D.* Honest-by-disclosure off Earth. *Retarget-when-done:* the
+  realism of the driven ocean retargets whether S5 is worth its weight.
+- **S5 — DEFERRED decision point: ocean-2, two-way loop closure (ClimaCoupler territory).** Feed ocean SST
+  **back** into planet-sim — which closes rung-2's *faked* evaporation `E` (the prescribed `P−E` whose honest
+  `E` the staircase never had). This is where **ClimaCoupler** finally earns its place. **Reassess here**,
+  with real ClimaOcean experience in hand, before committing — the roadmap deliberately *stops* and re-plans
+  at this gate.
+
+### 11.4 The settled fork & the living-staircase rule (the user's caveat, made the framing principle)
+
+**One fork, settled: ECCO-ingest lives in the *new* repo as S1** (planet-sim stays atmosphere-only). The
+alternative — ECCO as planet-sim's last rung, to de-risk against real data *before* the split — stays named,
+because (per the rule below) even settled forks can be retargeted.
+
+**The rule (the user's caveat, 2026-06-12): every rung is provisional until the previous one lands.** This
+is not a frozen waterfall — it is the **same living-contract discipline the rest of this plan runs on**
+(engines are living contracts / ADR 0005; spike-first de-risking; "a trade, not a win"; anchor-then-trust-
+delta). Each rung above carries a **`Retarget-when-done`** note precisely because its successor's *target*
+is expected to move once the predecessor's real output is in hand: R1's serialized schema is re-judged
+against S1's real ECCO dimensions; S2's forcing seam is provisional until an S3 run accepts it; S5 is
+re-planned from scratch after S4. **Plan the next rung concretely, hold the rung after it loosely**, and
+**revalidate the whole chain at each landing** — the staircase is climbed one validated step at a time, with
+the banister redrawn after every step.
