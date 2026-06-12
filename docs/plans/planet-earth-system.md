@@ -1179,8 +1179,74 @@ full emergent `P` field forces an unphysical evaporation pattern, see below):
    *benchmark (loose)* — equatorial export + extratropical convergence (the named extratropical-only
    trade). **Deferred:** ITCZ/Hadley (mean circulation); the resolved storm-track precip *pattern* (rung
    3, the vertical, spike-confirmed); the full MSE-diffusing moist EBM where `T` responds (**rung 2.5** —
-   re-opens the `(A,B,D)` calibration). Tests: `planet/tests/test_moist.py` (15, all **fast**); full
-   planet gate **179 passed, 1 skip**. No engine edit; `uses` unchanged.
+   re-opens the `(A,B,D)` calibration — **now BUILT, see below; refined to D-only**). Tests:
+   `planet/tests/test_moist.py` (15, all **fast**); full planet gate **179 passed, 1 skip**. No engine
+   edit; `uses` unchanged.
+
+**Rung 2.5 — BUILT (the MSE-diffusing moist EBM where `T` responds; `planet/moist_ebm.py`, 2026-06-12).**
+The named step up from rung-2 Phase A: rung 2 added moisture as a **pure diagnostic** that never touched
+the `T`-equation; rung 2.5's whole point is that **`T` itself responds**, so the headline is an *emergent
+climate response* the diagnostic could not produce — **polar-amplified warming** (Hwang & Frierson 2010;
+Flannery 1984; Siler–Roe–Armour 2018). It is a **separate model alongside rung-0, NOT a replacement** (the
+dry EBM stays the default; this is the opt-in moist sibling, as circ-informed precip and the
+energy-constrained rate were). Built **spike-first** (`outputs/rung25_moist_ebm_spike.py`, gitignored) and
+advisor-pressure-tested — **the advisor caught a load-bearing math error and added the attribution
+backbone** (recorded below).
+- **The mechanism.** A moist atmosphere diffuses **moist static energy** `m = c_pT + L·q`, `q=RH·q_sat(T)`;
+  in temperature-equivalent units this is a **temperature** diffusion with a *moisture-amplified*
+  effective coefficient `D_eff(T) = D_s·(1 + β(T))`, `β = (L/c_p)·RH·dq_sat/dT`
+  (`moisture_amplification`). Because C–C `q_sat` is steep, **β is large in the warm tropics and ≈0 at
+  the cold pole** (Earth: `D_eff` ~1.3 equator → ~0.35 pole). As the climate warms the *tropical* β grows
+  fastest → tropics export more heat poleward → **poles warm more than the tropics**, emergent from
+  moisture alone (no ice-albedo feedback, no change in `D_s`). The dry EBM (constant `D`) warms **exactly
+  uniformly** under a uniform forcing — the clean null.
+- **THE ADVISOR'S MATH CATCH (load-bearing).** `D_eff` must sit **INSIDE** the flux divergence
+  `∂/∂x[(1−x²)·D_eff·∂T/∂x]`, not outside (`D_eff·∂/∂x[…]`) — the cross-term `(1−x²)(∂D_eff/∂x)(∂T/∂x)`
+  is the *same order* as the main term and is *literally where part of the PA mechanism lives*; the
+  outside form also breaks energy conservation. **`ebm.py` already places the callable `D(x)` inside** (the
+  rung-1 array-`D` path), so the design passes `D_eff` as that callable and lets the engine place it
+  (spike-confirmed at machine precision via conservation + a direct operator match).
+- **Design (5th reuse of the diffusion spine).** The moist climate is **one nonlinear relaxation**, not
+  nested solves: each Strang substep **freezes `D_eff` at the current `T`** and rebuilds the conservative
+  transport operator — the **identical idiom the ice-albedo `α(T)` already uses** in
+  `ebm.equilibrate` (a state-dependent coefficient re-frozen each substep). **Self-contained — does NOT
+  modify `ebm.py`** (the validated rung-0 hot path untouched; the ~one duplicated radiation helper is the
+  correct price). `face="harmonic"` pinned (the bit-for-bit reduction relies on the per-step cells
+  matching the dry model's once-built harmonic cells; `face="exact"` would silently break it).
+- **THE HEADLINE FRAMING (advisor) — redistribution around a PINNED mean, not added pole warmth.** With
+  constant albedo the global-mean response to a uniform OLR forcing `ΔA` is **pinned**: `⟨δT⟩ = ΔA/B` to
+  machine precision for *any* `D` (the diffusion conserves `∫T dx`, so transport cannot change the mean).
+  **Moisture REDISTRIBUTES that fixed `⟨δT⟩` poleward.** Asserted **tight** (conservation). The PA factor
+  `pole/equator δT` ≈ **1.5** (Earth, RH 0.8); **direction banked** (PA>1 robustly), **magnitude loose**
+  (1.43→1.50 across RH 0.6→0.8 — RH-dependent; the observed ~2–3× also needs the ice-albedo + lapse-rate
+  feedbacks held out of scope).
+- **THE ATTRIBUTION NULL (advisor — the backbone).** The moist model differs from dry in *two* ways (a
+  recalibrated `D`-shape AND the T-dependent `D_eff`); which causes PA? **Freeze `D_eff` at its present
+  profile and warm → PA = 1.0 *exactly*** (uniform `δT=ΔA/B` solves the perturbation for *any* frozen
+  `D(x)`), proving the PA is **100 % the `dD_eff/dT` feedback, 0 % the `D`-shape** (spike + test:
+  PA=1.0000, spread ~3e-10, via the genuine array-`D` `EnergyBalanceModel`).
+- **The recalibration = the named wall (the double-count).** Rung-0's `D=0.555` is an *effective*
+  diffusivity already absorbing latent transport; explicit MSE diffusion would double-count it, so
+  `recalibrate_sensible_D` re-derives a **smaller sensible `D_s≈0.30`** matching the dry present-day
+  **equator-pole contrast** (`⟨T⟩` is automatically equal — energy balance fixes it from `A,B,ᾱ`
+  independent of `D` — so contrast is the natural single scalar). **The TRADE (not a win):** a *single
+  scalar* can't reproduce all of dry `T(x)` — same mean+contrast but a **higher-moment shape residual**
+  (matched-contrast moist profile flatter in the interior, curvature toward the edges). **Target is a
+  modeling choice (named):** matching the P₂ amplitude `T₂` instead moves PA **< 5 %** (PA set by the
+  *shape* of β, not the scaling).
+- **Scope edges (named).** Refines the plan's "rung 2.5 re-opens `(A,B,D)`" → **only `D` re-opened**: `A`
+  is the forcing knob (uniform `ΔA` = CO₂ proxy), **`B` held FIXED** — re-deriving B's water-vapour
+  content is *local radiation = the rung-4 wall*, not opened. Forcing is **uniform `ΔA`, not `ΔS₀`** (`S₀`
+  is equator-weighted by `(1+s₂P₂)`, imposing tropical structure that *fights* PA). Fixed RH; **constant
+  albedo** for the clean Hwang–Frierson experiment (ice/lapse-rate feedbacks out of scope). **Separate
+  from the rung-2 `P−E` budget** — a `T`-response model, doesn't touch `moist.py`; rung-2's
+  `test_subtropical_evaporative_belt_is_not_reproduced` did **not** flip (a different deliverable).
+- **Triad.** *Tight* — exact analytic `dq_sat/dT` (vs finite-diff + ~7 %/K log-slope); `D_eff`-inside
+  conservation; pinned `⟨δT⟩=ΔA/B`; the frozen-`D_eff` PA=1 null. *Real-but-loose (unlock)* — the PA
+  itself (~1.5, direction banked / magnitude loose). *Plumbing* — RH=0 ∧ `D_s=0.555` ⟹ the genuine
+  `EnergyBalanceModel` rung-0 solve **bit-for-bit**. *Named choices* — recalibration to present contrast
+  (`D_s<0.555`) + its target-invariance. Tests: `planet/tests/test_moist_ebm.py` (12, all **fast**); full
+  planet gate **261 passed, 1 skip**. No engine edit; `uses` unchanged.
 
 **Visualization rungs A/B/C — DECIDED to build all three (animated eddy flow; 2026-06-11;
 rungs A+B BUILT — A 2026-06-11, B 2026-06-12; C pending — build detail in §9.5).** A forward decision (user): animate the emergent eddy life cycle across three
