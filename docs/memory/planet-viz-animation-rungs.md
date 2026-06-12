@@ -1,6 +1,6 @@
 ---
 name: planet-viz-animation-rungs
-description: "Animated eddy-flow visualization, 3 rungs A/B/C: rung A + the shared (h,u,v,θ) frame side-channel BUILT 2026-06-11 (diagnostic-pure, two-panel mechanism anim), B/C pending; honesty edges = channel-not-globe + ~90% reversible"
+description: "Animated eddy-flow visualization, 3 rungs A/B/C: rung A (matplotlib two-panel) + shared (h,u,v,θ) frame side-channel BUILT 2026-06-11; rung B (Plotly-globe anim, planet/eddy_globe.py) BUILT 2026-06-12; C (WebGL) pending; honesty edges = channel-not-globe + ~90% reversible"
 metadata: 
   node_type: memory
   type: project
@@ -10,8 +10,8 @@ metadata:
 **Decided 2026-06-11 (user): build all three visualization rungs A→B→C** to animate the
 emergent eddy life cycle (`eddy_flux.eddy_life_cycle` — the only time-varying,
 longitudinally-structured 2-D flow the project produces). Recorded in plan **§9.5** + the
-§10 running log. **Rung A + the shared frame side-channel BUILT 2026-06-11; B/C pending.**
-These are **visualization** rungs A/B/C — do NOT conflate with the §5 GCM staircase rungs 0–6.
+§10 running log. **Rung A + the shared frame side-channel BUILT 2026-06-11; Rung B BUILT 2026-06-12;
+C pending.** These are **visualization** rungs A/B/C — do NOT conflate with the §5 GCM staircase rungs 0–6.
 
 **BUILT (2026-06-11) — rung A + the shared prerequisite:** `n_frames` side-channel on
 `eddy_flux.eddy_life_cycle` (opt-in `EddyFrames` snapshotting `(h,u,v,θ)` + cumulative
@@ -47,7 +47,23 @@ references — weather, not climate). The rungs rise in cost, *fall* in pedagogi
   Frame-fidelity tests: `∫hθ` machine-exact, `eddy_ke` recomputed-from-frame matches series,
   `n_frames=0`-vs-N bit-for-bit. **Build A first** (honest by construction), judge B-vs-C
   after seeing real frames move.
-- **Rung B** = animate the existing Plotly globe (`planetmap`) — globe view, no new stack.
+- **Rung B** = animate the existing Plotly globe — **BUILT 2026-06-12** (`planet/eddy_globe.py`:
+  `eddy_globe_figure` + `save_eddy_globe_html`; `demo_eddy_globe.py` banks
+  `docs/figures/planet-eddy-globe.html` ~3.8 MB; `test_eddy_globe.py` 4 tests). **No new stack**
+  (reuses `[webviz]` Plotly + `planetmap._sphere_xyz`; plotly-free at import — lazy, subprocess
+  headless guard). **Both honesty edges carried GEOMETRICALLY:** the doubly-periodic channel maps to a
+  **bounded ~55° longitude sector at TRUE physical width** `Δlon=Lx/(a·cosφ_c)` (Earth radius `a`
+  recovered from the frames' own linear β-plane `(y,φ)` metric — no new constant/schema field), a
+  **single NH band** (measured 18.9°–61.1° lat × 55.1° lon) on a bare base sphere — **NOT** 360°-wrapped,
+  **NOT** mirrored to the SH (the `circulation_layer` two-hemisphere broadcast is valid only for a
+  *zonal-mean* jet; the eddy field is the project's ONLY longitudinally-structured field → does NOT
+  transfer — this was my design error the advisor overturned pre-build); + the Rung-A flux-budget panel
+  beside the globe (throughput-rages/net-small) keeps ~90%-reversible on screen, cursor + `κ diagnosed`
+  line tie the two. **Advisor's pre-push gate:** "builds ≠ animates" — frames update only the band's
+  `surfacecolor` (lean HTML, `x/y/z` static-merged), a known Plotly-3D soft spot → `cmin/cmax` re-stated
+  per frame (no colour-autoscale) + `redraw=True` on play/slider (force gl3d repaint) + a structural
+  test pinning each frame's `surfacecolor`/`traces`/that-the-band-changes. Browser play-through is the
+  ONE thing not headlessly self-verifiable (no kaleido) → handed to the user to eyeball.
 - **Rung C** = WebGL particle globe; vendor **mapbox/webgl-wind (ISC, GPU particles)** +
   **cambecc/earth (MIT, orthographic projection)** (licenses verified). webgl-wind is
   flat/equirectangular → needs a three.js sphere or a port of cambecc's projection. New

@@ -621,7 +621,7 @@ third consumer-in-waiting. Promotion is **not** done pre-emptively (the existing
 2026-06-09). **Building visualization rung A (§9.5) is what finally trips this trigger** —
 the eddy life-cycle animation is the time-animation primitive's first real consumer.
 
-### 9.5 Animated flow — the visualization rungs (decided 2026-06-11; **rung A BUILT 2026-06-11**, B/C pending)
+### 9.5 Animated flow — the visualization rungs (decided 2026-06-11; **rungs A+B BUILT** (A 2026-06-11, B 2026-06-12), C pending)
 
 The emergent eddy life cycle (`eddy_flux.eddy_life_cycle`) is the only genuinely
 time-varying, longitudinally-structured 2-D flow the project produces — the instability
@@ -645,7 +645,7 @@ unchanged — the inert-seam discipline (§9.3) applied to motion.
 | Viz rung | Renderer | Tech | What it is |
 |---|---|---|---|
 | **A** | matplotlib `FuncAnimation` | in-repo, `[viz]` | the **mechanism artifact** + the repo's first time-animation primitive (`plots.eddy_life_animation` + `demo_eddy_life.py`) |
-| **B** | Plotly globe animation | existing `[webviz]` stack | the **globe view** (frames → play/slider on `planetmap`'s sphere), no new tech |
+| **B** ✅ | Plotly globe animation | existing `[webviz]` stack | the **globe view** (frames → play/slider on `planetmap`'s sphere), no new tech — **BUILT 2026-06-12** |
 | **C** | WebGL particle globe | **new** JS/WebGL stack | the **showcase** — GPU particle advection on an orthographic globe |
 
 - **Rung A is meaningful on its own** (not merely a step to C): it validates the banked
@@ -659,7 +659,7 @@ unchanged — the inert-seam discipline (§9.3) applied to motion.
   Pillow is the CI-safe default; MP4 via ffmpeg is optional, guarded like the `[viz]`
   figures. Frame-fidelity tests: `∫hθ` machine-exact across banked frames, `eddy_ke`
   recomputed-from-a-frame matches the series, `n_frames=0`-vs-`N` bit-for-bit.
-- **Rung B** reuses the existing Plotly globe — a globe view for a fraction of C's cost.
+- **Rung B** reuses the existing Plotly globe — a globe view for a fraction of C's cost. **(BUILT — see below.)**
 - **Rung C** vendors **mapbox/webgl-wind (ISC — GPU particles, ~1M/60fps)** for the
   particle layer + **cambecc/earth (MIT — orthographic projection, D3)** for the globe (both
   licenses verified, reusable with attribution); webgl-wind is flat/equirectangular, so a
@@ -702,7 +702,29 @@ reversible than it is; integrating-per-latitude-first makes the endpoint ratio l
 `irreversible_fraction` by construction, and a marked `window_start` line reconciles the full-release
 curve with the banked windowed number. Frame-fidelity tests: `∫hθ` machine-exact across frames; `eddy_ke`
 recomputed *from a banked frame* reproduces the series exactly; the render is an `importorskip`-gated
-execution smoke-test. **B/C remain pending** — judge B-vs-C after seeing rung A's real frames move.
+execution smoke-test. **C remains pending** — judge it after seeing the globe (rung B) land.
+
+**Built — rung B, the Plotly-globe animation (2026-06-12).** The *same* banked frames lifted onto the
+existing `planetmap` sphere — *no new stack* (`planet/eddy_globe.py`: `eddy_globe_figure` +
+`save_eddy_globe_html`; `demo_eddy_globe.py` banks `docs/figures/planet-eddy-globe.html`, ~3.8 MB on par
+with the comparison-triptych globes). Plotly-free at import (Plotly lazy, like `planetmap`; a headless
+subprocess guard asserts no plotly/matplotlib/ipywidgets is pulled), reusing `planetmap._sphere_xyz`.
+**Both honesty edges are carried geometrically, not just captioned:** (1) the doubly-periodic channel is
+laid as a **bounded ~55° longitude sector at its true physical width** — `Δlon = Lx/(a·cosφ_c)`, with `a`
+recovered from the frames' own linear β-plane `(y, φ)` metric (no new constant/schema field) — a *single*
+NH band (measured 18.9°–61.1° lat × 55.1° lon) on an otherwise-bare base sphere, **not** a 360° wrap and
+**not** mirrored to the SH (the `circulation_layer` two-hemisphere broadcast is valid only for a
+*zonal-mean* jet; the eddy field is the project's only longitudinally-structured field, so it does not
+transfer). (2) The Rung-A flux-budget panel rides beside the globe (throughput-rages / net-stays-small),
+so the ~90 %-reversible finding stays on screen; a moving cursor + `κ diagnosed` line tie the two panels.
+**The advisor's gate** (before push): a figure that *builds* is not a figure that *animates* — the frames
+update only the band's `surfacecolor` (lean HTML; `x/y/z` static-merged from the base trace), which is a
+known Plotly-3D soft spot, so (a) `cmin/cmax` are re-stated per frame to forbid colour-autoscale, (b)
+`redraw=True` on play + every slider step forces the gl3d repaint, (c) a structural test pins each
+frame's `surfacecolor` to its θ snapshot + the `traces` indices + that the band changes across frames.
+The one thing not self-verifiable headlessly (no kaleido/browser here) is the actual play-through, handed
+to the user to eyeball. Geometry pin (always-green): the band is a bounded midlat sector, never
+pole-to-pole / 360°.
 
 ---
 
@@ -1051,7 +1073,7 @@ full emergent `P` field forces an unphysical evaporation pattern, see below):
    planet gate **179 passed, 1 skip**. No engine edit; `uses` unchanged.
 
 **Visualization rungs A/B/C — DECIDED to build all three (animated eddy flow; 2026-06-11;
-NOT built).** A forward decision (user): animate the emergent eddy life cycle across three
+rungs A+B BUILT — A 2026-06-11, B 2026-06-12; C pending — build detail in §9.5).** A forward decision (user): animate the emergent eddy life cycle across three
 rising-cost **visualization** rungs (distinct from the §5 GCM staircase) — **A** a matplotlib
 two-panel mechanism animation (the repo's first time-animation primitive, finally the §9.4
 rule-of-three third consumer), **B** a Plotly-globe animation (existing `[webviz]` stack), and
