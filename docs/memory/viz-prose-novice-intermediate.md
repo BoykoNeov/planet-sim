@@ -1,8 +1,10 @@
 ---
 name: viz-prose-novice-intermediate
-description: "User wants richer, novice→intermediate prose on EVERY visualization, now and future: plain-language labels (technical term parenthetical) + a compact caption defining the domain jargon, so a standalone figure stands on its own — not 'a glossary on every plot'"
-metadata:
+description: "User wants richer, novice→intermediate prose on EVERY visualization AND in the notebook, now and future: plain-language labels + definitions/glossaries/captions for the domain jargon. The 'relabel-don't-append' constraint was REMOVED by the user 2026-06-12 — appending definitions, glossaries, and hover tooltips is now welcome"
+metadata: 
+  node_type: memory
   type: feedback
+  originSessionId: 14b69ce7-9ac6-49bc-b843-e078d2bad808
 ---
 
 **Standing preference (user, 2026-06-12): every visualization must carry richer, novice→intermediate
@@ -12,8 +14,12 @@ eddy globe and listed the terms it failed to explain: *what is a "β-plane band"
 "swirls range"* (the last is them reading `(the swirls rage)` off the legend — proof the cryptic
 editorializing labels were the problem).
 
-**The vehicle = relabel, don't append** (advisor; resolves the tension with the *same-day* "remove
-overlapping text" request — see [[no-pointer-spike-lines]] for that one). Two moves, in order:
+**UPDATE — the "relabel, don't append" rule was REMOVED by the user (2026-06-12).** It was originally
+introduced (advisor) to resolve the tension with the same-day "remove overlapping text" request (see
+[[no-pointer-spike-lines]]), but the user now wants fuller explanation and is happy to **append** it:
+glossaries, term-by-term definition blocks, enriched tables, and hover tooltips are all welcome — not
+just relabelling existing text. The two techniques below stay in the toolbox (relabelling cryptic
+labels is still good), but they are no longer a *ceiling*; add explanation freely. Two moves, in order:
 1. **Plain-language labels with the technical term parenthetical.** Rewrite cryptic legend/axis/subtitle
    text into what it *means*, keep the jargon in `(…)` for the intermediate reader. This makes the
    *existing* text legible instead of adding new elements. (Eddy globe: `throughput Σ∫|F̄|dt (the swirls
@@ -36,11 +42,13 @@ overlapping text" request — see [[no-pointer-spike-lines]] for that one). Two 
   wraps (Plotly doesn't auto-wrap annotations) keep each line ≲108 visible chars so nothing overflows;
   inline `<span style='color:…'>` can tint a term to match its curve.
 
-**NOT "a glossary on every figure."** It's a per-figure judgment call, not a one-line sweep like the
-spike toggle. **Skip hover as the definition vehicle** (poor discoverability + it would overload the
-lat/lon tooltip deliberately kept). The figure must **stand alone** in the banked standalone HTML, but
-**deep pedagogy stays in the notebook** (`planet.ipynb` markdown) — link, don't duplicate; see
-[[pedagogy-novice-intermediate]].
+**Glossaries & hover are now welcome (user, 2026-06-12 — overturns the earlier "not a glossary on
+every figure / skip hover" stance).** The user explicitly asked for term-by-term definitions and a
+"click/hover to show a definition" affordance in the notebook prose. Hover via `<abbr title="…">`
+survives nbconvert AND JupyterLab 4.5's sanitizer (verified) — but it must stay a *cherry on top* of
+an always-visible definition (static GitHub rendering never fires a hover; a touch device has none).
+The figure/page must still **stand alone**; deep pedagogy concentrates in the notebook
+(`planet.ipynb` markdown) — see [[pedagogy-novice-intermediate]].
 
 **Why:** the banked HTML globes are viewed with no surrounding context; cryptic shorthand reads as
 gatekeeping to a novice and as ambiguous to an intermediate.
