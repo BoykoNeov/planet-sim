@@ -114,3 +114,33 @@ better built *with* their first consumer than extracted from thin air. The Plane
 and annotated-overlay primitives — is the awaited **third consumer** that will *earn* the
 promotion to `viz/`. This note is recorded so a future session does not read the three
 `plots.py` as a standing mandate to stand up `viz/` on the count alone.
+
+## Status note — 2026-06-12: honest-by-disclosure for the showcase layer
+
+A scoped refinement to Decision 2 (*a figure is never evidence of validity*), recorded for the
+planet-sim visualization "Rung C" (the *Perpetual-Ocean*-style particle globe; build plan §9.5,
+decided with the user 2026-06-12). It does **not** weaken the doctrine — it follows from it.
+
+Most planet-sim figures are **honest-by-construction**: the geometry cannot misrepresent the model
+(the eddy globe is one true latitude band, never a 360° wrap). A pure **showcase** renderer, whose
+purpose is *reach and delivery, not teaching*, is granted a second mode — **honest-by-disclosure**:
+it **may** present a view the model does not literally compute (a global-looking flow, particles that
+*imply* "currents carrying heat" that the ~90 %-reversible flux does not), **provided a visible
+on-screen disclaimer documents the departure.** This is licensed *precisely because* a figure is never
+in the correctness path (Decision 2): an illustration cannot fabricate validity, since validity lives
+only in the tested numbers.
+
+The carve-out is **narrow and asymmetric**, and one guardrail is non-negotiable:
+
+- **Physics-fidelity verification relaxes** for the showcase only — approximate rendering is fine, no
+  byte-golden, no numerical-transport proof. The engine/science layer keeps the full validation-triad
+  discipline untouched; so do the honest-by-construction figures.
+- **Documentation verification tightens.** Because the disclaimer **is the entire license**, it is the
+  one thing **machine-checked**: a structural test asserts the artifact carries the honesty caption,
+  on-screen and legible to a casual viewer. **Principle: the documentation is machine-checked even when
+  the physics is not.**
+
+So Decision 2 stands — *test the numbers, then draw them; a figure proves nothing.* This note adds only
+that a showcase figure may *illustrate beyond* the numbers when it *says so on its face*, and that the
+saying-so is itself tested. Scope: this is applied at planet-sim Rung C (§9.5); it is recorded here, in
+the program-level viz ADR, so a future session reads it as the sanctioned form rather than an erosion.

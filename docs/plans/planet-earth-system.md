@@ -610,6 +610,17 @@ editor needs); **NetCDF** is a documented future encoding for climate-tool inter
 consumer). **Round-trip identity (`import(export(s)) == s`) is a genuine correctness
 property and gets a genuine test**, unlike the map's smoke-tests.
 
+**Inert-honesty has two forms — geometry and disclosure.** Through v1 the discipline is **inertness**:
+an imported geography is *carried but not consumed*, the eddy globe is *one honest band, not a wrap*. The
+showcase flow renderer (§9.5, Rung C, decided 2026-06-12) introduces the second form, **honest-by-disclosure**:
+for the *showcase layer only*, an illustration may depart from what the model literally computes —
+a global-looking flow, "currents carrying heat" — **so long as a visible on-screen disclaimer documents the
+departure**, and a test machine-checks that the disclaimer is present (the documentation is verified even
+when the physics is not). The carve-out is narrow: it never touches the science layer or the
+honest-by-construction A/B rungs. Its data hook is this same manifest — a **vector-field-on-a-globe layer
+type** (grid + `(u,v)` + scalar + frames + **coverage-extent** + **provenance/honesty label**) joins the
+§9.1 layer registry, the coverage-extent carrying the band-vs-globe truth into the data itself.
+
 ### 9.4 Toolkit promotion
 
 Plot primitives start planet-local (`plots.py` static floor; the `planetmap.py` layer
@@ -646,7 +657,7 @@ unchanged — the inert-seam discipline (§9.3) applied to motion.
 |---|---|---|---|
 | **A** | matplotlib `FuncAnimation` | in-repo, `[viz]` | the **mechanism artifact** + the repo's first time-animation primitive (`plots.eddy_life_animation` + `demo_eddy_life.py`) |
 | **B** ✅ | Plotly globe animation | existing `[webviz]` stack | the **globe view** (frames → play/slider on `planetmap`'s sphere), no new tech — **BUILT 2026-06-12** |
-| **C** | WebGL particle globe | **new** JS/WebGL stack | the **showcase** — GPU particle advection on an orthographic globe |
+| **C** | original Canvas2D particle globe | self-contained inline HTML (no CDN) | the **showcase** — a general flow-on-a-globe renderer; *honest-by-disclosure* (decided 2026-06-12, below) |
 
 - **Rung A is meaningful on its own** (not merely a step to C): it validates the banked
   frames, builds the §9.4 primitive, and **teaches the mechanism honestly**. It is a
@@ -660,12 +671,12 @@ unchanged — the inert-seam discipline (§9.3) applied to motion.
   figures. Frame-fidelity tests: `∫hθ` machine-exact across banked frames, `eddy_ke`
   recomputed-from-a-frame matches the series, `n_frames=0`-vs-`N` bit-for-bit.
 - **Rung B** reuses the existing Plotly globe — a globe view for a fraction of C's cost. **(BUILT — see below.)**
-- **Rung C** vendors **mapbox/webgl-wind (ISC — GPU particles, ~1M/60fps)** for the
-  particle layer + **cambecc/earth (MIT — orthographic projection, D3)** for the globe (both
-  licenses verified, reusable with attribution); webgl-wind is flat/equirectangular, so a
-  three.js sphere or a port of cambecc's projection wraps it onto the globe. It is **reach /
-  delivery, not new teaching**, and the §6 dataset/attribution diligence applies to the
-  vendored libraries.
+- **Rung C** is the **showcase** — build approach **decided (2026-06-12, below):** an *original*
+  Canvas2D orthographic particle globe, architected as a general flow-on-a-globe renderer and governed
+  by the *honest-by-disclosure* carve-out. The provisional plan — vendoring **mapbox/webgl-wind (ISC —
+  GPU particles)** + **cambecc/earth (MIT — orthographic projection)** — is **superseded** there
+  (reimplementing their *techniques* sidesteps the §6 attribution burden; webgl-wind's GPU advection
+  returns only as the named WebGL upgrade seam). It is **reach / delivery, not new teaching**.
 
 **Named scope edges — carried through all three, *hardest to preserve at C*.** (1) The flow
 is a **doubly-periodic midlatitude β-plane band patch, not a global field** (the same edge as
@@ -673,8 +684,10 @@ is a **doubly-periodic midlatitude β-plane band patch, not a global field** (th
 circulation. (2) The flux is **~90 % reversible**: particles stream, but the streaming
 mostly *sloshes* — genuine net transport is only the small κ residual. The prettier the
 rung, the louder the medium itself whispers "global ocean currents carrying heat" — exactly
-the two things the model lacks — so **B and C must keep a flux indicator and a band label**
-(the §9.3 inert-honesty discipline, applied to motion). This is *why* the recommended order
+the two things the model lacks — so **B keeps a flux indicator and a band label**
+(the §9.3 inert-honesty discipline, applied to motion — *honest-by-construction*), and **C, the
+showcase, keeps the truth in a documented on-screen disclaimer instead** (*honest-by-disclosure*,
+decided 2026-06-12 — see the Rung C subsection below). This is *why* the recommended order
 is A first (honest by construction), then judge B-vs-C *after seeing real frames move*.
 
 **Verification answers the user's own screenshot concern.** Judging animation from
@@ -725,6 +738,76 @@ frame's `surfacecolor` to its θ snapshot + the `traces` indices + that the band
 The one thing not self-verifiable headlessly (no kaleido/browser here) is the actual play-through, handed
 to the user to eyeball. Geometry pin (always-green): the band is a bounded midlat sector, never
 pole-to-pole / 360°.
+
+**Rung C — the showcase: decided 2026-06-12 (original Canvas2D; *honest-by-disclosure*).** The build
+approach is now locked, and the provisional plan above (vendored libraries; band-label honesty) is
+**revised** by this decision. Rung C is what §9.5 already calls it — *reach / delivery, not new teaching* —
+and the user's forward framing (2026-06-12) widens it into a **general-purpose flow-on-a-globe renderer**:
+its design aim is to *one day* animate a full **GCM / ESM** wind-or-current field; until (and after) then it
+renders whatever lesser model we have — today, the one eddy band. The renderer is therefore architected
+around the *data*, not the eddy.
+
+- **Tech — an *original* Canvas2D orthographic globe (not vendored).** CPU particle advection — the
+  *cambecc/earth* architecture (orthographic projection + fading particle trails, ~5–10 k particles),
+  **reimplemented original**, on a Canvas2D globe — emitted as a **self-contained, inline-data, no-CDN**
+  HTML artifact (the existing `interactive.py` pattern: works straight off `file://`, deterministic,
+  golden-able). **Original, not vendored, decided:** reimplementing the *techniques* (GPU-free particle
+  advection; orthographic projection) sidesteps the §6 attribution burden that vendoring
+  `mapbox/webgl-wind` (ISC) + `cambecc/earth` (MIT) would pull in (no `NOTICE` file exists in the repo),
+  and it matches the repo's existing vanilla-canvas, agent-fluent, dependency-free idiom. Their licenses
+  stay compatible if a future session prefers to vendor; the techniques are the references either way.
+
+- **The renderer-agnostic data contract — the "one day a GCM" hook.** The renderer consumes a generic
+  **vector-field-on-a-globe** layer, *not* the eddy band specifically. The contract carries only: a
+  lat×lon **grid**, per-cell `(u, v)` components, an optional **scalar field** for colour, optional **time
+  frames**, a **coverage-extent**, and a **provenance / honesty label** (the disclaimer text). It commits
+  to **nothing** about projection or particle representation — those stay renderer-side, so a later WebGL
+  swap (below) reuses the contract unchanged. The **coverage-extent carries the band-vs-globe truth into
+  the data itself**: the same renderer *labels the band* today (coverage = the ~55° NH sector measured in
+  rung B) and *illustrates the globe with disclosure* tomorrow (coverage = global, fed by GCM
+  winds/currents). This is a new **layer type** for the §9.1 registry / planet-spec schema (§9.3) — a
+  vector field joining the existing scalar layers — so the showcase renderer and the interactive map share
+  one manifest.
+
+- **Honest-by-disclosure — the scoped honesty carve-out (the one real policy change).** Rungs A and B are
+  **honest-by-construction**: the geometry cannot lie — one band, the flux-budget panel on screen. Rung C,
+  the *showcase*, is **honest-by-disclosure**: it **may** render a global-looking, continuously-streaming
+  field the model does not literally produce — a band extended toward a globe; particles that *imply* net
+  currents though the instantaneous flux is **~90 % reversible** — **provided the departure is documented
+  visibly in the artifact itself.** The user's condition (2026-06-12) is explicit — illustrate freely *"if
+  it['s] documented … currents carry heat, when they do not."* Two consequences, deliberately asymmetric:
+   - **Physics-fidelity verification relaxes.** Approximate is fine for the showcase; **no byte-golden, no
+     numerical transport proof.** The model/science layer keeps *all* of that discipline (the validation
+     triad, the scope edges, the inert seams) — the figure was never in the correctness path (ADR 0002 #2:
+     *a figure is never evidence of validity*), which is exactly what *licenses* the illustration.
+   - **Documentation verification tightens.** Because the on-screen disclaimer **is the entire license**,
+     it is the one thing **machine-checked**: a structural test asserts the artifact carries the honesty
+     caption, **on-screen and legible to a casual viewer** — not a code comment, not buried in this plan.
+     **Principle: the documentation is machine-checked even when the physics is not.**
+   The carve-out is **narrow — the Rung-C showcase renderer only.** A/B's honest-by-construction guarantees
+   and the two named scope edges (as they bind A/B) are untouched; the science layer's overclaim-policing
+   is untouched.
+
+- **What the on-screen disclaimer must say (minimum).** That the flow is **illustrative**; **which**
+  model/coverage it depicts (today: one midlatitude β-plane band; when fed a richer model: that model,
+  named); that the streaming **mostly sloshes** (genuine net transport is only the small κ residual); and
+  that *"currents carrying heat"* is an artistic reading the numbers do **not** validate. This is the §9.3
+  inert-honesty discipline re-expressed as **disclosure** (a caption) rather than **geometry** (a literal
+  band).
+
+- **WebGL upgrade seam + a concrete trigger.** Canvas2D CPU particles are the v1 renderer; a **WebGL / GPU
+  ping-pong** integrator (the *webgl-wind* technique) is the documented upgrade **behind the same data
+  contract** — swap the integrator, keep the contract and the disclaimer test. **Trigger (named, not
+  "someday"):** when grid resolution × particle count pushes the interactive frame-rate below ~30 fps —
+  the GCM-resolution regime — move advection onto the GPU. Until then, CPU particles on Canvas2D stay
+  responsive, self-contained, and golden-friendly.
+
+- **Deliverables for the build session (not executed this session).** A generic renderer module
+  (`planet/flow_globe.py` — named for the role, the eddy being its first consumer), a demo
+  (`planet/demo_eddy_particles.py`) banking a self-contained `docs/figures/planet-eddy-particles.html`, a
+  `catalog.py` `DEMOS` entry + the drift-guarded `python -m planet site` regenerate, and **structural +
+  disclaimer-presence tests** (mirroring `test_eddy_globe.py` *minus* the byte-golden, *plus* the caption
+  assertion). Browser play-through is the one thing handed to the user to eyeball.
 
 ---
 
@@ -1087,6 +1170,23 @@ vs `|F̄|` throughput) makes the small-net-residual finding *visible* rather tha
 stirring movie overclaim transport. Recommended build order is **A first** (honest by
 construction, in-repo, CI-testable), then judge B-vs-C after seeing real frames move. Full
 roadmap, the rungs table, and the named scope edges: **§9.5**.
+
+**Rung C — build approach decided; not yet built (2026-06-12).** A forward decision (user): build the
+showcase as a **general-purpose flow-on-a-globe renderer** aimed at *one day* visualizing a full
+**GCM / ESM** field — rendering lesser models (today, the one eddy band) in the meantime. Locked: an
+**original Canvas2D** orthographic particle globe (reimplemented *cambecc/earth* technique — **not**
+vendored, sidestepping the §6 attribution burden; no `NOTICE` file exists), emitted as a self-contained
+no-CDN HTML artifact (the `interactive.py` pattern); a **renderer-agnostic data contract** (grid +
+`(u,v)` + scalar + frames + **coverage-extent** + **provenance/honesty label**, nothing about
+projection/particles) so a later **WebGL/GPU** swap reuses it unchanged (trigger: frame-rate < ~30 fps at
+GCM resolution). The one **policy change**: a scoped honesty carve-out — rungs A/B stay
+*honest-by-construction*; **Rung C is *honest-by-disclosure*** (user, 2026-06-12: illustrate freely *"if
+documented … currents carry heat, when they do not"*). Asymmetric verification: **physics-fidelity relaxes**
+(approximate is fine, no byte-golden — the figure was never in the correctness path, ADR 0002 #2) but
+**documentation tightens** — a test machine-checks the on-screen disclaimer is present, *because the
+disclaimer is the entire license*. Carve-out is narrow (showcase renderer only; science + A/B untouched).
+Doctrine recorded in **§9.5** + **§9.3** + ADR 0002 status note; build deliverables listed in §9.5. **Plan
+only this session — not executed.**
 
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko

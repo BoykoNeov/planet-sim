@@ -1,6 +1,6 @@
 ---
 name: planet-viz-animation-rungs
-description: "Animated eddy-flow visualization, 3 rungs A/B/C: rung A (matplotlib two-panel) + shared (h,u,v,θ) frame side-channel BUILT 2026-06-11; rung B (Plotly-globe anim, planet/eddy_globe.py) BUILT 2026-06-12; C (WebGL) pending; honesty edges = channel-not-globe + ~90% reversible"
+description: "Animated eddy-flow visualization, 3 rungs A/B/C: rung A (matplotlib two-panel) + shared (h,u,v,θ) frame side-channel BUILT 2026-06-11; rung B (Plotly-globe anim, planet/eddy_globe.py) BUILT 2026-06-12; rung C build-approach DECIDED 2026-06-12 = original Canvas2D flow-globe + honest-by-disclosure carve-out (NOT built); honesty edges = channel-not-globe + ~90% reversible"
 metadata: 
   node_type: memory
   type: project
@@ -11,7 +11,8 @@ metadata:
 emergent eddy life cycle (`eddy_flux.eddy_life_cycle` — the only time-varying,
 longitudinally-structured 2-D flow the project produces). Recorded in plan **§9.5** + the
 §10 running log. **Rung A + the shared frame side-channel BUILT 2026-06-11; Rung B BUILT 2026-06-12;
-C pending.** These are **visualization** rungs A/B/C — do NOT conflate with the §5 GCM staircase rungs 0–6.
+Rung C build-approach DECIDED 2026-06-12 (plan-only, NOT built — see the Rung C bullet below).** These are
+**visualization** rungs A/B/C — do NOT conflate with the §5 GCM staircase rungs 0–6.
 
 **BUILT (2026-06-11) — rung A + the shared prerequisite:** `n_frames` side-channel on
 `eddy_flux.eddy_life_cycle` (opt-in `EddyFrames` snapshotting `(h,u,v,θ)` + cumulative
@@ -89,18 +90,38 @@ references — weather, not climate). The rungs rise in cost, *fall* in pedagogi
   reseated low (`y=-0.40`, `b=360`/`height=860`), font 11→14, formulas `Σ∫|F̄|dt`/`Σ|∫F̄dt|` restored
   with word-glosses + curve-coloured `<span>` tints — these refinements folded into
   [[viz-prose-novice-intermediate]].
-- **Rung C** = WebGL particle globe; vendor **mapbox/webgl-wind (ISC, GPU particles)** +
-  **cambecc/earth (MIT, orthographic projection)** (licenses verified). webgl-wind is
-  flat/equirectangular → needs a three.js sphere or a port of cambecc's projection. New
-  JS/WebGL stack; reach/delivery not new teaching; §6 attribution diligence applies.
+- **Rung C** = the showcase — **build approach DECIDED 2026-06-12 (user), PLAN-ONLY (not built this
+  session).** User reframed it as a **general-purpose flow-on-a-globe renderer** aimed at *one day*
+  visualizing a full **GCM/ESM** field; renders lesser models (today: the one eddy band) meanwhile. LOCKED:
+  (1) **original Canvas2D** orthographic particle globe — reimplement the *cambecc/earth* technique
+  (orthographic projection + fading CPU particle trails ~5–10k), **NOT vendored** (sidesteps §6 attribution
+  burden + no `NOTICE` file exists; `webgl-wind`/`cambecc` are the design references only), self-contained
+  inline-data **no-CDN** HTML (the `interactive.py` pattern). (2) **Renderer-agnostic data contract** = a
+  generic **vector-field-on-a-globe** layer: grid + per-cell `(u,v)` + optional scalar (colour) + optional
+  frames + **coverage-extent** + **provenance/honesty label** — and NOTHING about projection/particles
+  (renderer-side), so the **WebGL/GPU ping-pong** upgrade (the webgl-wind technique) reuses the contract
+  unchanged. **Coverage-extent carries the band-vs-globe truth into the data** (label-the-band today,
+  illustrate-the-globe-with-disclosure tomorrow). Joins the §9.1 layer registry / planet-spec as a new
+  layer TYPE. WebGL swap **trigger (named):** interactive frame-rate < ~30 fps at GCM resolution. (3) The
+  one **policy change = honest-by-disclosure** (see below). Deliverables (future build): `planet/flow_globe.py`
+  (generic renderer) + `demo_eddy_particles.py` → `docs/figures/planet-eddy-particles.html` + catalog entry
+  + drift-guarded site regen + structural & **disclaimer-presence** tests (mirror `test_eddy_globe.py` minus
+  byte-golden, plus the caption assertion). Doctrine recorded in plan §9.5 + §9.3 + ADR 0002 status note.
 
 **Two honesty edges carried through all three (hardest to preserve at C):** (1) the flow is a
 **doubly-periodic midlatitude β-plane band patch, NOT a global field** (same edge as
 `planetmap.circulation_layer`) → on a globe it is one honest latitude band; (2) the
 instantaneous flux is **~90% reversible** → particles stream but mostly slosh, net transport
 is only the small κ residual. The prettier the rung, the more the medium implies global net
-transport the model lacks → **B/C must keep a flux indicator + band label** (§9.3 inert-honesty
-applied to motion). Verification (answers the user's screenshot concern): rung A is a
+transport the model lacks. **Edges carried two WAYS (the 2026-06-12 carve-out):** A/B are
+**honest-by-construction** — the geometry cannot lie (B keeps the flux indicator + a true band label,
+never a 360° wrap); **C, the showcase, is honest-by-disclosure** — it MAY illustrate beyond the model
+(global-looking flow, "currents carry heat" though flux is reversible) **IF a VISIBLE on-screen
+disclaimer documents the departure** (user 2026-06-12: illustrate freely *"if documented"*). The carve-out
+is **narrow + asymmetric**: physics-fidelity verification RELAXES for C only (approximate OK, no
+byte-golden — a figure was never in the correctness path, ADR 0002 #2), but **documentation verification
+TIGHTENS** — a test machine-checks the disclaimer is present (the disclaimer IS the entire license).
+Science layer + A/B untouched. Verification (answers the user's screenshot concern): rung A is a
 fixed-camera flat field (frames directly comparable) + numerical proof (`∫hθ` machine-exact,
 θ bounded, `eddy_ke` saturates, cumulative flux → diagnosed `kappa_bulk`), not the eye.
 
