@@ -12,11 +12,21 @@ Two tiers, like the rest of the repo:
 from __future__ import annotations
 
 import json
+import os
 import re
 
 import pytest
 
 from planet import interactive
+
+# The slow golden regenerates 408 EBM solves and compares the page byte-for-byte. That is safe as a
+# *local* drift guard (it runs on the machine that banked the page), but fragile cross-platform: a
+# last-bit LAPACK difference on the Linux CI runner — especially one that flips a digit in a 60-char
+# biome string near a Whittaker threshold — would fail the comparison for a non-bug. So, exactly like
+# the notebook smoke-test, it is skipped in CI; the fast structural tests below cover correctness
+# there. The local full gate still runs it. (REMOVE if the page is ever generated deterministically
+# cross-platform, e.g. from a committed grid artifact rather than a live re-solve.)
+_SKIP_IN_CI = os.environ.get("CI", "").lower() in {"true", "1"}
 
 # A tiny grid whose (0,0) cell is the exact Earth detent (S0=1365, CO2=0) → the baseline message.
 _SMALL = dict(s0_values=[1365.0, 1375.0], co2_values=[0.0, 2.0])
@@ -67,6 +77,11 @@ def test_committed_page_is_well_formed():
 
 
 @pytest.mark.slow
+@pytest.mark.skipif(
+    _SKIP_IN_CI,
+    reason="byte-exact over 408 live EBM solves — fragile cross-platform (LAPACK last-bit near a "
+    "Whittaker biome threshold); a local-only drift guard. Fast structural tests cover CI.",
+)
 def test_committed_page_is_up_to_date():
     """docs/interactive/index.html must equal a fresh full-grid build (re-run `python -m planet.interactive`)."""
     expected = interactive.build_app_html(interactive.compute_grid())

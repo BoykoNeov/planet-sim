@@ -198,7 +198,7 @@ function render() {
   $("oneline").textContent = c.oneline;
   $("paragraph").textContent = c.paragraph;
   $("st-tbar").textContent = c.Tbar.toFixed(1) + " °C";
-  $("st-ice").textContent = c.ice >= 89 ? "ice-free" : (c.ice <= 1 ? "frozen over" : c.ice.toFixed(0) + "°");
+  $("st-ice").textContent = c.ice >= 89.5 ? "ice-free" : (c.ice <= 1 ? "frozen over" : c.ice.toFixed(0) + "°");
   $("st-rf").textContent = c.rainforest.toFixed(0) + "%";
   $("st-tu").textContent = c.tundra.toFixed(0) + "%";
   drawDisk(c); drawCurve(c);
