@@ -1253,6 +1253,23 @@ orchestrator) is owed **only** for the deferred two-way loop (S5). The GPU-nativ
 is **Makie.jl** (GL/WGL) — the synergistic renderer the new repo gets for free in its own language; on the
 planet-sim side the same fields render through the §9.5 globe stack already built.
 
+> **Verified against primary sources (2026-06-12).** The four load-bearing architecture claims above were
+> checked against the CliMA documentation, not assumed: (1) ClimaOcean is *"a framework for realistic
+> ocean-only and coupled ocean + sea-ice simulations **driven by prescribed atmospheres**"* — atmosphere
+> prescribed, not prognostic, confirmed; (2) `JRA55PrescribedAtmosphere` is the canonical built-in, and the
+> headline example *"initialized from the ECCO state estimate, coupled to a prescribed atmosphere derived from
+> the JRA55-do reanalysis"* — note the README frames JRA55 as **the example built-in, not a blessed sole
+> default**, which *strengthens* the substitution argument: the prescribed-atmosphere slot is pluggable by
+> design, so dropping planet-sim's atmosphere in where JRA55 sat is the interface working as intended, not a
+> hack; (3) ClimaOcean is **standalone**, *"built on Oceananigans and ClimaSeaIce"* — no ClimaAtmos / no
+> ClimaCoupler dependency, confirming one-way needs ClimaOcean only; (4) ClimaCoupler is the orchestration
+> layer *"bringing atmosphere, land, ocean and sea ice together"* with feedback (CMIP/AMIP) — exactly the
+> two-way loop, correctly deferred to S5. ECCO confirmed as a **dataset/state estimate** (ECCO2Daily,
+> `ECCORestoring`), the init + restoring anchor. **One live wrinkle the living-staircase rule already covers:**
+> the CliMA docs note that *generic coupling machinery is migrating to a separate package* (`NumericalEarth.jl`),
+> so the exact package/type names S2–S3 bind against may shift before we get there — which is precisely why S2
+> is *"design against the **seen** API, not the guessed one"* and sits after S3. Re-confirm at S1.
+
 **The honesty ceiling (carried from the staircase, hardened here).** A custom world's ocean output **cannot
 be validated** — there is no observation of a planet that doesn't exist. So Earth is the **only** anchor:
 ECCO (below) is the ocean's `[[ebm-radiation-source]]`-class ground truth. The discipline is **anchor on

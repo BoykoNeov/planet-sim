@@ -17,7 +17,14 @@ language/audience) + cold-start (throws away the emergent atmosphere). **The col
 ClimaOcean runs ocean+sea-ice with the **atmosphere PRESCRIBED as forcing** (default JRA55) — and
 planet-sim **IS** an atmosphere (EBM + jet + rung-2 moisture/`P−E`) → one-way coupling is a **substitution**
 (planet-sim's emergent atmosphere replaces JRA55), needing **ClimaOcean ONLY** — NOT ClimaAtmos, NOT
-ClimaCoupler. ClimaCoupler is owed **only** for the deferred two-way loop (S5). Julia-side GPU renderer =
+ClimaCoupler. ClimaCoupler is owed **only** for the deferred two-way loop (S5).
+**VERIFIED against CliMA docs 2026-06-12** (all 4 architecture claims hold): ClimaOcean = *"ocean-only and
+coupled ocean+sea-ice driven by prescribed atmospheres"*, standalone *"built on Oceananigans and ClimaSeaIce"*
+(no ClimaAtmos/ClimaCoupler dep); `JRA55PrescribedAtmosphere` is the canonical **built-in (pluggable, not a
+blessed sole default → the substitution slot is the interface working as intended)**; ClimaCoupler = the
+atmosphere+land+ocean+ice orchestration layer = the S5 two-way loop; ECCO = `ECCO2Daily`/`ECCORestoring`
+dataset. **Live wrinkle (living-staircase already covers it):** generic coupling machinery is migrating to
+`NumericalEarth.jl`, so exact package/type names S2–S3 bind against may shift — re-confirm at S1. Julia-side GPU renderer =
 **Makie.jl** (GL/WGL), free in-language; planet-sim side reuses the §9.5 globe stack. Python↔Julia =
 atmosphere↔ocean = project boundary, all the same line.
 
