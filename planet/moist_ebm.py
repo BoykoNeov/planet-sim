@@ -80,10 +80,14 @@ Validation triad (plan §3) — re-classed for honesty
   **frozen-D_eff attribution null**: freezing ``D_eff`` at its present profile and warming gives
   **exactly uniform** ``δT`` (PA = 1), proving the emergent PA is the ``dD_eff/dT`` feedback, not the
   recalibrated ``D``-shape.
-* **Real-but-loose physics (the unlock).** The **polar amplification** itself: poles warm ~1.4–1.5×
-  the tropics (Earth defaults, RH 0.6–0.8), emergent from moisture transport alone. The **direction**
-  (PA > 1, robustly) is banked; the **magnitude** is loose (it grows with RH, and the observed ~2–3×
-  also needs ice-albedo + lapse-rate feedbacks held out of scope here).
+* **Real-but-loose physics (the unlock).** The **polar amplification** itself: the poles warm more than
+  the tropics, emergent from moisture transport alone. The **direction** (PA > 1, robustly across RH) is
+  banked; the **magnitude** is loose — and the *metric matters*, so it is reported two ways: the
+  **single-endpoint** ratio ``δT(pole)/δT(equator)`` ≈ **1.5** (Earth, RH 0.8 — the most generous, and
+  the polar cell sits on the harmonic-face bias), and the **area-band** ratio
+  ``mean(δT|φ≥60°)/mean(δT|φ≤30°)`` ≈ **1.4**. Both pass a loose ``1.3–1.7`` band; "~1.5" names the
+  endpoint ratio specifically. The observed ~2–3× also needs ice-albedo + lapse-rate feedbacks held out
+  of scope here.
 * **Plumbing (by construction).** RH = 0 **and** ``D_s = D_TRANSPORT`` reduce the moist relaxation to
   the dry rung-0 solve **bit-for-bit** (``β ≡ 0`` ⟹ the per-step operator is the dry one, every step).
 
@@ -316,17 +320,35 @@ def recalibrate_sensible_D(params: Optional[EBMParams] = None, RH: float = moist
 # --------------------------------------------------------------------------- #
 # The headline experiment — polar amplification under a uniform ΔA, dry-uniform null beside it.
 # --------------------------------------------------------------------------- #
+# Band edges for the area-averaged polar-amplification metric (the less-generous, less-bias-exposed
+# companion to the single-endpoint ratio): mean warming poleward of 60° over mean warming equatorward
+# of 30°. The endpoint ratio reads off the two extreme cells (the warmest/coldest, and the polar cell
+# sits on the harmonic-face bias ebm.py flags — the bias largely cancels in a δT *difference*, but the
+# band average is reported alongside so the most-generous number is not mistaken for *the* number.
+POLAR_BAND_DEG = 60.0
+TROPICAL_BAND_DEG = 30.0
+
+
+def _band_pa(phi: np.ndarray, dT: np.ndarray) -> float:
+    """Band-averaged polar amplification ``mean(δT | φ≥60°) / mean(δT | φ≤30°)``."""
+    return float(np.mean(dT[phi >= POLAR_BAND_DEG]) / np.mean(dT[phi <= TROPICAL_BAND_DEG]))
+
+
 @dataclass(frozen=True)
 class PolarAmplification:
-    """Emergent polar amplification: dry-vs-moist warming under a uniform OLR forcing ``ΔA`` (cm — °C).
+    """Emergent polar amplification: dry-vs-moist warming under a uniform OLR forcing ``ΔA`` (°C).
 
     ``phi`` latitudes (deg); ``D_s`` the recalibrated sensible diffusivity; ``RH``/``dA`` the closure
     and forcing. ``*_present``/``*_warm`` are the equilibrium climates before/after the forcing for the
     ``dry`` (constant ``D``) and ``moist`` (``D_eff(T)``) models; ``delta_T_dry``/``delta_T_moist`` the
     warming profiles. ``mean_delta_T`` is the **pinned** global-mean warming ``ΔA/B`` (both models share
-    it to machine precision — the conservation anchor). ``pa_dry`` (≈ 1, the uniform null) and
-    ``pa_moist`` (the headline, ~1.5) are the pole/equator warming ratios; ``polar_excess`` is the
-    moist pole warming **minus** the pinned mean (the redistributed excess). Plain arrays.
+    it to machine precision — the conservation anchor). The polar amplification is reported **two ways**
+    (name the metric): ``pa_moist`` / ``pa_dry`` are the **single-endpoint** ratios ``δT(pole)/δT(equator)``
+    (the headline ~1.5 for moist; ≈ 1 the dry null), and ``pa_moist_band`` / ``pa_dry_band`` are the
+    **area-band** ratios ``mean(δT|φ≥60°)/mean(δT|φ≤30°)`` (the less-generous, less-bias-exposed
+    companion, ~1.4 for moist) — both honest "polar amplification"; the band average is carried so the
+    most-generous endpoint number is not mistaken for *the* number. ``polar_excess`` is the moist pole
+    warming **minus** the pinned mean (the redistributed excess). Plain arrays.
     """
 
     phi: np.ndarray
@@ -342,6 +364,8 @@ class PolarAmplification:
     mean_delta_T: float
     pa_dry: float
     pa_moist: float
+    pa_dry_band: float
+    pa_moist_band: float
     polar_excess: float
 
 
@@ -372,13 +396,16 @@ def polar_amplification(params: Optional[EBMParams] = None, RH: float = moist.RH
 
     dTd = dry_warm.T - dry_present.T
     dTm = moist_warm.T - moist_present.T
+    phi = dry_present.latitude_deg()
     return PolarAmplification(
-        phi=dry_present.latitude_deg(), D_s=float(D_s), RH=float(RH), dA=float(dA),
+        phi=phi, D_s=float(D_s), RH=float(RH), dA=float(dA),
         dry_present=dry_present, dry_warm=dry_warm,
         moist_present=moist_present, moist_warm=moist_warm,
         delta_T_dry=dTd, delta_T_moist=dTm,
         mean_delta_T=float(np.mean(dTm)),
         pa_dry=float(dTd[-1] / dTd[0]),
         pa_moist=float(dTm[-1] / dTm[0]),
+        pa_dry_band=_band_pa(phi, dTd),
+        pa_moist_band=_band_pa(phi, dTm),
         polar_excess=float(dTm[-1] - np.mean(dTm)),
     )

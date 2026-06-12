@@ -46,7 +46,12 @@ break it).
 albedo ⟹ `⟨δT⟩=ΔA/B` to machine precision for **any** D (diffusion conserves ∫T dx → transport can't move
 the global mean). So moisture **redistributes a fixed `⟨δT⟩` poleward**. This is asserted **TIGHT**
 (conservation), and PA is the *shape* of that redistribution. (Forcing = uniform `ΔA` = CO₂ proxy, NOT
-`ΔS₀` — S₀ is equator-weighted by `(1+s₂P₂)`, imposing tropical structure that FIGHTS PA.)
+`ΔS₀` — S₀ is equator-weighted by `(1+s₂P₂)`, imposing tropical structure that FIGHTS PA.) **NAME THE
+METRIC (advisor catch #2):** the headline ~1.5 is the **single-endpoint** ratio `δT(pole)/δT(equator)`
+(most generous, polar cell on the harmonic-face bias — but the bias CANCELS in a δT *difference*); the
+**area-band** ratio `mean(δT|≥60°)/mean(δT|≤30°)` ≈ **1.4** (less generous); both honest, both pass the
+loose 1.3–1.7 band, both stored on `PolarAmplification` (`pa_moist`/`pa_moist_band`). A `.converged`
+guard was also added (the one failure mode the suite was blind to).
 
 **THE ATTRIBUTION NULL (advisor — the backbone of the claim).** The moist model differs from dry two
 ways (recalibrated `D`-shape AND T-dependent `D_eff`) — which makes PA? **Freeze `D_eff` at its present

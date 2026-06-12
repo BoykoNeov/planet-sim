@@ -121,6 +121,8 @@ def test_RH0_default_D_reduces_to_rung0_engine_bit_for_bit(params):
 def test_moist_polar_amplifies_while_dry_warms_uniformly(params, pa):
     # The headline: the moist EBM warms the pole MORE than the equator (PA > 1); the dry EBM warms
     # EXACTLY uniformly (the clean null — transport of a uniform field is zero).
+    assert pa.moist_present.converged and pa.moist_warm.converged   # the relaxation reached a fixed point
+    assert pa.dry_present.converged and pa.dry_warm.converged
     assert pa.delta_T_moist[-1] > pa.delta_T_moist[0]          # pole warms more than equator
     assert pa.pa_moist > 1.2                                   # genuine amplification
     assert pa.pa_dry == pytest.approx(1.0, abs=1e-3)           # dry null
@@ -128,10 +130,15 @@ def test_moist_polar_amplifies_while_dry_warms_uniformly(params, pa):
     assert pa.polar_excess > 0.0                               # pole warms above the pinned mean
 
 
-def test_polar_amplification_factor_in_loose_band(pa):
-    # Loose benchmark (Earth defaults, RH 0.8): poles warm ~1.5× the tropics from moisture alone. The
-    # magnitude is loose — the observed ~2–3× also needs ice-albedo + lapse-rate feedbacks (out of scope).
-    assert 1.3 < pa.pa_moist < 1.7
+def test_polar_amplification_factor_in_loose_band_both_metrics(pa):
+    # Loose benchmark (Earth defaults, RH 0.8). NAME THE METRIC: the single-endpoint ratio (the headline
+    # ~1.5, the most generous, polar cell on the harmonic-face bias) and the area-band ratio
+    # mean(>=60°)/mean(<=30°) (~1.4, less generous) are BOTH honest polar amplification — assert both in
+    # the loose band, with endpoint ≥ band (the endpoint reads the warmest/coldest extremes).
+    assert 1.3 < pa.pa_moist < 1.7                             # endpoint ratio ~1.5
+    assert 1.25 < pa.pa_moist_band < 1.6                       # area-band ratio ~1.4
+    assert pa.pa_moist >= pa.pa_moist_band                     # endpoint is the more generous metric
+    assert pa.pa_dry_band == pytest.approx(1.0, abs=1e-3)      # dry null both ways (band metric too)
 
 
 def test_pa_direction_is_robust_grows_with_RH(params):
@@ -139,6 +146,7 @@ def test_pa_direction_is_robust_grows_with_RH(params):
     # at every RH. Each RH recalibrated to its own present contrast so the comparison is fair.
     pa_lo = me.polar_amplification(params, RH=0.6, dA=10.0)
     pa_hi = me.polar_amplification(params, RH=0.8, dA=10.0)
+    assert pa_lo.moist_warm.converged and pa_hi.moist_warm.converged   # both relaxations converged
     assert pa_lo.pa_moist > 1.0 and pa_hi.pa_moist > 1.0
     assert pa_hi.pa_moist > pa_lo.pa_moist
 

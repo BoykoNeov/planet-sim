@@ -1217,9 +1217,12 @@ backbone** (recorded below).
   constant albedo the global-mean response to a uniform OLR forcing `ΔA` is **pinned**: `⟨δT⟩ = ΔA/B` to
   machine precision for *any* `D` (the diffusion conserves `∫T dx`, so transport cannot change the mean).
   **Moisture REDISTRIBUTES that fixed `⟨δT⟩` poleward.** Asserted **tight** (conservation). The PA factor
-  `pole/equator δT` ≈ **1.5** (Earth, RH 0.8); **direction banked** (PA>1 robustly), **magnitude loose**
-  (1.43→1.50 across RH 0.6→0.8 — RH-dependent; the observed ~2–3× also needs the ice-albedo + lapse-rate
-  feedbacks held out of scope).
+  is **reported two ways (name the metric, advisor):** the **single-endpoint** ratio `δT(pole)/δT(equator)`
+  ≈ **1.5** (Earth, RH 0.8 — the *most generous*, and the polar cell sits on the harmonic-face bias the
+  bias largely cancels in a δT *difference*), and the **area-band** ratio `mean(δT|φ≥60°)/mean(δT|φ≤30°)`
+  ≈ **1.4** (less generous) — both honest, both pass a loose `1.3–1.7` band. **Direction banked** (PA>1
+  robustly), **magnitude loose** (endpoint 1.43→1.50 across RH 0.6→0.8; the observed ~2–3× also needs the
+  ice-albedo + lapse-rate feedbacks held out of scope).
 - **THE ATTRIBUTION NULL (advisor — the backbone).** The moist model differs from dry in *two* ways (a
   recalibrated `D`-shape AND the T-dependent `D_eff`); which causes PA? **Freeze `D_eff` at its present
   profile and warm → PA = 1.0 *exactly*** (uniform `δT=ΔA/B` solves the perturbation for *any* frozen
@@ -1243,10 +1246,12 @@ backbone** (recorded below).
   `test_subtropical_evaporative_belt_is_not_reproduced` did **not** flip (a different deliverable).
 - **Triad.** *Tight* — exact analytic `dq_sat/dT` (vs finite-diff + ~7 %/K log-slope); `D_eff`-inside
   conservation; pinned `⟨δT⟩=ΔA/B`; the frozen-`D_eff` PA=1 null. *Real-but-loose (unlock)* — the PA
-  itself (~1.5, direction banked / magnitude loose). *Plumbing* — RH=0 ∧ `D_s=0.555` ⟹ the genuine
-  `EnergyBalanceModel` rung-0 solve **bit-for-bit**. *Named choices* — recalibration to present contrast
-  (`D_s<0.555`) + its target-invariance. Tests: `planet/tests/test_moist_ebm.py` (12, all **fast**); full
-  planet gate **261 passed, 1 skip**. No engine edit; `uses` unchanged.
+  itself (endpoint ratio ~1.5 / area-band ~1.4, direction banked / magnitude loose). *Plumbing* — RH=0 ∧
+  `D_s=0.555` ⟹ the genuine `EnergyBalanceModel` rung-0 solve **bit-for-bit**. *Named choices* —
+  recalibration to present contrast (`D_s<0.555`) + its target-invariance + the **named PA metric**
+  (endpoint vs area-band, the advisor's "don't let the most-generous number read as *the* number"). Tests:
+  `planet/tests/test_moist_ebm.py` (12, all **fast**, incl. a `.converged` guard); full planet gate
+  **261 passed, 1 skip**. No engine edit; `uses` unchanged.
 
 **Visualization rungs A/B/C — DECIDED to build all three (animated eddy flow; 2026-06-11;
 rungs A+B BUILT — A 2026-06-11, B 2026-06-12; C pending — build detail in §9.5).** A forward decision (user): animate the emergent eddy life cycle across three
