@@ -131,11 +131,18 @@ def eddy_globe_figure(eddy, *, frame_ms: int = 120):
     fig.add_trace(band_surface(fr.theta[0]), row=1, col=1)       # idx 1 — the eddy band (ANIMATED: surfacecolor)
     band_i = 1
 
-    ymax = float(fr.thru_cum.max()) * 1.08 or 1.0
-    fig.add_trace(go.Scatter(x=fr.times, y=fr.thru_cum, mode="lines",
+    # The transport budget, normalized to a FRACTION of total throughput so the panel reads 0..1 — the
+    # raw cumulative is ~3e7 K·m (a meaningless magnitude that collapses the axis); the RATIO is the
+    # story: throughput climbs to 1.0 while net plateaus at the irreversible fraction (~0.1). κ is
+    # diagnosed elsewhere, so this rescale is legibility-only (ADR 0002: the panel is "reach not correctness").
+    total = float(fr.thru_cum[-1]) or 1.0
+    thru_frac = fr.thru_cum / total
+    net_frac = fr.net_cum / total
+    ymax = 1.08
+    fig.add_trace(go.Scatter(x=fr.times, y=thru_frac, mode="lines",
                              line=dict(color=THROUGHPUT_COLOR, width=2.5),
                              name="throughput  Σ∫|F̄|dt  (the swirls rage)"), row=1, col=2)
-    fig.add_trace(go.Scatter(x=fr.times, y=fr.net_cum, mode="lines",
+    fig.add_trace(go.Scatter(x=fr.times, y=net_frac, mode="lines",
                              line=dict(color=NET_COLOR, width=2.5),
                              name="net  Σ|∫F̄dt|  (the small residual)"), row=1, col=2)
     fig.add_trace(go.Scatter(x=[fr.window_start, fr.window_start], y=[0.0, ymax], mode="lines",
@@ -150,12 +157,11 @@ def eddy_globe_figure(eddy, *, frame_ms: int = 120):
                              line=dict(color="#222222", width=1.2),
                              showlegend=False, hoverinfo="skip"), row=1, col=2)
     thru_i = len(fig.data)
-    fig.add_trace(go.Scatter(x=[fr.times[0]], y=[fr.thru_cum[0]], mode="markers+text",
+    fig.add_trace(go.Scatter(x=[fr.times[0]], y=[thru_frac[0]], mode="markers",
                              marker=dict(color=THROUGHPUT_COLOR, size=9),
-                             text=[f"t = {fr.times[0]:.0f}"], textposition="top center",
-                             textfont=dict(size=11), showlegend=False, hoverinfo="skip"), row=1, col=2)
+                             showlegend=False, hoverinfo="skip"), row=1, col=2)
     net_i = len(fig.data)
-    fig.add_trace(go.Scatter(x=[fr.times[0]], y=[fr.net_cum[0]], mode="markers",
+    fig.add_trace(go.Scatter(x=[fr.times[0]], y=[net_frac[0]], mode="markers",
                              marker=dict(color=NET_COLOR, size=9),
                              showlegend=False, hoverinfo="skip"), row=1, col=2)
 
@@ -169,8 +175,8 @@ def eddy_globe_figure(eddy, *, frame_ms: int = 120):
             # cmin/cmax are re-stated per frame so the fixed colour range can't autoscale on a merge.
             data=[go.Surface(surfacecolor=fr.theta[k], cmin=tmin, cmax=tmax),
                   go.Scatter(x=[t, t], y=[0.0, ymax]),
-                  go.Scatter(x=[t], y=[fr.thru_cum[k]], text=[f"t = {t:.0f}"]),
-                  go.Scatter(x=[t], y=[fr.net_cum[k]])],
+                  go.Scatter(x=[t], y=[thru_frac[k]]),
+                  go.Scatter(x=[t], y=[net_frac[k]])],
             traces=[band_i, cursor_i, thru_i, net_i],
         ))
     fig.frames = frames
@@ -200,23 +206,24 @@ def eddy_globe_figure(eddy, *, frame_ms: int = 120):
                  f"instantaneous flux is ~{round(100 * (1 - irr)):.0f}% reversible — the band streams, "
                  "net transport is only the small κ residual</sub>",
             x=0.5, xanchor="center", font=dict(size=15)),
-        width=1180, height=640, margin=dict(l=0, r=0, t=72, b=10),
+        width=1180, height=640, margin=dict(l=0, r=0, t=88, b=10),
         scene=dict(xaxis=no_axis, yaxis=no_axis, zaxis=no_axis, aspectmode="data",
                    camera=dict(eye=dict(x=1.5, y=0.5, z=0.95))),
         updatemenus=[play], sliders=[slider],
-        legend=dict(x=0.62, y=0.99, yanchor="top", font=dict(size=10),
-                    bgcolor="rgba(255,255,255,0.65)"),
+        # legend seated in the panel's empty top-left (throughput is still near zero there early on),
+        # clear of the title block above and the rising curves to its right.
+        legend=dict(x=0.635, y=0.80, xanchor="left", yanchor="top", font=dict(size=10),
+                    bgcolor="rgba(255,255,255,0.7)", bordercolor="#cccccc", borderwidth=1),
     )
     fig.update_xaxes(title_text="release time (inertial periods)",
                      range=[float(fr.times[0]), float(fr.times[-1])], row=1, col=2)
-    fig.update_yaxes(title_text="cumulative meridional transport (K·m, interior-band sum)",
+    fig.update_yaxes(title_text="cumulative transport (fraction of total throughput)",
                      range=[0.0, ymax], row=1, col=2)
-    fig.add_annotation(text=f"Throughput rages, net stays small (irreversible fraction ≈ {irr:.2f})",
-                       xref="paper", yref="paper", x=0.81, y=1.02, xanchor="center", yanchor="bottom",
-                       showarrow=False, font=dict(size=12))
-    fig.add_annotation(x=fr.window_start, y=ymax, xref="x2", yref="y2", text="κ diagnosed",
+    # row/col resolves to the panel's real x/y axes — NOT a hardcoded "x2"/"y2", which would spawn a
+    # phantom overlaid axis (the bug that produced the double x-axis + the collapsed 33.2M range).
+    fig.add_annotation(x=fr.window_start, y=ymax, text="κ diagnosed",
                        textangle=-90, xanchor="left", yanchor="top", showarrow=False,
-                       font=dict(size=9, color=WINDOW_COLOR))
+                       font=dict(size=9, color=WINDOW_COLOR), row=1, col=2)
     return fig
 
 
