@@ -33,7 +33,7 @@ docs/figures/        # banked figures (planet-*.png) + two interactive globes
 
 ```powershell
 pip install -e ".[viz]"                  # compute + figures
-python planet/demo_snowball.py           # any demo prints its validation table + banks a figure
+python -m planet.demo_snowball           # any demo prints its validation table + banks a figure
 jupyter lab planet/planet.ipynb          # the teaching notebook (needs .[viz,notebook])
 # the interactive deep-end globe (needs .[webviz]): planet.planetmap.interactive_map()
 ```
