@@ -1274,7 +1274,14 @@ advisor's load-bearing risks** before any build:
   **first-principles-validated**: at zero shear it is **neutral to machine precision** (`max|Im ω|≈3e-20`)
   and **recovers the two-layer Poincaré dispersions** (external `ω²=f₀²+gH_tot k²`, internal
   `ω²=f₀²+g'H_e k²`). It gives σ(k) with a **short-wave cutoff**, a most-unstable wavelength **~6.8× the
-  layer deformation radius** (`λ*≈680 km` at idealized params), and (with β) a finite critical shear.
+  layer deformation radius** (`λ*≈680 km` at idealized params). **The baroclinic `G_k` terms are
+  externally anchored** (zero-shear Poincaré leaves them untested → otherwise they'd rest only on the
+  self-consistent Phillips convergence = two hand-derivations that could share a compensating error): the
+  max-growth coefficient `σ_max≈0.304·U_s/L_d` matches the **Eady** model (continuous stratification, a
+  *wholly independent* derivation) `0.310` to **2 %**, and the critical-shear *formula* `U_s,crit=β·g'H/f₀²`
+  matches the literature `β/k²_int` (Pedlosky/Vallis, web-confirmed). The solver is **f-plane** (β is not in
+  the perturbation operator → it is correctly **Eady-like: no critical shear, unstable for all shear**); a
+  *finite* critical shear needs β = a Phase-A (β-capable, QG/PV-gradient) item, not a spike claim.
 - **QG Phillips = the LOOSE cross-check that confirms the tight leg.** Derived as a 2×2 and compared to the
   SW solver: in the **rigid-lid limit (`g→∞`, the external mode infinitely fast) they converge to <0.5%**
   (`σ_SW/σ_Phillips→1.004`), mutually validating both; at the actual free-surface params the gap is a clean
@@ -1295,6 +1302,17 @@ advisor's load-bearing risks** before any build:
   solver (mirroring `engines/fluid`'s discretization) integrating a single growing mode lands the measured
   growth rate **within ~4 % of the analytic σ, monotonically converging with resolution** (5.2→4.1→3.8 % at
   nx=32→64→128). The stacked-layer advection + coupled-pressure + Coriolis + SSP-RK3 all behave.
+
+**Calibrate the "GO" (advisor done-check — the hedge is load-bearing).** The spike de-risks **buildability**
+at **high confidence** — linear baroclinic instability exists, the engine route reproduces it, the CFL is
+affordable — but that was the **textbook-guaranteed** part (70-year-old physics + an implementation/CFL
+check). **The Phase-B *quantitative* payoff remains an OPEN BET:** that the *saturated* eddy flux comes out
+**irreversible** (vs rung-1's ~90 %-reversible barotropic finding) at a **realistic magnitude** (near rung-0's
+`κ~2.2e6`, vs rung-1's ~1000× off) — i.e. that the reduction-to-EBM is genuinely **non-vacuous** — is
+**untouched by a linear spike** and is *exactly* the claim class this project **downgraded at rung 1**
+("named, not banked") and **overturned at rung 2** (the extratropical-only trade). Phase A succeeding moves
+that risk **zero**. So "spike-validated / GO" means *the route is sound to build*, **not** *the rung is
+de-risked* — the saturation reality-check is owed before the payoff is banked.
 
 **The A/B split (advisor — the same machinery-vs-emergent split as rungs 1 & 2):**
 - **Phase A = the linear baroclinic growth rate (tight, the current energy-conserving engine).** Extend

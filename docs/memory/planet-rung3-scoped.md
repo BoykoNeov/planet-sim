@@ -32,8 +32,14 @@ coupling) into the *tight* leg. The rung-appropriate move (matching Phase 3's Po
 growing mode (built from the equations, **not a recalled quartic**). σ = max Im(ω). **First-principles
 validated in the spike:** zero-shear → **neutral to machine precision** (`max|Im ω|≈3e-20`) AND **recovers
 both Poincaré dispersions** (external `ω²=f₀²+gH_tot k²`, internal `ω²=f₀²+g'H_e k²`). Gives σ(k) with a
-**short-wave cutoff**, most-unstable `λ*≈6.8×` the layer deformation radius (`≈680 km` idealized), finite
-critical shear with β.
+**short-wave cutoff**, most-unstable `λ*≈6.8×` the layer deformation radius (`≈680 km` idealized). **The
+baroclinic `G_k` terms are EXTERNALLY anchored** (zero-shear Poincaré leaves them untested → else they rest
+only on the self-consistent Phillips convergence = two hand-derivations, advisor's circularity catch): max-
+growth coefficient `σ_max≈0.304·U_s/L_d` matches the **EADY** model (independent derivation) `0.310` to
+**2%**, and the critical-shear *formula* `U_s,crit=β·g'H/f₀²` matches the literature `β/k²_int`
+(Pedlosky/Vallis, web-confirmed). **The solver is f-PLANE** (β not in the perturbation operator → correctly
+**Eady-like: NO critical shear, unstable for all shear**); a *finite* critical shear needs β = a Phase-A
+(β-capable QG/PV-gradient) item, NOT a spike claim (the advisor caught my overclaim here).
 
 **QG Phillips = the LOOSE cross-check that CONFIRMS the tight leg.** Derived 2×2; in the **rigid-lid limit
 (`g→∞`, external mode infinitely fast) σ_SW/σ_Phillips → 1.004 (<0.5%)** = mutual validation; at free-
@@ -51,6 +57,14 @@ bite. **Idealized `(g,H,Δρ/ρ)`** chosen for modest `√(gH)` + resolvable int
 3** (validates *mechanism + growth rate*, not Earth jet speeds = the same config-tuned honesty banked at
 rungs 1–2). **The route is sound:** a linearized two-layer C-grid SSP-RK3 solver (mirrors `engines/fluid`)
 reproduces the analytic σ **within ~4%, monotonically converging** (5.2→4.1→3.8% at nx 32→64→128).
+
+**CALIBRATE THE GO (advisor done-check — the hedge is load-bearing).** The spike de-risks **buildability**
+(linear instability exists, engine reproduces it, CFL affordable) at HIGH confidence — but that's the
+**textbook-guaranteed** part. **The Phase-B QUANTITATIVE PAYOFF is an OPEN BET** (irreversible flux at
+realistic magnitude → non-vacuous reduction-to-EBM): untouched by a linear spike, and *exactly* the claim
+class downgraded at rung 1 (named-not-banked) + overturned at rung 2. Phase A succeeding moves that risk
+**ZERO**. "Spike-validated/GO" = *the route is sound to build*, NOT *the rung is de-risked* — the saturation
+reality-check is owed before banking the payoff.
 
 **THE A/B SPLIT (advisor's #3 — same machinery-vs-emergent split as rungs 1 & 2):**
 - **Phase A = the LINEAR growth rate (tight; the current energy-conserving engine).** Extend `engines/fluid`
