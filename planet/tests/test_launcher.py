@@ -128,3 +128,13 @@ def test_open_banked_globe_rejects_out_of_range(monkeypatch, capsys):
     monkeypatch.setattr(launcher, "_open_in_browser", lambda *a, **k: pytest.fail("should not open"))
     launcher._open_banked_globe("99")
     assert "no such globe" in capsys.readouterr().out
+
+
+def test_site_verb_builds_and_opens(monkeypatch):
+    """`python -m planet site` wires write_site() → open. Stubbed so the test writes/opens nothing."""
+    opened: list = []
+    # Don't touch the shared docs/index.html (xdist-safe) and don't spawn a browser.
+    monkeypatch.setattr("planet.site.write_site", lambda: launcher._REPO_ROOT / "docs" / "index.html")
+    monkeypatch.setattr(launcher, "_open_in_browser", lambda path, label="": opened.append(path.name))
+    assert launcher.main(["site"]) == 0
+    assert opened == ["index.html"]

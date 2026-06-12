@@ -25,63 +25,12 @@ import shutil
 import subprocess
 import sys
 import webbrowser
-from dataclasses import dataclass
 from pathlib import Path
 
+from planet.catalog import DEMOS, Demo, _REPO_ROOT  # the single source of truth (re-exported)
+
 _HERE = Path(__file__).resolve().parent
-_REPO_ROOT = _HERE.parent
 _NOTEBOOK = _HERE / "planet.ipynb"
-
-
-@dataclass(frozen=True)
-class Demo:
-    """One catalogue entry — a runnable ``planet.<module>`` exposing ``main()``."""
-
-    key: str                 # the short name the user types
-    module: str              # the importable module whose main() we call
-    title: str               # one-line headline for the menu
-    blurb: str               # a sentence of what it shows
-    extras: tuple[str, ...]  # the pip extras its figure needs ("viz" / "webviz")
-    artifact: str            # repo-relative primary artifact (offered to open afterwards)
-    section: str             # menu grouping header
-    sim: bool = False        # True ⇒ runs a multi-second fluid simulation (warn first)
-
-
-# The single source of truth. The interactive menu, the CLI dispatch, and the catalogue
-# test all read this one list — add a demo here and it shows up in every surface at once.
-DEMOS: tuple[Demo, ...] = (
-    Demo("snowball", "planet.demo_snowball", "Snowball-Earth hysteresis",
-         "one knob (the solar constant), two stable climates, a catastrophic freeze",
-         ("viz",), "docs/figures/planet-snowball.png", "Climate — energy balance"),
-    Demo("biomes", "planet.demo_biomes", "Climate → biome map",
-         "the Whittaker (temperature, rainfall) classifier; warming migrates the bands poleward",
-         ("viz",), "docs/figures/planet-biomes.png", "Climate — energy balance"),
-    Demo("exoplanet", "planet.demo_exoplanet", "Exoplanet knobs",
-         "a redder star and a bigger planet reshape the climate and the ice line",
-         ("viz",), "docs/figures/planet-exoplanet.png", "Climate — energy balance"),
-    Demo("obliquity", "planet.demo_obliquity", "Axial tilt (obliquity)",
-         "how the planet's tilt reshapes the pole-to-equator sunlight",
-         ("viz",), "docs/figures/planet-obliquity.png", "Climate — energy balance"),
-    Demo("shallowwater", "planet.demo_shallowwater", "Rotating shallow-water atmosphere",
-         "geostrophic adjustment on the sphere — the circulation engine on its own",
-         ("viz",), "docs/figures/planet-shallowwater.png",
-         "Circulation — shallow-water (runs a short sim)", sim=True),
-    Demo("coupler", "planet.demo_coupler", "EBM → circulation coupler",
-         "an emergent jet grows from the pole-to-equator temperature gradient (one-way coupling)",
-         ("viz", "webviz"), "docs/figures/planet-coupler.png",
-         "Circulation — shallow-water (runs a short sim)", sim=True),
-    Demo("eddy_life", "planet.demo_eddy_life", "Eddy life cycle — GIF",
-         "the emergent eddy stirring the temperature, animated as a two-panel GIF",
-         ("viz",), "docs/figures/planet-eddy-life.gif",
-         "Circulation — shallow-water (runs a short sim)", sim=True),
-    Demo("eddy_globe", "planet.demo_eddy_globe", "Eddy life cycle — globe",
-         "the same eddy life cycle, animated on the interactive globe",
-         ("webviz",), "docs/figures/planet-eddy-globe.html",
-         "Circulation — shallow-water (runs a short sim)", sim=True),
-    Demo("map", "planet.planetmap", "Interactive biome-map globe",
-         "the present-day globe — rotate / zoom / hover (the live sliders run in the notebook)",
-         ("webviz",), "docs/figures/planet-map.html", "Interactive globes"),
-)
 
 _BY_KEY = {d.key: d for d in DEMOS}
 
@@ -212,6 +161,14 @@ def _open_banked_globe(choice: str | None = None) -> None:
     _open_in_browser(_REPO_ROOT / rel, label)
 
 
+def _build_and_open_site() -> None:
+    """(Re)generate the landing page from the catalogue and open it in the browser."""
+    from planet import site                      # local import: keeps the launcher start-up lean
+    path = site.write_site()
+    print(f"  landing page generated → {path.relative_to(_REPO_ROOT)}")
+    _open_in_browser(path, "the planet-sim landing page")
+
+
 def _run_all() -> None:
     """Run every demo in catalogue order (banks every figure). Never auto-opens — that'd be 9 tabs."""
     for demo in DEMOS:
@@ -236,6 +193,7 @@ def print_catalog() -> None:
         print(f"        {demo.blurb}")
     print("\n  Open a saved result (no compute):")
     print("     g  globes        open a banked interactive globe (biome / coupler / eddy)")
+    print("     s  site          build & open the landing page (links to every demo & globe)")
     print("     n  notebook      open the teaching notebook in JupyterLab          [notebook]")
     print("\n     a  all           run every demo and bank every figure")
     print("     q  quit\n")
@@ -263,6 +221,8 @@ def _menu_loop() -> None:
             _launch_notebook()
         elif cmd in ("g", "globe", "globes"):
             _open_banked_globe()
+        elif cmd in ("s", "site", "page", "web"):
+            _build_and_open_site()
         elif cmd.isdigit() and 1 <= int(cmd) <= len(DEMOS):
             _run_demo(DEMOS[int(cmd) - 1], offer_open=True)
         elif cmd in _BY_KEY:
@@ -299,6 +259,8 @@ def _dispatch_one(token: str) -> int:
         _launch_notebook()
     elif tok in ("globes", "globe"):
         _open_banked_globe()
+    elif tok in ("site", "page", "web"):
+        _build_and_open_site()
     elif tok in _BY_KEY:
         _run_demo(_BY_KEY[tok], offer_open=sys.stdout.isatty())
     else:

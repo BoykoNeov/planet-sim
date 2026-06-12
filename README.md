@@ -45,7 +45,15 @@ python -m planet snowball     # run one demo (prints its validation table + bank
 python -m planet list         # print the full catalogue of demos
 python -m planet notebook     # open the teaching notebook in JupyterLab (opens your browser for you)
 python -m planet globes       # just open a saved interactive globe — no compute
+python -m planet site         # build & open the landing page — a clickable gallery of everything
 ```
+
+**Browse it as a webpage.** `python -m planet site` (re)generates [`docs/index.html`](docs/index.html)
+— a self-contained, clickable gallery linking every demo figure, the three interactive globes, and
+the notebook. It's generated from the demo catalogue (`planet/catalog.py`), so it never drifts: a
+test fails the build if the committed page is out of date. Open it straight off disk, or publish the
+`docs/` folder via **GitHub Pages** (Settings → Pages → *Deploy from branch* → `main` / `/docs`) for a
+shareable site — the figure and globe links are relative, so they resolve either way.
 
 Each demo banks its figure under `docs/figures/` (and `outputs/`). The render stacks are opt-in —
 `.[viz]` for the PNG/GIF figures, `.[webviz]` for the interactive Plotly globes, `.[notebook]` for
@@ -56,11 +64,11 @@ extra to install rather than erroring. The notebook also hosts the live-slider g
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow"     # routine fast lane — 247 tests
-./run_tests.ps1                   # full suite — 276 tests (adds slow live-solver + notebook)
+./run_tests.ps1 -m "not slow"     # routine fast lane — 254 tests
+./run_tests.ps1                   # full suite — 283 tests (adds slow live-solver + notebook)
 ```
 
-The suite is **276 tests**, all green. The one **live-climlab** cross-check needs the
+The suite is **283 tests**, all green. The one **live-climlab** cross-check needs the
 `[climate]` extra and otherwise skips — it is an opt-in bonus on top of the EBM's analytic +
 frozen-table validation, so it skips in CI by design. The Plotly map render smoke-tests need
 `[webviz]`; the planet-spec round-trip-identity test (the deep end's one real correctness

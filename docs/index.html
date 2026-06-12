@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>planet-sim — a planetary climate simulator</title>
+<style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.55 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+       color: #e8ecf4; background: #0b1020; }
+a { color: #8ab4ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+header { padding: 3rem 1.5rem 1.5rem; text-align: center;
+         background: radial-gradient(1200px 400px at 50% -10%, #1b2647 0%, #0b1020 70%); }
+header h1 { margin: 0; font-size: 2.6rem; letter-spacing: -.02em; }
+.tagline { max-width: 46rem; margin: .6rem auto 0; color: #aeb7cc; }
+.links { margin-top: .8rem; color: #6b7796; }
+main { max-width: 72rem; margin: 0 auto; padding: 1rem 1.5rem 4rem; }
+h2 { margin: 2.4rem 0 .3rem; font-size: 1.45rem; }
+h2 + .sub { margin: 0 0 1rem; color: #8b95ad; }
+h3.section { margin: 1.6rem 0 .6rem; font-size: 1rem; text-transform: uppercase;
+             letter-spacing: .08em; color: #8b95ad; font-weight: 600; }
+.grid { display: grid; gap: 1.1rem;
+        grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+.card, .globe { background: #131a30; border: 1px solid #232c49; border-radius: 12px;
+                overflow: hidden; display: flex; flex-direction: column; }
+.card .thumb { display: block; background: #0c1226; aspect-ratio: 16 / 10; overflow: hidden; }
+.card .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card .body { padding: .8rem .9rem 1rem; display: flex; flex-direction: column; gap: .35rem; }
+.card h4 { margin: 0; font-size: 1.02rem; }
+.card p { margin: 0; color: #b9c1d6; font-size: .92rem; }
+.badge { font-size: .72rem; color: #9fb0d6; }
+.cmd code, .card code { background: #0c1226; border: 1px solid #232c49; border-radius: 6px;
+                        padding: .12rem .4rem; font-size: .82rem; color: #cfe0ff; }
+.cta { margin-top: .2rem; font-weight: 600; }
+.globe { padding: 1.4rem 1.1rem; text-align: center; align-items: center; gap: .4rem;
+         background: radial-gradient(360px 160px at 50% 0%, #1c2a55 0%, #131a30 75%); }
+.globe .orb { font-size: 2.4rem; }
+.globe .t { font-weight: 600; }
+.globe .cta { color: #8ab4ff; }
+footer { border-top: 1px solid #232c49; margin-top: 2.5rem; padding-top: 1.2rem;
+         color: #8b95ad; font-size: .9rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>planet-sim</h1>
+  <p class="tagline">Stellar flux and planet parameters in — climate, circulation, and biomes out.
+  A clickable tour of every demonstration, interactive globe, and the teaching notebook.</p>
+  <p class="links"><a href="https://github.com/BoykoNeov/planet-sim">GitHub repo ↗</a> ·
+     <a href="https://github.com/BoykoNeov/planet-sim/blob/main/README.md">README ↗</a> ·
+     <a href="https://github.com/BoykoNeov/planet-sim/blob/main/docs/plans/planet-earth-system.md">build plan ↗</a></p>
+</header>
+<main>
+<section>
+  <h2>Interactive globes</h2>
+  <p class="sub">Drag to rotate, scroll to zoom, hover for the numbers — no install, they open straight in your browser.</p>
+  <div class="grid">
+    <a class="globe" href="figures/planet-coupler-map.html">
+      <span class="orb">🌍</span>
+      <span class="t">EBM → circulation coupler</span>
+      <span class="cta">Open interactive globe ↗</span>
+    </a>
+    <a class="globe" href="figures/planet-eddy-globe.html">
+      <span class="orb">🌍</span>
+      <span class="t">Eddy life cycle — globe</span>
+      <span class="cta">Open interactive globe ↗</span>
+    </a>
+    <a class="globe" href="figures/planet-map.html">
+      <span class="orb">🌍</span>
+      <span class="t">Interactive biome-map globe</span>
+      <span class="cta">Open interactive globe ↗</span>
+    </a>
+  </div>
+</section>
+<section>
+  <h2>Demonstrations</h2>
+  <p class="sub">Each prints its validation table and banks a figure; click a figure for the full image, or copy the command to reproduce it.</p>
+  <h3 class="section">Climate — energy balance</h3>
+  <div class="grid">
+    <article class="card">
+      <a class="thumb" href="figures/planet-snowball.png"><img src="figures/planet-snowball.png" alt="Snowball-Earth hysteresis" loading="lazy"></a>
+      <div class="body">
+        <h4>Snowball-Earth hysteresis</h4>
+        <p>one knob (the solar constant), two stable climates, a catastrophic freeze</p>
+        <p class="badge">needs <code>.[viz]</code></p>
+        <p class="cmd"><code>python -m planet snowball</code></p>
+        
+      </div>
+    </article>
+    <article class="card">
+      <a class="thumb" href="figures/planet-biomes.png"><img src="figures/planet-biomes.png" alt="Climate → biome map" loading="lazy"></a>
+      <div class="body">
+        <h4>Climate → biome map</h4>
+        <p>the Whittaker (temperature, rainfall) classifier; warming migrates the bands poleward</p>
+        <p class="badge">needs <code>.[viz]</code></p>
+        <p class="cmd"><code>python -m planet biomes</code></p>
+        
+      </div>
+    </article>
+    <article class="card">
+      <a class="thumb" href="figures/planet-exoplanet.png"><img src="figures/planet-exoplanet.png" alt="Exoplanet knobs" loading="lazy"></a>
+      <div class="body">
+        <h4>Exoplanet knobs</h4>
+        <p>a redder star and a bigger planet reshape the climate and the ice line</p>
+        <p class="badge">needs <code>.[viz]</code></p>
+        <p class="cmd"><code>python -m planet exoplanet</code></p>
+        
+      </div>
+    </article>
+    <article class="card">
+      <a class="thumb" href="figures/planet-obliquity.png"><img src="figures/planet-obliquity.png" alt="Axial tilt (obliquity)" loading="lazy"></a>
+      <div class="body">
+        <h4>Axial tilt (obliquity)</h4>
+        <p>how the planet&#x27;s tilt reshapes the pole-to-equator sunlight</p>
+        <p class="badge">needs <code>.[viz]</code></p>
+        <p class="cmd"><code>python -m planet obliquity</code></p>
+        
+      </div>
+    </article>
+  </div>
+  <h3 class="section">Circulation — shallow-water (runs a short sim)</h3>
+  <div class="grid">
+    <article class="card">
+      <a class="thumb" href="figures/planet-shallowwater.png"><img src="figures/planet-shallowwater.png" alt="Rotating shallow-water atmosphere" loading="lazy"></a>
+      <div class="body">
+        <h4>Rotating shallow-water atmosphere</h4>
+        <p>geostrophic adjustment on the sphere — the circulation engine on its own</p>
+        <p class="badge">needs <code>.[viz]</code> · runs a short simulation</p>
+        <p class="cmd"><code>python -m planet shallowwater</code></p>
+        
+      </div>
+    </article>
+    <article class="card">
+      <a class="thumb" href="figures/planet-coupler.png"><img src="figures/planet-coupler.png" alt="EBM → circulation coupler" loading="lazy"></a>
+      <div class="body">
+        <h4>EBM → circulation coupler</h4>
+        <p>an emergent jet grows from the pole-to-equator temperature gradient (one-way coupling)</p>
+        <p class="badge">needs <code>.[viz]</code> <code>.[webviz]</code> · runs a short simulation</p>
+        <p class="cmd"><code>python -m planet coupler</code></p>
+        <a class="cta" href="figures/planet-coupler-map.html">Open interactive globe ↗</a>
+      </div>
+    </article>
+    <article class="card">
+      <a class="thumb" href="figures/planet-eddy-life.gif"><img src="figures/planet-eddy-life.gif" alt="Eddy life cycle — GIF" loading="lazy"></a>
+      <div class="body">
+        <h4>Eddy life cycle — GIF</h4>
+        <p>the emergent eddy stirring the temperature, animated as a two-panel GIF</p>
+        <p class="badge">needs <code>.[viz]</code> · runs a short simulation</p>
+        <p class="cmd"><code>python -m planet eddy_life</code></p>
+        
+      </div>
+    </article>
+    <article class="card">
+      <a class="thumb" href="figures/planet-eddy-globe.html" style="display:flex;align-items:center;justify-content:center;font-size:2.4rem">🌍</a>
+      <div class="body">
+        <h4>Eddy life cycle — globe</h4>
+        <p>the same eddy life cycle, animated on the interactive globe</p>
+        <p class="badge">needs <code>.[webviz]</code> · runs a short simulation</p>
+        <p class="cmd"><code>python -m planet eddy_globe</code></p>
+        
+      </div>
+    </article>
+  </div>
+  <h3 class="section">Interactive globes</h3>
+  <div class="grid">
+    <article class="card">
+      <a class="thumb" href="figures/planet-map.html" style="display:flex;align-items:center;justify-content:center;font-size:2.4rem">🌍</a>
+      <div class="body">
+        <h4>Interactive biome-map globe</h4>
+        <p>the present-day globe — rotate / zoom / hover (the live sliders run in the notebook)</p>
+        <p class="badge">needs <code>.[webviz]</code></p>
+        <p class="cmd"><code>python -m planet map</code></p>
+        
+      </div>
+    </article>
+  </div>
+</section>
+<section>
+  <h2>Experiment in the notebook</h2>
+  <p class="sub">The notebook is the sandbox — this is where you run your own experiments.</p>
+  <article class="card" style="max-width:42rem">
+    <div class="body">
+      <p><code>planet.ipynb</code> is the teaching narrative and the bench: build a world in the
+      §7 <em>design-a-world</em> sandbox, drag the exoplanet / obliquity / size knobs, and
+      predict-then-check each climate. It needs a running kernel, so launch it locally:</p>
+      <p class="cmd"><code>python -m planet notebook</code></p>
+      <p>Prefer to read it first?
+         <a href="https://github.com/BoykoNeov/planet-sim/blob/main/planet/planet.ipynb">View the notebook rendered on GitHub ↗</a>.
+         The live-slider globe lives here too (<code>planet.planetmap.interactive_map()</code>).</p>
+    </div>
+  </article>
+</section>
+<footer>
+  <p>The science &amp; the decisions behind each leg:
+     <a href="https://github.com/BoykoNeov/planet-sim/blob/main/docs/plans/planet-earth-system.md">the build plan</a> ·
+     ADRs <a href="https://github.com/BoykoNeov/planet-sim/blob/main/docs/decisions/0001-language-and-performance.md">0001</a> · <a href="https://github.com/BoykoNeov/planet-sim/blob/main/docs/decisions/0002-visualization-and-ux.md">0002</a> · <a href="https://github.com/BoykoNeov/planet-sim/blob/main/docs/decisions/0003-test-execution-policy.md">0003</a> · <a href="https://github.com/BoykoNeov/planet-sim/blob/main/docs/decisions/0004-interactive-maps-and-state-interchange.md">0004</a> · <a href="https://github.com/BoykoNeov/planet-sim/blob/main/docs/decisions/0005-engines-are-living-contracts.md">0005</a>.</p>
+  <p>This page is generated from the demo catalogue (<code>planet/catalog.py</code>) —
+     regenerate it with <code>python -m planet site</code> after adding a demo; a test fails the
+     build if it drifts.</p>
+</footer>
+</main>
+</body>
+</html>
