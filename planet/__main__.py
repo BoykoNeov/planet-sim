@@ -24,6 +24,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import webbrowser
 from pathlib import Path
 
@@ -31,6 +32,7 @@ from planet.catalog import DEMOS, Demo, _REPO_ROOT  # the single source of truth
 
 _HERE = Path(__file__).resolve().parent
 _NOTEBOOK = _HERE / "planet.ipynb"
+_SERVER_LOG = _REPO_ROOT / "outputs" / "jupyter-server.log"  # gitignored; the server logs here
 
 _BY_KEY = {d.key: d for d in DEMOS}
 
@@ -95,14 +97,46 @@ def _notebook_url_from_log(line: str) -> str | None:
     return f"{base}/lab/tree/planet/planet.ipynb?token={token}"
 
 
+def _wait_for_notebook_url(log_path: Path, proc: subprocess.Popen, timeout: float = 90.0) -> str | None:
+    """Tail the server's log file until it announces its URL — or it dies / we time out.
+
+    We read the log *file* rather than the live stdout pipe on purpose (see ``_launch_notebook``):
+    iterate with ``readline()`` and short-sleep on EOF, because a plain ``for line in f`` would stop
+    at the first end-of-file — which we reach before JupyterLab has finished booting and printed its
+    URL. Bail early if the server process exits (a startup crash) so we don't wait the full timeout.
+    """
+    deadline = time.monotonic() + timeout
+    with open(log_path, "r", encoding="utf-8", errors="replace") as log:
+        while time.monotonic() < deadline:
+            line = log.readline()
+            if not line:                              # caught up to the writer — wait for more
+                if proc.poll() is not None:           # …unless the server already exited (crash)
+                    return None
+                time.sleep(0.2)
+                continue
+            sys.stdout.write(line)                    # echo the boot banner (bounded: we stop at the URL)
+            sys.stdout.flush()
+            nb_url = _notebook_url_from_log(line)
+            if nb_url:
+                return nb_url
+    return None
+
+
 def _launch_notebook() -> None:
     """Open the teaching notebook in JupyterLab — *we* open the browser, so it never makes you
     copy a URL.
 
-    JupyterLab's own auto-open writes a temporary redirect ``.html`` and points the browser at
-    that file; on Windows the browser often can't read it (``ERR_ACCESS_DENIED``). So we launch
-    with ``--no-browser``, read the ``http://localhost:PORT/lab?token=…`` line off its log, and
-    open the notebook URL ourselves — the one mechanism that actually broke is removed entirely.
+    Two Windows traps are designed out here:
+
+    * **The redirect file.** JupyterLab's own auto-open writes a temporary redirect ``.html`` and
+      points the browser at it; on Windows the browser often can't read that file
+      (``ERR_ACCESS_DENIED``). So we launch ``--no-browser`` and open the ``/lab/tree/`` URL ourselves.
+    * **The frozen server.** If the server's output goes through a pipe we echo to the console, a
+      *paused* console — Windows QuickEdit / selecting text in the window pauses its output — blocks
+      our echo, stops us draining the pipe, fills the OS pipe buffer, and then JupyterLab blocks on
+      its own log writes and goes unreachable (the browser shows "error connecting to server" and
+      "File Save Error … Failed to fetch"). So the server logs to a **file** instead: a file never
+      back-pressures, so no console habit can starve it. We detect the URL by tailing that file.
     """
     if not _NOTEBOOK.exists():
         print(f"Notebook not found: {_NOTEBOOK}")
@@ -115,26 +149,36 @@ def _launch_notebook() -> None:
 
     print(f"Launching JupyterLab on {_NOTEBOOK.relative_to(_REPO_ROOT)} …")
     print("(leave this running; press Ctrl-C here to stop the server)\n")
-    # Serve from the repo root so the notebook opens at a stable /lab/tree/ path.
-    proc = subprocess.Popen(
-        [jupyter, "lab", "--no-browser"],
-        cwd=str(_REPO_ROOT),
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, bufsize=1,
-    )
-    opened = False
+    _SERVER_LOG.parent.mkdir(parents=True, exist_ok=True)
+    # Truncate per launch ('w') so a stale URL/token from a previous run can't be picked up.
+    log = open(_SERVER_LOG, "w", encoding="utf-8")
     try:
-        assert proc.stdout is not None
-        for line in proc.stdout:
-            sys.stdout.write(line)
-            sys.stdout.flush()
-            if not opened:
-                nb_url = _notebook_url_from_log(line)
-                if nb_url:
-                    print(f"\n→ Opening the notebook in your browser:\n  {nb_url}\n"
-                          "  (if it doesn't open, paste that URL into your browser)\n")
-                    webbrowser.open(nb_url)
-                    opened = True
+        # Serve from the repo root so the notebook opens at a stable /lab/tree/ path. The child gets
+        # its own inherited handle to the log, so we can close ours straight after it starts.
+        proc = subprocess.Popen(
+            [jupyter, "lab", "--no-browser"],
+            cwd=str(_REPO_ROOT),
+            stdout=log, stderr=subprocess.STDOUT,
+            text=True,
+        )
+    finally:
+        log.close()
+
+    log_rel = _SERVER_LOG.relative_to(_REPO_ROOT)
+    nb_url = _wait_for_notebook_url(_SERVER_LOG, proc)
+    if nb_url:
+        print(f"\n→ Opening the notebook in your browser:\n  {nb_url}\n"
+              "  (if it doesn't open, paste that URL into your browser)\n")
+        webbrowser.open(nb_url)
+    elif proc.poll() is not None:
+        print(f"\nJupyterLab exited before announcing a URL — see {log_rel} for why.")
+        return
+    else:
+        print(f"\nCouldn't detect the server URL yet — open {log_rel}, or run "
+              "`jupyter lab list`, to get it.\n")
+
+    print(f"JupyterLab is running (its log → {log_rel}). Press Ctrl-C here to stop the server.\n")
+    try:
         proc.wait()
     except KeyboardInterrupt:
         print("\nStopping JupyterLab …")
