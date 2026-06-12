@@ -71,7 +71,13 @@ references — weather, not climate). The rungs rise in cost, *fall* in pedagogi
   dropped the redundant "Throughput rages" annotation; **normalized the panel to a fraction of total
   throughput** (throughput→1.0, net plateaus at ~`irr`) so it reads 0..1 not ~3e7 K·m; dropped the
   floating `t=N` marker; reseated the legend. Also removed hover spike lines per the new standing
-  preference → [[no-pointer-spike-lines]].
+  preference → [[no-pointer-spike-lines]]. **Second polish pass (2026-06-12):** legend moved to the
+  panel's upper-RIGHT corner (still overlapped the rising curves on the left; near-opaque bg masks the
+  throughput endpoint it now sits on); + **richer novice→intermediate prose** = relabel-don't-append
+  (de-jargoned legend/subtitle, technical term parenthetical) + ONE plain-language caption (β-plane band
+  / "reversible" + the % / κ residual) seated below the controls — the Rung-B figure is the **exemplar**
+  for the new standing rule [[viz-prose-novice-intermediate]] (sweep of planetmap globes + triptych +
+  GIFs still owed).
 - **Rung C** = WebGL particle globe; vendor **mapbox/webgl-wind (ISC, GPU particles)** +
   **cambecc/earth (MIT, orthographic projection)** (licenses verified). webgl-wind is
   flat/equirectangular → needs a three.js sphere or a port of cambecc's projection. New

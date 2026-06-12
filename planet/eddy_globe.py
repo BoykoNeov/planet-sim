@@ -139,12 +139,15 @@ def eddy_globe_figure(eddy, *, frame_ms: int = 120):
     thru_frac = fr.thru_cum / total
     net_frac = fr.net_cum / total
     ymax = 1.08
+    # Plain-language legend (novice→intermediate): "back-and-forth stirring" / "net heat moved" carry the
+    # meaning; the technical term (throughput / κ residual) rides parenthetically. The cryptic raw formulas
+    # + the "swirls rage" / "small residual" editorializing are gone — the caption below defines the terms.
     fig.add_trace(go.Scatter(x=fr.times, y=thru_frac, mode="lines",
                              line=dict(color=THROUGHPUT_COLOR, width=2.5),
-                             name="throughput  Σ∫|F̄|dt  (the swirls rage)"), row=1, col=2)
+                             name="back-and-forth stirring  (throughput)"), row=1, col=2)
     fig.add_trace(go.Scatter(x=fr.times, y=net_frac, mode="lines",
                              line=dict(color=NET_COLOR, width=2.5),
-                             name="net  Σ|∫F̄dt|  (the small residual)"), row=1, col=2)
+                             name="net heat moved poleward  (κ residual)"), row=1, col=2)
     fig.add_trace(go.Scatter(x=[fr.window_start, fr.window_start], y=[0.0, ymax], mode="lines",
                              line=dict(color=WINDOW_COLOR, dash="dash", width=1.4),
                              showlegend=False, hoverinfo="skip"), row=1, col=2)
@@ -198,25 +201,30 @@ def eddy_globe_figure(eddy, *, frame_ms: int = 120):
                          for k in range(fr.times.size)])
 
     irr = eddy.irreversible_fraction
+    rev_pct = round(100 * (1 - irr))     # the share of the stirring that cancels out (≈92%)
+    res_pct = round(100 * irr)           # the residual that survives as net κ transport (≈8%)
     # showspikes=False kills the hover crosshair/projection lines that track the pointer (3-D scene spikes
     # default ON) — a standing preference: no pointer-following spike lines on any visualization.
     no_axis = dict(showbackground=False, showticklabels=False, showgrid=False, zeroline=False,
                    visible=False, showspikes=False)
     fig.update_layout(
         title=dict(
+            # plain-language subtitle: keeps "band" + "reversible" (the test pins both) but drops the
+            # β-plane / κ-residual jargon down to the caption.
             text="Planet §9.5 — the emergent eddy life cycle, on the globe<br>"
-                 "<sub>one midlatitude β-plane band (a ~55° patch — NOT a planet-wide flow); the "
-                 f"instantaneous flux is ~{round(100 * (1 - irr)):.0f}% reversible — the band streams, "
-                 "net transport is only the small κ residual</sub>",
+                 "<sub>one midlatitude band, not a planet-wide flow: swirling eddies stir heat poleward "
+                 f"and back, and ~{rev_pct:.0f}% of it is reversible — so only the small remainder is net "
+                 "transport</sub>",
             x=0.5, xanchor="center", font=dict(size=15)),
-        width=1180, height=640, margin=dict(l=0, r=0, t=88, b=10),
+        # b margin holds the plain-language caption below the play/slider controls (which hang at y≈0).
+        width=1180, height=640, margin=dict(l=0, r=0, t=84, b=150),
         scene=dict(xaxis=no_axis, yaxis=no_axis, zaxis=no_axis, aspectmode="data",
                    camera=dict(eye=dict(x=1.5, y=0.5, z=0.95))),
         updatemenus=[play], sliders=[slider],
-        # legend seated in the panel's empty top-left (throughput is still near zero there early on),
-        # clear of the title block above and the rising curves to its right.
-        legend=dict(x=0.635, y=0.80, xanchor="left", yanchor="top", font=dict(size=10),
-                    bgcolor="rgba(255,255,255,0.7)", bordercolor="#cccccc", borderwidth=1),
+        # legend in the panel's upper-RIGHT corner (per user: it overlapped the rising curves on the left).
+        # The throughput curve terminates near this corner, so a near-opaque bg masks it cleanly.
+        legend=dict(x=0.99, y=0.99, xanchor="right", yanchor="top", font=dict(size=10),
+                    bgcolor="rgba(255,255,255,0.9)", bordercolor="#cccccc", borderwidth=1),
     )
     fig.update_xaxes(title_text="release time (inertial periods)", showspikes=False,
                      range=[float(fr.times[0]), float(fr.times[-1])], row=1, col=2)
@@ -227,6 +235,24 @@ def eddy_globe_figure(eddy, *, frame_ms: int = 120):
     fig.add_annotation(x=fr.window_start, y=ymax, text="κ diagnosed",
                        textangle=-90, xanchor="left", yanchor="top", showarrow=False,
                        font=dict(size=9, color=WINDOW_COLOR), row=1, col=2)
+
+    # The one piece of NEW prose: a plain-language caption (novice→intermediate) so the standalone HTML
+    # stands on its own. It defines the domain jargon the labels can't carry — β-plane band, "reversible",
+    # the κ residual — seated in the expanded bottom margin BELOW the play/slider controls (xref/yref=
+    # "paper", y<0) so it adds explanation without re-cluttering the plot.
+    fig.add_annotation(
+        xref="paper", yref="paper", x=0.5, y=-0.20, xanchor="center", yanchor="top",
+        showarrow=False, align="left", font=dict(size=11, color="#444444"),
+        text=(
+            "<b>How to read it.</b>  The coloured patch is <b>one midlatitude band</b> — a rectangular slice "
+            "of a single latitude zone (a “β-plane”), <b>not</b> the whole planet.<br>"
+            "An unstable jet sheds swirling eddies that stir the temperature θ poleward one moment and back "
+            f"the next; about <b>{rev_pct:.0f}% of that stirring cancels out</b> (it is “reversible”).<br>"
+            f"Only the ~{res_pct:.0f}% that survives — bundled as the eddy diffusivity <b>κ</b> — is net "
+            "poleward heat transport. Right panel: total stirring (throughput) races up while the net "
+            "(the κ residual) barely lifts off the floor."
+        ),
+    )
     return fig
 
 

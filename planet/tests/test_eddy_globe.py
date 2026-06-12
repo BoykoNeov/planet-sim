@@ -122,6 +122,11 @@ def test_demo_eddy_globe_renders(tmp_path):
     # the two honesty edges are ON the figure, not just in the demo's prose.
     assert "reversible" in fig.layout.title.text              # the ~90%-reversible edge
     assert "band" in fig.layout.title.text.lower()            # the band-not-globe edge
+
+    # the standing preference: a plain-language caption (novice→intermediate) defines the domain jargon
+    # (β-plane band, "reversible", the κ residual) so the standalone HTML stands on its own.
+    caption_texts = [a.text for a in fig.layout.annotations if a.text]
+    assert any("β-plane" in t and "reversible" in t for t in caption_texts)
     # the band lat extent tracks the REAL channel (a midlat band), not pole-to-pole.
     (_x, _y, _z), lat2d, _lon2d, lon1d = eg._band_geometry(fr)
     assert np.isclose(lat2d.min(), fr.phi.min()) and np.isclose(lat2d.max(), fr.phi.max())
