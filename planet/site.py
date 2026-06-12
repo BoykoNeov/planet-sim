@@ -106,7 +106,7 @@ def _hero_globes(demos: tuple[Demo, ...]) -> str:
       <span class="t">{_esc(d.title)}</span>
       <span class="cta">Open interactive globe ↗</span>
     </a>""")
-    return ('<section>\n  <h2>Interactive globes</h2>\n'
+    return ('<section>\n  <h2>Explore the globes in 3D</h2>\n'
             '  <p class="sub">Drag to rotate, scroll to zoom, hover for the numbers — no install, '
             'they open straight in your browser.</p>\n'
             f'  <div class="grid">\n' + "\n".join(cards) + "\n  </div>\n</section>")
