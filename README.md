@@ -32,11 +32,26 @@ docs/figures/        # banked figures (planet-*.png) + two interactive globes
 ## Quickstart
 
 ```powershell
-pip install -e ".[viz]"                  # compute + figures
-python -m planet.demo_snowball           # any demo prints its validation table + banks a figure
-jupyter lab planet/planet.ipynb          # the teaching notebook (needs .[viz,notebook])
-# the interactive deep-end globe (needs .[webviz]): planet.planetmap.interactive_map()
+pip install -e ".[viz,webviz,notebook]"   # compute + figures + interactive globes + notebook
+python -m planet                          # the front door: a menu of every demo, globe & the notebook
 ```
+
+`python -m planet` is the **one command to remember** — it lists every demonstration and runs
+or opens them for you (including launching the notebook straight into your browser). Want to go
+straight to one?
+
+```powershell
+python -m planet snowball     # run one demo (prints its validation table + banks a figure)
+python -m planet list         # print the full catalogue of demos
+python -m planet notebook     # open the teaching notebook in JupyterLab (opens your browser for you)
+python -m planet globes       # just open a saved interactive globe — no compute
+```
+
+Each demo banks its figure under `docs/figures/` (and `outputs/`). The render stacks are opt-in —
+`.[viz]` for the PNG/GIF figures, `.[webviz]` for the interactive Plotly globes, `.[notebook]` for
+JupyterLab — and a demo whose stack is missing still prints its physics summary and tells you which
+extra to install rather than erroring. The notebook also hosts the live-slider globe
+(`planet.planetmap.interactive_map()`), the one view that needs a running kernel.
 
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
