@@ -138,6 +138,10 @@ def test_construction_validation():
         lay.step(s, 0.0)
     with pytest.raises(ValueError):                       # dt above the external-mode CFL
         lay.step(s, 1e9)
+    # a background on a β-plane is inconsistent (the mean Coriolis would be unbalanced) → rejected
+    bg = lay.thermal_wind([2.0, -2.0])
+    with pytest.raises(ValueError):
+        LayeredShallowWater(grid, 10.0, [500.0, 500.0], [0.2], f0=1e-4, beta=1e-11, background=bg)
 
 
 # --------------------------------------------------------------------------- #

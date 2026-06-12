@@ -200,6 +200,15 @@ class LayeredShallowWater:
         self.f_corner = (self.f0 + self.beta * (y_corner - self.y_ref))[:, None] * np.ones((1, grid.nx))
         self.background = background
         if background is not None:
+            if self.beta != 0.0:
+                # The background is balanced only on the f-plane: once f varies in y the omitted
+                # mean Coriolis −f(y)·U_k is unbalanced (a spurious drift, not the β-effect). The
+                # β-capable PV-gradient treatment is the named within-rung extension — enforce the
+                # documented constraint rather than silently drift (cf. the enforced CFL guard).
+                raise ValueError(
+                    "a thermal-wind background is consistent only on the f-plane (beta=0); "
+                    "got beta != 0 (a β-capable basic state is the named within-rung extension)"
+                )
             U = np.asarray(background.U, dtype=float)
             G = np.asarray(background.G, dtype=float)
             if U.shape != (self.nl,) or G.shape != (self.nl,):
