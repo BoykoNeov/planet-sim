@@ -143,12 +143,39 @@ references — weather, not climate). The rungs rise in cost, *fall* in pedagogi
   physics-fidelity **RELAXES** (no byte-golden / no transport proof); **documentation verification TIGHTENS** —
   the disclaimer is a **visible** DOM `<div class="disclaimer">`, machine-checked to carry **both** honesty
   clauses + never hidden (`display:none`/`visibility:hidden`/`opacity:0`); plus headless-import +
-  coverage-band-not-global + no-external-`src=` guards. GPU ping-pong advection seam stays **named-not-built**
-  (CPU v1 responsive; trigger <~30 fps @ GCM). Gate **303 fast-lane pass**. **The one un-headless-verifiable
+  coverage-band-not-global + no-external-`src=` guards. GPU ping-pong advection seam was **named-not-built** at
+  initial build (CPU v1 responsive; trigger <~30 fps @ GCM) — **now BUILT 2026-06-13, see the GPU-ping-pong
+  paragraph below**. Gate **303 fast-lane pass** (→ 304 after the GPU build). **The one un-headless-verifiable
   thing = the browser play-through** (no WebGL here) → handed to user to eyeball (acceptance: particles stream
   along one tilted band / rest of globe bare / disclaimer legible / drag-zoom responsive; failure modes: blank =
   WebGL-init, frozen = ACCEL/advection, smeared-globe = coverage-box bug) — same hand-off Rung B took. Advisor
   read the JS and confirmed r137 API + camera-frames-band + collocation-axes + advection-dims all correct.
+
+  **GPU ping-pong advection BUILT 2026-06-13 (user-requested ahead of the <30fps trigger; advisor green-lit +
+  static-traced the impl correct).** The named seam closes: advection runs **entirely on the GPU** by default,
+  the original CPU `step()` loop demoted to a **runtime FALLBACK**. State = **RGBA32F float texture**, 1 texel/
+  particle `(lon,lat,age,life)`; off-screen frag shader `UPDATE_FS` reads state → advects by the SAME
+  `dλ/dt=u/(a cosφ)`,`dφ/dt=v/a` metric+`accel` → writes the other target (**ping-pong**); a `Points` cloud's
+  vertex shader `DRAW_VS` reads each position from the state texture (sphere xform + `gl_PointSize` attenuation +
+  RdBu_r cmap + alpha-fade all ported to GLSL; sliders→uniforms). Velocity(+θ) = **half-float `DataTexture`**
+  `(u,v,θ,0)` linear-filtered (core WebGL2; state tex `Nearest` ⟹ no float-linear ext). **Hand-rolled** core
+  `WebGLRenderTarget`×2 + `RawShaderMaterial` — `GPUComputationRenderer` REJECTED (ESM/CORS over `file://` + new
+  NOTICE dep). **NO new vendored lib → NOTICE untouched; `FlowField`/`_build_data`/disclaimer/carve-out ALL
+  unchanged — the swap touched ONLY the renderer (proof §9.3 boundary was right).** Binding constraint = **WebGL
+  can't run in CI** ⟹ design for *blind-handoff-recoverable* (advisor's framing) via the **de-risk trio**: (1)
+  CPU fallback so a GPU failure degrades to a working globe NEVER a blank one; (2) path picked at runtime by
+  **feature-detect** (`isWebGL2`+`EXT_color_buffer_float`) + **raw-compile-validate the GLSL vs the live `gl`**
+  (three logs but does NOT throw on link-fail) + `try/catch` init; (3) **console diagnostics** name active-path +
+  fallback-reason + a **diagnostic read-back** logs particle-0's round-tripped state (catches the ONE residual
+  gap the gate misses: a driver advertising the ext yet rendering an INCOMPLETE float target → frozen-at-seed
+  while console says "GPU active"). r137 landmines front-loaded (advisor list): state tex `Nearest`,
+  `gl_PointSize` attenuation by hand, `depthTest:true` vs opaque base (far-side occlusion), `RGBAFormat` not
+  `RGBFormat`, GLSL1 on `RawShaderMaterial`, `frustumCulled=false` on update-quad AND Points. **7th structural
+  test** pins the artifact carries BOTH GPU shader source AND CPU fallback (a future edit can't gut the net).
+  Gate **304 fast-lane pass**; browser play-through again handed to user — **"frozen" now has a 2nd GPU cause**
+  (incomplete float target, visible in the read-back log); GPU-vs-CPU default point size may differ ≤ pixel-ratio
+  (≤2×), slider-correctable NOT a bug. Advisor traced texel-identity end-to-end + `velUV`↔CPU-`sample()` +
+  sphere-xform byte-identical + every division NaN-guarded (compiled-but-wrong won't go fully blank) — all correct.
 
 **Two honesty edges carried through all three (hardest to preserve at C):** (1) the flow is a
 **doubly-periodic midlatitude β-plane band patch, NOT a global field** (same edge as

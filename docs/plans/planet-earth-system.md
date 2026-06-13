@@ -823,7 +823,9 @@ the ADR 0002 note. That the swap is *local* is the proof the boundary was drawn 
   same data contract** — swap the integrator, keep the contract and the disclaimer test. **Trigger (named,
   not "someday"):** when grid resolution × particle count pushes the interactive frame-rate below ~30 fps —
   the GCM-resolution regime — move advection onto the GPU. Until then, CPU advection on the three.js sphere
-  stays responsive, self-contained (inline three.js, no CDN), and golden-friendly.
+  stays responsive, self-contained (inline three.js, no CDN), and golden-friendly. **Built 2026-06-13
+  (follow-up, user-requested ahead of the trigger): the GPU ping-pong integrator now ships as the default
+  with the CPU loop demoted to a runtime fallback — see the "GPU ping-pong advection" build paragraph in §9.5.**
 
 - **Deliverables for the build session (not executed this session).** A generic renderer module
   (`planet/flow_globe.py` — named for the role, the eddy being its first consumer) emitting a three.js
@@ -863,8 +865,9 @@ path); **documentation verification tightens** — the disclaimer is a *visible*
 class="disclaimer">`), and the machine-checked test asserts it carries **both** honesty clauses and is never
 hidden (`display:none`/`visibility:hidden`/`opacity:0`). Plus the always-green guards: headless-import,
 coverage-is-a-bounded-midlat-band-not-global, self-contained-with-three.js-inlined (no external `src=`). The
-GPU ping-pong advection seam stays **named-not-built** (CPU `BufferGeometry` v1 is responsive at this
-resolution; trigger = <~30 fps at GCM scale). **The one thing not headlessly self-verifiable** (no WebGL here)
+GPU ping-pong advection seam stayed **named-not-built** at this initial build (CPU `BufferGeometry` v1 is
+responsive at this resolution; trigger = <~30 fps at GCM scale) — **now built 2026-06-13, see the "GPU
+ping-pong advection" paragraph below.** **The one thing not headlessly self-verifiable** (no WebGL here)
 is the actual browser play-through — handed to the user to eyeball (acceptance: particles stream along one
 tilted band, rest of globe bare, disclaimer legible, drag/zoom responsive); same hand-off Rung B took. Gate:
 303 fast-lane tests pass.
@@ -888,6 +891,36 @@ named seam:** the open-ended remainder — colour ramps, particle density preset
 speculative with no second consumer, so it stays named-not-built. No test changes (the carve-out keeps the
 disclaimer the only machine-checked thing; the 6 structural tests pass untouched); artifact re-banked, gate still
 303 fast-lane pass.
+
+**GPU ping-pong advection (2026-06-13, user-requested ahead of the trigger; advisor green-lit + done-checked).**
+The named seam closes: particle advection now runs **entirely on the GPU** by default, with the original CPU
+`step()` loop demoted to a **runtime fallback**. State lives in an **RGBA32F float texture**, one texel per
+particle = `(lon, lat, age, life)`; each frame an off-screen fragment shader (`UPDATE_FS`) reads the current
+state, advects by the *same* `dλ/dt = u/(a cosφ)`, `dφ/dt = v/a` metric and `accel` the CPU path used, and
+writes the next state into a second target — the two **ping-pong**. A `Points` cloud then draws them, its vertex
+shader (`DRAW_VS`) reading each particle's position straight from the state texture (sphere transform, point-size
+attenuation, RdBu_r colour, alpha fade all moved into GLSL); sliders became uniforms. The velocity (+θ) field
+rides along as a **half-float `DataTexture`** (`(u, v, θ, 0)`, linear-filtered — core in WebGL2; the state
+texture is `Nearest`, so no float-linear extension is needed). **Hand-rolled** with core three.js
+`WebGLRenderTarget`×2 + `RawShaderMaterial` — `GPUComputationRenderer` was *rejected* (an ESM addon, CORS-blocked
+over `file://`, and a new vendored dep owing its own NOTICE). **No new vendored library → NOTICE untouched.**
+The binding constraint is that **WebGL cannot run in CI**, so the design optimises for *a blind hand-off staying
+recoverable* (the advisor's framing): (1) the CPU loop ships as a fallback so a GPU failure degrades to a working
+globe, never a blank one; (2) the path is chosen at runtime by **feature-detect** (`isWebGL2` +
+`EXT_color_buffer_float`) + **raw-compile-validating the GLSL against the live context** (three logs but does not
+*throw* on a link failure) + a `try/catch` around init; (3) **console diagnostics** name the active path and the
+fallback reason, and a **diagnostic read-back** logs particle 0's round-tripped state (the one residual gap the
+gate can't catch — a driver that advertises the extension yet renders an *incomplete* float target → frozen
+particles while the console still says "GPU active"). r137 landmines front-loaded: state texture `Nearest`,
+`gl_PointSize` attenuation replicated by hand, `depthTest:true` against the opaque base (far-side occlusion),
+`RGBAFormat` not `RGBFormat`, GLSL1 on `RawShaderMaterial`, `frustumCulled=false` on both the update quad and the
+Points (texture-resident bounds). A 7th structural test pins that the artifact carries **both** the GPU shader
+source and the CPU fallback, so a future edit can't silently gut the safety net. The data contract (`FlowField`),
+`_build_data`, the disclaimer, and the carve-out are **all unchanged** — the swap touched only the renderer,
+exactly as §9.3 predicted. Gate **304 fast-lane pass**; the browser play-through is again the one thing handed to
+the user (acceptance unchanged; **"frozen particles" now has a second GPU cause** — an incomplete float target,
+visible in the read-back log — and GPU vs CPU default point size may differ by up to the pixel-ratio, ≤2×, which
+is slider-correctable, not a bug).
 
 ---
 

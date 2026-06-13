@@ -235,8 +235,9 @@ body { font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 """
 
 # The in-browser app. Plain JS (no f-string — the braces are JS). DATA + three.js are inlined ahead of
-# this block. The particle advection (lat/lon metric integration + respawn) and the spherical orbit
-# camera are ORIGINAL; three.js supplies only the scene / camera / WebGL renderer (vendored inline).
+# this block. The particle advection — both the GPU ping-pong pass (the default) and the CPU step()
+# fallback — and the spherical orbit camera are ORIGINAL; three.js supplies only the scene / camera /
+# WebGL renderer / render targets / shader-material plumbing (vendored inline).
 _APP_JS = r"""
 const D = window.FLOW_DATA, T = window.THREE;
 const lat = D.lat, lon = D.lon, ny = lat.length, nx = lon.length;
@@ -305,24 +306,223 @@ function cmap(t) {
   const s = (t - 0.5) / 0.5; return [mid[0] + (hi[0] - mid[0]) * s, mid[1] + (hi[1] - mid[1]) * s, mid[2] + (hi[2] - mid[2]) * s];
 }
 
-// deterministic particles (a fixed-seed LCG → a reproducible artifact even without a byte-golden test).
+// --------------------------------------------------------------------------------------------------- #
+// Particle advection — TWO implementations of the SAME lat/lon-metric integration: a GPU ping-pong pass
+// (the default; state lives in a float texture, advanced entirely on the GPU) and a CPU step() loop (the
+// fallback). We cannot run WebGL in CI, so the design rule is: a GPU failure must degrade to the working
+// CPU globe — never a blank one — and the console must say which path ran and why. The active path's
+// per-frame update is bound to `tick`; the appearance sliders to `applySize`/`applyOpacity`/`applySharp`.
+// --------------------------------------------------------------------------------------------------- #
 const N = D.n_particles;
-const pos = new Float32Array(N * 3), col = new Float32Array(N * 4);   // colour is RGBA — alpha carries the fade
-const pLat = new Float32Array(N), pLon = new Float32Array(N), pAge = new Float32Array(N), pLife = new Float32Array(N);
+let tick = null, applySize = null, applyOpacity = null, applySharp = null, onResizeHook = null;
+
+// a deterministic, fixed-seed LCG → a reproducible *initial* state for either path (the motion is then
+// stochastic, which the honest-by-disclosure carve-out permits — there is no byte-golden on this figure).
 let seed = 1234567;
 function rnd() { seed = (1103515245 * seed + 12345) % 2147483648; return seed / 2147483648; }
+
+// ===== GPU ping-pong advection (the default) ======================================================= #
+// Particle state is an RGBA32F texture, one texel per particle = (lon, lat, age, life). Each frame an
+// off-screen fragment shader (UPDATE_FS) reads the current state texture, advects every particle by the
+// same metric the CPU path uses, and writes the next state into a second target; the two targets
+// ping-pong. A Points cloud then draws the particles, its vertex shader (DRAW_VS) reading each particle's
+// position straight from the state texture. The velocity (+θ) field rides along as a half-float
+// DataTexture, RGBA = (u, v, θ, 0). All shaders are GLSL1 (texture2D / attribute / varying) on
+// RawShaderMaterial, so the source we hand three is exactly what we can validate against the live context.
+const QUAD_VS = `precision highp float;
+attribute vec3 position; attribute vec2 uv; varying vec2 vUv;
+void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+
+const INIT_FS = `precision highp float;
+uniform sampler2D uSeed; varying vec2 vUv;
+void main() { gl_FragColor = texture2D(uSeed, vUv); }`;
+
+const UPDATE_FS = `precision highp float;
+uniform sampler2D uState, uVel;
+uniform float uDt, uAccel, uRadius, uRandom;
+uniform vec2 uLonRange, uLatRange, uVelGrid;
+varying vec2 vUv;
+const float DEG = 57.29577951308232, RAD = 0.017453292519943295;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+vec2 velUV(float lon, float lat) {
+  float gx = clamp((lon - uLonRange.x) / max(1e-6, uLonRange.y - uLonRange.x), 0.0, 1.0);
+  float gy = clamp((lat - uLatRange.x) / max(1e-6, uLatRange.y - uLatRange.x), 0.0, 1.0);
+  return vec2((gx * (uVelGrid.x - 1.0) + 0.5) / uVelGrid.x,
+              (gy * (uVelGrid.y - 1.0) + 0.5) / uVelGrid.y);   // texel-centre sampling, matches CPU sample()
+}
+void main() {
+  vec4 st = texture2D(uState, vUv);
+  float lon = st.x, lat = st.y, age = st.z, life = st.w;
+  vec4 vel = texture2D(uVel, velUV(lon, lat));
+  float cosp = max(0.05, cos(lat * RAD));
+  lon += DEG * (vel.x / (uRadius * cosp)) * uAccel * uDt;   // dλ/dt = u/(a cosφ)
+  lat += DEG * (vel.y / uRadius) * uAccel * uDt;            // dφ/dt = v/a
+  age += uDt;
+  bool gone = lon < uLonRange.x || lon > uLonRange.y || lat < uLatRange.x || lat > uLatRange.y;
+  if (age > life || gone) {                                 // respawn inside coverage (never paints bare globe)
+    lat = uLatRange.x + hash(vUv + vec2(uRandom, 0.123)) * (uLatRange.y - uLatRange.x);
+    lon = uLonRange.x + hash(vUv + vec2(0.456, uRandom)) * (uLonRange.y - uLonRange.x);
+    age = 0.0; life = 2.0 + hash(vUv * 1.7 + uRandom) * 4.0;
+  }
+  gl_FragColor = vec4(lon, lat, age, life);
+}`;
+
+const DRAW_VS = `precision highp float;
+uniform mat4 modelViewMatrix, projectionMatrix;
+uniform sampler2D uState, uVel;
+uniform float uSize, uScale, uRadius, uHasScalar;
+uniform vec2 uLonRange, uLatRange, uVelGrid, uScalarRange;
+attribute vec3 position;                 // .xy = this particle's texel-centre UV into uState
+varying vec3 vColor; varying float vFade;
+const float RAD = 0.017453292519943295;
+vec2 velUV(float lon, float lat) {
+  float gx = clamp((lon - uLonRange.x) / max(1e-6, uLonRange.y - uLonRange.x), 0.0, 1.0);
+  float gy = clamp((lat - uLatRange.x) / max(1e-6, uLatRange.y - uLatRange.x), 0.0, 1.0);
+  return vec2((gx * (uVelGrid.x - 1.0) + 0.5) / uVelGrid.x,
+              (gy * (uVelGrid.y - 1.0) + 0.5) / uVelGrid.y);
+}
+vec3 cmap(float t) {                      // RdBu_r: 0 = cool blue, 1 = warm red (matches Rung A/B θ)
+  vec3 lo = vec3(0.23, 0.31, 0.75), mid = vec3(0.96, 0.96, 0.96), hi = vec3(0.79, 0.16, 0.18);
+  return t < 0.5 ? mix(lo, mid, t / 0.5) : mix(mid, hi, (t - 0.5) / 0.5);
+}
+void main() {
+  vec4 st = texture2D(uState, position.xy);
+  float lon = st.x, lat = st.y, age = st.z, life = st.w;
+  float p = lat * RAD, l = lon * RAD;
+  vec3 xyz = vec3(cos(p) * cos(l), sin(p), cos(p) * sin(l)) * 1.012;
+  vec4 mv = modelViewMatrix * vec4(xyz, 1.0);
+  gl_Position = projectionMatrix * mv;
+  gl_PointSize = uSize * uScale / max(0.001, -mv.z);        // replicate three's size attenuation
+  float t = 0.5;
+  if (uHasScalar > 0.5) {
+    float theta = texture2D(uVel, velUV(lon, lat)).z;
+    t = clamp((theta - uScalarRange.x) / max(1e-6, uScalarRange.y - uScalarRange.x), 0.0, 1.0);
+  }
+  vColor = cmap(t);
+  vFade = min(1.0, age / 0.3) * min(1.0, (life - age) / 0.5);   // fade in from spawn, out toward death
+}`;
+
+const DRAW_FS = `precision highp float;
+uniform float uOpacity, uSharp; varying vec3 vColor; varying float vFade;
+void main() {
+  float r = length(gl_PointCoord - 0.5) * 2.0;             // 0 at centre → 1 at the sprite edge
+  if (r > 1.0) discard;                                    // round, not a square GL point
+  float core = clamp(uSharp, 0.0, 0.97);                   // opaque out to `core`, then linear to 0 at the rim
+  float a = 1.0 - clamp((r - core) / max(1e-4, 1.0 - core), 0.0, 1.0);
+  float alpha = a * vFade * uOpacity;
+  if (alpha < 0.01) discard;
+  gl_FragColor = vec4(vColor, alpha);
+}`;
+
+function buildGPU() {
+  // velocity (+θ) as a linear-filtered half-float texture: RGBA = (u, v, θ, 0). Half precision is ample
+  // for a few-m/s velocity and a colour channel, and linear-filtering half-float is core in WebGL2.
+  const toHalf = T.DataUtils.toHalfFloat;
+  const velData = new Uint16Array(nx * ny * 4);
+  for (let k = 0; k < nx * ny; k++) {
+    velData[k * 4] = toHalf(U[k]); velData[k * 4 + 1] = toHalf(V[k]);
+    velData[k * 4 + 2] = toHalf(S ? S[k] : 0); velData[k * 4 + 3] = 0;
+  }
+  const velTex = new T.DataTexture(velData, nx, ny, T.RGBAFormat, T.HalfFloatType);
+  velTex.minFilter = velTex.magFilter = T.LinearFilter;
+  velTex.wrapS = velTex.wrapT = T.ClampToEdgeWrapping; velTex.needsUpdate = true;
+
+  // pack the particles into the smallest square float texture that holds them (one texel each).
+  const texSize = Math.ceil(Math.sqrt(N)), M = texSize * texSize;
+  const seedData = new Float32Array(M * 4);
+  for (let i = 0; i < M; i++) {                           // same LCG draw order as spawn(): lat, lon, life
+    const la = cov.lat_min + rnd() * (cov.lat_max - cov.lat_min);
+    const lo = cov.lon_min + rnd() * (cov.lon_max - cov.lon_min);
+    seedData[i * 4] = lo; seedData[i * 4 + 1] = la; seedData[i * 4 + 2] = 0; seedData[i * 4 + 3] = 2.0 + rnd() * 4.0;
+  }
+  const seedTex = new T.DataTexture(seedData, texSize, texSize, T.RGBAFormat, T.FloatType);
+  seedTex.minFilter = seedTex.magFilter = T.NearestFilter; seedTex.needsUpdate = true;
+
+  // the two ping-pong targets — FloatType so positions keep full precision, NearestFilter so a particle
+  // reads exactly its own texel (LinearFilter would blend neighbouring particles into garbage motion).
+  const rtOpts = { type: T.FloatType, format: T.RGBAFormat, minFilter: T.NearestFilter,
+                   magFilter: T.NearestFilter, depthBuffer: false, stencilBuffer: false,
+                   wrapS: T.ClampToEdgeWrapping, wrapT: T.ClampToEdgeWrapping };
+  let rtCur = new T.WebGLRenderTarget(texSize, texSize, rtOpts);
+  let rtNext = new T.WebGLRenderTarget(texSize, texSize, rtOpts);
+
+  // an off-screen full-screen quad whose fragment shader advects every particle once per frame.
+  const quadScene = new T.Scene(), quadCam = new T.Camera();
+  const quad = new T.Mesh(new T.PlaneGeometry(2, 2), new T.RawShaderMaterial(
+    { uniforms: { uSeed: { value: seedTex } }, vertexShader: QUAD_VS, fragmentShader: INIT_FS }));
+  quad.frustumCulled = false;            // the shader writes clip coords directly — never cull the update pass
+  quadScene.add(quad);
+  const updateMat = new T.RawShaderMaterial({
+    uniforms: { uState: { value: null }, uVel: { value: velTex }, uDt: { value: 0 }, uAccel: { value: ACCEL },
+                uRadius: { value: A }, uRandom: { value: 0 },
+                uLonRange: { value: new T.Vector2(cov.lon_min, cov.lon_max) },
+                uLatRange: { value: new T.Vector2(cov.lat_min, cov.lat_max) },
+                uVelGrid: { value: new T.Vector2(nx, ny) } },
+    vertexShader: QUAD_VS, fragmentShader: UPDATE_FS });
+  renderer.setRenderTarget(rtCur); renderer.render(quadScene, quadCam);   // seed both targets from the LCG state
+  renderer.setRenderTarget(rtNext); renderer.render(quadScene, quadCam);
+  renderer.setRenderTarget(null);
+  // a DIAGNOSTIC (not a gate): read particle 0 straight back out of the float target. The feature gate +
+  // compile check can't catch a driver that advertises EXT_color_buffer_float yet renders an INCOMPLETE
+  // float target — there the state round-trips as zeros/NaN and the particles freeze at seed while the
+  // console still says "GPU active". Logging the round-tripped state turns that into a paste-back tell.
+  try {
+    const probe = new Float32Array(4);
+    renderer.readRenderTargetPixels(rtCur, 0, 0, 1, 1, probe);
+    console.log("[flow-globe] GPU state round-trip — particle 0 (lon,lat,age,life) = " +
+                probe[0].toFixed(2) + ", " + probe[1].toFixed(2) + ", " + probe[2].toFixed(2) + ", " +
+                probe[3].toFixed(2) + "  (zeros/NaN here ⇒ the float target didn't round-trip ⇒ frozen)");
+  } catch (e) { console.warn("[flow-globe] GPU state read-back unavailable:", e && e.message); }
+  quad.material = updateMat;
+
+  // the visible Points: each vertex's `position.xy` is its texel-centre UV; DRAW_VS reads the particle's
+  // (lon, lat) from the state texture. Bounds live in the texture, so the CPU bounding sphere is
+  // meaningless → disable frustum culling (else three culls the whole cloud at most camera angles).
+  const refs = new Float32Array(M * 3);
+  for (let i = 0; i < M; i++) {
+    refs[i * 3] = ((i % texSize) + 0.5) / texSize; refs[i * 3 + 1] = (Math.floor(i / texSize) + 0.5) / texSize;
+  }
+  const gpuGeo = new T.BufferGeometry();
+  gpuGeo.setAttribute("position", new T.BufferAttribute(refs, 3));
+  const drawMat = new T.RawShaderMaterial({
+    uniforms: { uState: { value: rtCur.texture }, uVel: { value: velTex }, uSize: { value: D.particle_size },
+                uScale: { value: 0.5 * (renderer.domElement.height || H) }, uOpacity: { value: D.particle_opacity },
+                uSharp: { value: D.particle_sharpness }, uRadius: { value: A }, uHasScalar: { value: S ? 1 : 0 },
+                uLonRange: { value: new T.Vector2(cov.lon_min, cov.lon_max) },
+                uLatRange: { value: new T.Vector2(cov.lat_min, cov.lat_max) },
+                uVelGrid: { value: new T.Vector2(nx, ny) }, uScalarRange: { value: new T.Vector2(smin, smax) } },
+    vertexShader: DRAW_VS, fragmentShader: DRAW_FS,
+    transparent: true, depthTest: true, depthWrite: false, blending: T.NormalBlending });   // occlude far side
+  const gpuPoints = new T.Points(gpuGeo, drawMat); gpuPoints.frustumCulled = false;
+  scene.add(gpuPoints);
+
+  tick = function (dt) {
+    updateMat.uniforms.uDt.value = dt; updateMat.uniforms.uRandom.value = Math.random();
+    updateMat.uniforms.uState.value = rtCur.texture;
+    renderer.setRenderTarget(rtNext); renderer.render(quadScene, quadCam); renderer.setRenderTarget(null);
+    const swap = rtCur; rtCur = rtNext; rtNext = swap;     // ping-pong
+    drawMat.uniforms.uState.value = rtCur.texture;
+  };
+  applySize = (v) => { drawMat.uniforms.uSize.value = v; };
+  applyOpacity = (v) => { drawMat.uniforms.uOpacity.value = v; };
+  applySharp = (v) => { drawMat.uniforms.uSharp.value = v; };
+  onResizeHook = () => { drawMat.uniforms.uScale.value = 0.5 * (renderer.domElement.height || H); };
+}
+
+// ===== CPU advection (the fallback) ================================================================ #
+// The original, dependency-free path: integrate every particle in JS each frame and re-upload the
+// position/colour buffers. Identical metric and look to the GPU path; this is what runs if WebGL2 /
+// float-render targets / the shaders are unavailable, so the showcase is never a blank globe.
+const pos = new Float32Array(N * 3), col = new Float32Array(N * 4);   // colour is RGBA — alpha carries the fade
+const pLat = new Float32Array(N), pLon = new Float32Array(N), pAge = new Float32Array(N), pLife = new Float32Array(N);
 function spawn(i) {
   pLat[i] = cov.lat_min + rnd() * (cov.lat_max - cov.lat_min);
   pLon[i] = cov.lon_min + rnd() * (cov.lon_max - cov.lon_min);
   pAge[i] = 0; pLife[i] = 2.0 + rnd() * 4.0;       // seconds before respawn (staggered so trails don't blink together)
 }
-for (let i = 0; i < N; i++) spawn(i);
-
-// a ROUND particle sprite (a radial alpha falloff): square GL points are the amateur tell, and a round
-// sprite is the single biggest "showcase" upgrade. The sprite is white, so the per-vertex temperature
-// colour survives (final rgb = vColor·white); its radial alpha rounds off the dot. `sharp` ∈ [0,1] sets
-// the opaque-core radius: 0 = fade from the centre (soft bloom), ~1 = full alpha out to a near-hard disc
-// edge (sharp). Cheap to regenerate (a 64² canvas), so the sharpness slider just rebuilds the texture.
+// a ROUND particle sprite (a radial alpha falloff): a square GL point is the amateur tell. The sprite is
+// white, so the per-vertex temperature colour survives; `sharp` ∈ [0,1] sets the opaque-core radius
+// (0 = soft bloom, ~1 = near-hard disc). Cheap to regenerate (a 64² canvas), so the slider rebuilds it.
 function particleSprite(sharp) {
   const s = 64, cvs = document.createElement("canvas"); cvs.width = cvs.height = s;
   const g = cvs.getContext("2d");
@@ -334,38 +534,72 @@ function particleSprite(sharp) {
   g.fillStyle = grd; g.fillRect(0, 0, s, s);
   return new T.CanvasTexture(cvs);
 }
-const geo = new T.BufferGeometry();
-geo.setAttribute("position", new T.BufferAttribute(pos, 3));
-geo.setAttribute("color", new T.BufferAttribute(col, 4));            // RGBA: the 4th channel is the spawn/death fade
-const pmat = new T.PointsMaterial({ size: D.particle_size, map: particleSprite(D.particle_sharpness),
-                                    vertexColors: true, transparent: true, opacity: D.particle_opacity,
-                                    depthWrite: false });
-const points = new T.Points(geo, pmat);
-scene.add(points);
-
-function step(dt) {
-  for (let i = 0; i < N; i++) {
-    const la = pLat[i], lo = pLon[i];
-    const uu = sample(U, la, lo), vv = sample(V, la, lo);
-    const cosp = Math.max(0.05, Math.cos(la * RAD));
-    pLon[i] += DEG * (uu / (A * cosp)) * ACCEL * dt;   // dλ/dt = u/(a cosφ)
-    pLat[i] += DEG * (vv / A) * ACCEL * dt;            // dφ/dt = v/a
-    pAge[i] += dt;
-    const out = pLat[i] < cov.lat_min || pLat[i] > cov.lat_max || pLon[i] < cov.lon_min || pLon[i] > cov.lon_max;
-    if (pAge[i] > pLife[i] || out) spawn(i);
-    const xyz = sph(pLat[i], pLon[i], 1.012);
-    pos[i * 3] = xyz[0]; pos[i * 3 + 1] = xyz[1]; pos[i * 3 + 2] = xyz[2];
-    let t = S ? (sample(S, pLat[i], pLon[i]) - smin) / ((smax - smin) || 1) : 0.5;
-    t = Math.max(0, Math.min(1, t));
-    const c = cmap(t);                                 // full-brightness colour, ALWAYS (never dimmed toward black)
-    // the fade lives in ALPHA, not RGB: a fresh particle fades in from transparent (not from a dark dot),
-    // and a dying one fades fully out — both ends clean against whatever sits behind them.
-    const alpha = Math.min(1, pAge[i] / 0.3) * Math.min(1, (pLife[i] - pAge[i]) / 0.5);
-    col[i * 4] = c[0]; col[i * 4 + 1] = c[1]; col[i * 4 + 2] = c[2]; col[i * 4 + 3] = alpha;
-  }
-  geo.attributes.position.needsUpdate = true;
-  geo.attributes.color.needsUpdate = true;
+function buildCPU() {
+  const geo = new T.BufferGeometry();
+  geo.setAttribute("position", new T.BufferAttribute(pos, 3));
+  geo.setAttribute("color", new T.BufferAttribute(col, 4));            // RGBA: the 4th channel is the spawn/death fade
+  const pmat = new T.PointsMaterial({ size: D.particle_size, map: particleSprite(D.particle_sharpness),
+                                      vertexColors: true, transparent: true, opacity: D.particle_opacity,
+                                      depthWrite: false });
+  scene.add(new T.Points(geo, pmat));
+  for (let i = 0; i < N; i++) spawn(i);
+  tick = function (dt) {
+    for (let i = 0; i < N; i++) {
+      const la = pLat[i], lo = pLon[i];
+      const uu = sample(U, la, lo), vv = sample(V, la, lo);
+      const cosp = Math.max(0.05, Math.cos(la * RAD));
+      pLon[i] += DEG * (uu / (A * cosp)) * ACCEL * dt;   // dλ/dt = u/(a cosφ)
+      pLat[i] += DEG * (vv / A) * ACCEL * dt;            // dφ/dt = v/a
+      pAge[i] += dt;
+      const gone = pLat[i] < cov.lat_min || pLat[i] > cov.lat_max || pLon[i] < cov.lon_min || pLon[i] > cov.lon_max;
+      if (pAge[i] > pLife[i] || gone) spawn(i);
+      const xyz = sph(pLat[i], pLon[i], 1.012);
+      pos[i * 3] = xyz[0]; pos[i * 3 + 1] = xyz[1]; pos[i * 3 + 2] = xyz[2];
+      let t = S ? (sample(S, pLat[i], pLon[i]) - smin) / ((smax - smin) || 1) : 0.5;
+      t = Math.max(0, Math.min(1, t));
+      const c = cmap(t);                                 // full-brightness colour, ALWAYS (never dimmed toward black)
+      // the fade lives in ALPHA, not RGB: a fresh particle fades in from transparent, a dying one fully out.
+      const alpha = Math.min(1, pAge[i] / 0.3) * Math.min(1, (pLife[i] - pAge[i]) / 0.5);
+      col[i * 4] = c[0]; col[i * 4 + 1] = c[1]; col[i * 4 + 2] = c[2]; col[i * 4 + 3] = alpha;
+    }
+    geo.attributes.position.needsUpdate = true;
+    geo.attributes.color.needsUpdate = true;
+  };
+  applySize = (v) => { pmat.size = v; };
+  applyOpacity = (v) => { pmat.opacity = v; };
+  applySharp = (v) => { const old = pmat.map; pmat.map = particleSprite(v); pmat.needsUpdate = true; if (old) old.dispose(); };
 }
+
+// ===== pick the path: GPU if WebGL2 + float-render targets + the shaders compile; else CPU ========== #
+// We cannot run WebGL here, so we validate the GLSL against the live context (compile + link) before
+// trusting it — three logs but does NOT throw on a link failure — and degrade to CPU on any miss, naming
+// the reason in the console so a blind play-through is debuggable from a paste-back, not a guess.
+function compileOK(srcV, srcF) {
+  const gl = renderer.getContext();
+  function sh(type, src) {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    const ok = gl.getShaderParameter(s, gl.COMPILE_STATUS);
+    return { s, ok, log: ok ? "" : (gl.getShaderInfoLog(s) || "") };
+  }
+  const v = sh(gl.VERTEX_SHADER, srcV), f = sh(gl.FRAGMENT_SHADER, srcF);
+  let ok = v.ok && f.ok, log = v.log + f.log;
+  if (ok) {
+    const p = gl.createProgram(); gl.attachShader(p, v.s); gl.attachShader(p, f.s); gl.linkProgram(p);
+    ok = gl.getProgramParameter(p, gl.LINK_STATUS); if (!ok) log += (gl.getProgramInfoLog(p) || ""); gl.deleteProgram(p);
+  }
+  gl.deleteShader(v.s); gl.deleteShader(f.s); return { ok, log };
+}
+let useGPU = false, why = "";
+if (!renderer.capabilities.isWebGL2) why = "WebGL2 unavailable";
+else if (!renderer.getContext().getExtension("EXT_color_buffer_float")) why = "EXT_color_buffer_float unavailable";
+else {
+  const u = compileOK(QUAD_VS, UPDATE_FS), d = compileOK(DRAW_VS, DRAW_FS), z = compileOK(QUAD_VS, INIT_FS);
+  if (u.ok && d.ok && z.ok) useGPU = true;
+  else { why = "shader compile/link failed"; console.warn("[flow-globe] GPU shaders rejected:\n" + u.log + d.log + z.log); }
+}
+if (useGPU) { try { buildGPU(); } catch (e) { useGPU = false; why = "GPU init threw: " + (e && e.message); console.warn("[flow-globe]", e); } }
+if (useGPU) console.log("[flow-globe] GPU ping-pong advection active");
+else { buildCPU(); console.warn("[flow-globe] CPU advection fallback active — " + why); }
 
 // --- hand-rolled spherical orbit camera (drag → azimuth/elevation, wheel → radius) --- #
 let az = D.center_lon * RAD, el = D.center_lat * RAD, radius = 3.0;
@@ -392,27 +626,24 @@ canvas.addEventListener("wheel", (e) => {
 }, { passive: false });
 window.addEventListener("resize", () => {
   [W, H] = size(); renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix();
+  if (onResizeHook) onResizeHook();                       // the GPU draw needs its point-size scale refreshed
 });
 
-// --- live appearance controls: size + opacity mutate the material directly; sharpness rebuilds the
-// (cheap) sprite texture and disposes the old one. All three touch only appearance — no re-render of the
-// field data. The open-ended rest — colour ramps, particle density, trail length, shape menus — is a
-// deliberately deferred seam: speculative, with no second consumer yet, so it stays named-not-built. --- #
+// --- live appearance controls: size + opacity + edge sharpness. Each dispatches to the ACTIVE advection
+// path (GPU → a uniform; CPU → the material / a rebuilt sprite), so the sliders work the same whichever
+// path the browser picked. All three touch only appearance. The open-ended rest — colour ramps, particle
+// density, trail length, shape menus — is a deliberately deferred seam (speculative, no second consumer
+// yet, so still named-not-built). The GPU ping-pong advection itself is the seam this build closes. --- #
 const sizeR = document.getElementById("sizeRange"), opacR = document.getElementById("opacityRange");
 const sharpR = document.getElementById("sharpRange");
-if (sizeR) sizeR.addEventListener("input", () => { pmat.size = parseFloat(sizeR.value); });
-if (opacR) opacR.addEventListener("input", () => { pmat.opacity = parseFloat(opacR.value); });
-if (sharpR) sharpR.addEventListener("input", () => {
-  const old = pmat.map;
-  pmat.map = particleSprite(parseFloat(sharpR.value));   // a sharper/softer rim, regenerated live
-  pmat.needsUpdate = true;
-  if (old) old.dispose();                                 // free the replaced GPU texture
-});
+if (sizeR) sizeR.addEventListener("input", () => applySize(parseFloat(sizeR.value)));
+if (opacR) opacR.addEventListener("input", () => applyOpacity(parseFloat(opacR.value)));
+if (sharpR) sharpR.addEventListener("input", () => applySharp(parseFloat(sharpR.value)));
 
 let last = performance.now();
 function loop(now) {
   let dt = (now - last) / 1000; last = now; if (dt > 0.1) dt = 0.1;
-  step(dt); renderer.render(scene, camera); requestAnimationFrame(loop);
+  tick(dt); renderer.render(scene, camera); requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 """

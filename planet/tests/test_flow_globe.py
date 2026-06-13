@@ -120,6 +120,20 @@ def test_disclaimer_is_a_visible_dom_element_carrying_both_clauses():
     assert "display:none" not in style and "visibility:hidden" not in style and "opacity:0" not in style
 
 
+def test_html_carries_both_gpu_pipeline_and_cpu_fallback():
+    # The advection runs on the GPU (a float-texture ping-pong pass) by default, but we cannot run WebGL
+    # in CI — so the original CPU step() loop ships as a RUNTIME fallback (a GPU failure must degrade to a
+    # working globe, never a blank one, and say why in the console). The fallback IS the verification
+    # substitute, so pin that BOTH paths survive in the artifact — a future edit can't silently gut it.
+    html = fg.flow_globe_html(fg.flow_field_from_eddy(_synthetic_eddy()))
+    # the GPU pipeline: the ping-pong state advection (shaders + float render targets + the feature gate).
+    assert "buildGPU" in html and "WebGLRenderTarget" in html
+    assert "gl_FragColor = vec4(lon, lat, age, life)" in html         # the update-pass state shader (UPDATE_FS)
+    assert "EXT_color_buffer_float" in html                           # the float-render feature gate
+    # the CPU fallback: the JS step loop is built and wired, with a console reason when the GPU path is out.
+    assert "buildCPU" in html and "CPU advection fallback active" in html
+
+
 @pytest.mark.slow
 def test_demo_eddy_particles_banks_the_artifact(tmp_path):
     # ADR 0002: an execution smoke-test, not a physics check (test_eddy_flux validates the numbers). Runs
