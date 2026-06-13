@@ -1,6 +1,6 @@
 ---
 name: planet-viz-animation-rungs
-description: "Animated eddy-flow visualization, 3 rungs A/B/C: rung A (matplotlib two-panel) + shared (h,u,v,θ) frame side-channel BUILT 2026-06-11; rung B (Plotly-globe anim, planet/eddy_globe.py) BUILT 2026-06-12; rung C build-approach DECIDED 2026-06-12, AMENDED same day to a three.js/WebGL true-3D-sphere particle flow-globe (was original Canvas2D) + honest-by-disclosure carve-out (NOT built); honesty edges = channel-not-globe + ~90% reversible"
+description: "Animated eddy-flow visualization, 3 rungs A/B/C ALL BUILT: rung A (matplotlib two-panel) + shared (h,u,v,θ) frame side-channel BUILT 2026-06-11; rung B (Plotly-globe anim, planet/eddy_globe.py) BUILT 2026-06-12; rung C (three.js/WebGL true-3D-sphere particle flow-globe, planet/flow_globe.py + honest-by-disclosure carve-out) BUILT 2026-06-13; honesty edges = channel-not-globe + ~90% reversible"
 metadata: 
   node_type: memory
   type: project
@@ -11,7 +11,8 @@ metadata:
 emergent eddy life cycle (`eddy_flux.eddy_life_cycle` — the only time-varying,
 longitudinally-structured 2-D flow the project produces). Recorded in plan **§9.5** + the
 §10 running log. **Rung A + the shared frame side-channel BUILT 2026-06-11; Rung B BUILT 2026-06-12;
-Rung C build-approach DECIDED 2026-06-12 (plan-only, NOT built — see the Rung C bullet below).** These are
+Rung C BUILT 2026-06-13 (`planet/flow_globe.py` — the three.js particle flow-globe; build record in the Rung C
+bullet below).** All three rungs are now built. These are
 **visualization** rungs A/B/C — do NOT conflate with the §5 GCM staircase rungs 0–6.
 
 **BUILT (2026-06-11) — rung A + the shared prerequisite:** `n_frames` side-channel on
@@ -90,8 +91,8 @@ references — weather, not climate). The rungs rise in cost, *fall* in pedagogi
   reseated low (`y=-0.40`, `b=360`/`height=860`), font 11→14, formulas `Σ∫|F̄|dt`/`Σ|∫F̄dt|` restored
   with word-glosses + curve-coloured `<span>` tints — these refinements folded into
   [[viz-prose-novice-intermediate]].
-- **Rung C** = the showcase — **build approach DECIDED 2026-06-12 (user), AMENDED the same day to a true
-  3-D sphere, PLAN-ONLY (not built this session).** User reframed it as a **general-purpose
+- **Rung C** = the showcase — **DECIDED 2026-06-12 (user), AMENDED same day to a true 3-D sphere, BUILT
+  2026-06-13 (build record at the end of this bullet).** User reframed it as a **general-purpose
   flow-on-a-globe renderer** aimed at *one day* visualizing a full **GCM/ESM** field; renders lesser models
   (today: the one eddy band) meanwhile. **First locked as an *original Canvas2D orthographic* globe, then
   amended (user) to a `three.js` / WebGL *perspective* globe — particles streaming on a REAL rotatable
@@ -121,6 +122,33 @@ references — weather, not climate). The rungs rise in cost, *fall* in pedagogi
   **DOM overlay** over the WebGL canvas → easier to machine-check than canvas-drawn text; mirror
   `test_eddy_globe.py` minus byte-golden, plus the caption assertion). Doctrine recorded in plan §9.5 +
   §9.3 + ADR 0002 status note.
+  **BUILT 2026-06-13 exactly as locked** (advisor green-lit + done-checked): `planet/flow_globe.py` = the
+  **generic** renderer — a renderer-agnostic `FlowField` contract (`Coverage` extent + `honesty` disclaimer +
+  lat/lon grid + `(u,v)` + optional `scalar`) + `flow_field_from_eddy` (first consumer) + `flow_globe_html`/
+  `save_flow_globe_html`; **NumPy-only at import** (builds an HTML string; `eddy_globe` import is local).
+  `demo_eddy_particles.py` banks `docs/figures/planet-eddy-particles.html` (~758 KB) reusing
+  `demo_eddy_life.compute` (one life cycle, three views); `catalog.py` entry `eddy_particles` `extras=()`
+  (self-contained artifact, generation needs only core) → auto on menu/CLI/site (golden test regen). **Three
+  decisions, advisor-blessed:** (1) **three.js r137 UMD vendored inline** (`planet/vendor/three.min.js`, global
+  `THREE`, plain `<script>`) — NOT ESM (ES-module imports are CORS-blocked over `file://`, would break
+  self-contained-off-disk); orbit camera + particle advection **hand-rolled** so three.js core is the only
+  vendored piece; the §6 deliverable shipped = repo `NOTICE` with three.js' **full MIT body** + the inlined
+  `@license` banner (attribution travels with both repo & artifact). (2) **Band-confined coverage** (seed
+  particles only within the true ~55° NH sector via Rung-B's shared `_band_geometry`/**newly-extracted
+  `_earth_radius`** — so B/C can't drift; fabricating a global `(u,v)` from a 55° patch = inventing data).
+  Band-confinement does **NOT** downgrade C to honest-by-construction — streaming still implies currents the
+  ~90 %-reversible flux lacks → disclaimer mandatory + carries the *mostly-sloshes / net-is-the-small-κ-residual*
+  clause. (3) **Steady stream from the saturated frame** (nearest `saturation_period`, lean one-field payload =
+  the Perpetual-Ocean look). **Verification per the carve-out** (`test_flow_globe.py`, 6 fast + 1 slow):
+  physics-fidelity **RELAXES** (no byte-golden / no transport proof); **documentation verification TIGHTENS** —
+  the disclaimer is a **visible** DOM `<div class="disclaimer">`, machine-checked to carry **both** honesty
+  clauses + never hidden (`display:none`/`visibility:hidden`/`opacity:0`); plus headless-import +
+  coverage-band-not-global + no-external-`src=` guards. GPU ping-pong advection seam stays **named-not-built**
+  (CPU v1 responsive; trigger <~30 fps @ GCM). Gate **303 fast-lane pass**. **The one un-headless-verifiable
+  thing = the browser play-through** (no WebGL here) → handed to user to eyeball (acceptance: particles stream
+  along one tilted band / rest of globe bare / disclaimer legible / drag-zoom responsive; failure modes: blank =
+  WebGL-init, frozen = ACCEL/advection, smeared-globe = coverage-box bug) — same hand-off Rung B took. Advisor
+  read the JS and confirmed r137 API + camera-frames-band + collocation-axes + advection-dims all correct.
 
 **Two honesty edges carried through all three (hardest to preserve at C):** (1) the flow is a
 **doubly-periodic midlatitude β-plane band patch, NOT a global field** (same edge as

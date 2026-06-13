@@ -57,6 +57,17 @@ BASE_SPHERE_COLOR = "#dce3ea"   # the bare planet the eddy band sits on
 BAND_RAISE = 1.012              # the eddy band radius — just above the base sphere (avoid z-fighting)
 
 
+def _earth_radius(fr) -> float:
+    """Recover Earth's radius ``a`` (m) from the frames' own linear β-plane metric ``φ = φ_ref + deg((y−y_ref)/a)``.
+
+    The eddy channel carries no planet radius of its own — it is a Cartesian ``(x, y)`` β-plane patch — but
+    its latitude/position pair ``(fr.phi, fr.y)`` *is* the linear metric, so ``a = Δy / rad(Δφ)`` recovers it
+    with no new constant or schema field. Shared by the Rung-B globe (:func:`_band_geometry`) and the Rung-C
+    particle globe (:mod:`planet.flow_globe`) so the two renderers can never drift on where the band sits.
+    """
+    return (fr.y[1] - fr.y[0]) / np.radians(fr.phi[1] - fr.phi[0])
+
+
 def _band_geometry(fr):
     """Map the doubly-periodic β-plane channel onto a TRUE-WIDTH longitude sector (NOT a 360° wrap).
 
@@ -67,7 +78,7 @@ def _band_geometry(fr):
     on ``lon = 0``, so the patch occupies only its honest angular width (~55°), not the whole planet.
     Earth's radius ``a`` is recovered from the frames' linear β-plane metric — no new constant needed.
     """
-    a = (fr.y[1] - fr.y[0]) / np.radians(fr.phi[1] - fr.phi[0])          # Earth radius from φ = φ_ref + deg((y−y_ref)/a)
+    a = _earth_radius(fr)                                               # Earth radius from φ = φ_ref + deg((y−y_ref)/a)
     phi_c = float(fr.phi.mean())
     lon1d = np.degrees((fr.x - fr.x.mean()) / (a * np.cos(np.radians(phi_c))))   # centred sector (deg)
     lon2d, lat2d = np.meshgrid(lon1d, fr.phi)                            # (ny, nx): rows = lat, cols = lon

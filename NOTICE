@@ -1,0 +1,51 @@
+planet-sim — third-party notices
+=================================
+
+planet-sim is the work of its authors; the engines, the physics, and the
+visualization code are original. This file records the **one** piece of
+third-party software the project *vendors* (carries a copy of), so that the
+attribution its licence requires travels with the repository and with the
+artifacts the repository emits.
+
+
+-------------------------------------------------------------------------------
+three.js  —  WebGL 3-D library  (revision r137, minified UMD build)
+-------------------------------------------------------------------------------
+
+  Homepage : https://threejs.org
+  Source   : https://github.com/mrdoob/three.js  (tag r137)
+  Vendored : planet/vendor/three.min.js  — the unmodified r137 minified UMD
+             build, carried verbatim (its own `@license` banner left intact).
+  Used by  : planet/flow_globe.py inlines this file into the self-contained
+             HTML showcase it emits (docs/figures/planet-eddy-particles.html,
+             the §9.5 "Rung C" particle flow-globe), so that the page opens
+             straight off the filesystem (file://) with no network access — the
+             reason it is vendored inline rather than loaded from a CDN.
+
+  Only the three.js scene/camera/WebGL framework is vendored. The particle
+  advection and the orbit camera control in planet/flow_globe.py are original
+  (we build *on* three.js; we do not copy a particle or controls library).
+
+three.js is distributed under the MIT License, reproduced in full below.
+
+  The MIT License
+
+  Copyright © 2010-2022 three.js authors
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.

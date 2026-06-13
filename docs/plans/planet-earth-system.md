@@ -632,7 +632,7 @@ third consumer-in-waiting. Promotion is **not** done pre-emptively (the existing
 2026-06-09). **Building visualization rung A (§9.5) is what finally trips this trigger** —
 the eddy life-cycle animation is the time-animation primitive's first real consumer.
 
-### 9.5 Animated flow — the visualization rungs (decided 2026-06-11; **rungs A+B BUILT** (A 2026-06-11, B 2026-06-12), C pending)
+### 9.5 Animated flow — the visualization rungs (decided 2026-06-11; **rungs A+B+C BUILT** — A 2026-06-11, B 2026-06-12, C 2026-06-13)
 
 The emergent eddy life cycle (`eddy_flux.eddy_life_cycle`) is the only genuinely
 time-varying, longitudinally-structured 2-D flow the project produces — the instability
@@ -657,7 +657,7 @@ unchanged — the inert-seam discipline (§9.3) applied to motion.
 |---|---|---|---|
 | **A** | matplotlib `FuncAnimation` | in-repo, `[viz]` | the **mechanism artifact** + the repo's first time-animation primitive (`plots.eddy_life_animation` + `demo_eddy_life.py`) |
 | **B** ✅ | Plotly globe animation | existing `[webviz]` stack | the **globe view** (frames → play/slider on `planetmap`'s sphere), no new tech — **BUILT 2026-06-12** |
-| **C** | three.js / WebGL perspective globe | self-contained inline HTML (three.js vendored, no CDN) | the **showcase** — a general flow-on-a-globe **particle-streaming** renderer; *honest-by-disclosure* (decided 2026-06-12, amended same day to a true 3-D sphere, below) |
+| **C** ✅ | three.js / WebGL perspective globe | self-contained inline HTML (three.js vendored, no CDN) | the **showcase** — a general flow-on-a-globe **particle-streaming** renderer; *honest-by-disclosure* — **BUILT 2026-06-13** (decided 2026-06-12, amended same day to a true 3-D sphere, below) |
 
 - **Rung A is meaningful on its own** (not merely a step to C): it validates the banked
   frames, builds the §9.4 primitive, and **teaches the mechanism honestly**. It is a
@@ -744,7 +744,8 @@ to the user to eyeball. Geometry pin (always-green): the band is a bounded midla
 pole-to-pole / 360°.
 
 **Rung C — the showcase: decided 2026-06-12; amended the same day to a true 3-D sphere (three.js / WebGL
-perspective; *honest-by-disclosure*).** The build approach is locked. Rung C is what §9.5 already calls
+perspective; *honest-by-disclosure*); BUILT 2026-06-13 (build record at the end of this subsection).**
+The build approach was locked, then built as locked. Rung C is what §9.5 already calls
 it — *reach / delivery, not new teaching* — and the user's forward framing (2026-06-12) widens it into a
 **general-purpose flow-on-a-globe renderer**: its design aim is to *one day* animate a full **GCM / ESM**
 wind-or-current field; until (and after) then it renders whatever lesser model we have — today, the one eddy
@@ -835,6 +836,38 @@ the ADR 0002 note. That the swap is *local* is the proof the boundary was drawn 
   machine-check in the HTML source than canvas-drawn text would have been — so the disclaimer-presence
   test asserts that overlay's honesty text is present. Browser play-through is the one thing handed to the
   user to eyeball.
+
+**Built — rung C, the three.js particle flow-globe (2026-06-13).** Built exactly as locked. `planet/flow_globe.py`
+is the **generic** renderer: a renderer-agnostic `FlowField` contract (lat×lon grid + per-cell `(u,v)` +
+optional `scalar` + `Coverage` extent + `honesty` disclaimer string) + `flow_field_from_eddy` (its first
+consumer) + `flow_globe_html`/`save_flow_globe_html`. It is **NumPy-only at import** (builds an HTML *string*;
+the `eddy_globe` import is local to the builder), mirroring the headless discipline. `demo_eddy_particles.py`
+banks `docs/figures/planet-eddy-particles.html` (~758 KB — three.js inlined) reusing `demo_eddy_life.compute`
+(one shared life cycle, three views); a `catalog.py` entry (`extras=()` — generation needs only core, the
+artifact is self-contained) auto-adds it to the menu/CLI/landing page, the golden site test enforcing
+regeneration. **Decisions, advisor-blessed at the done-check:** (1) **three.js r137 UMD vendored inline**
+(`planet/vendor/three.min.js`, global `THREE`, plain `<script>`) — *not* ESM, because ES-module imports are
+blocked over `file://` (CORS), which would break the self-contained-off-disk property; the orbit camera +
+particle advection are **hand-rolled** (original), so three.js core is the only vendored piece. The §6
+deliverable it owes — a repo `NOTICE` with three.js' **full MIT body** (not just the SPDX tag) + its inlined
+`@license` banner — ships, so attribution travels with both repo and artifact. (2) **Band-confined coverage**
+(seed particles only within the true ~55° NH sector recovered from Rung-B's shared `_band_geometry`/
+`_earth_radius` — extracted so B and C can't drift) — fabricating a global `(u,v)` from a 55° patch would be
+*inventing* data, not illustrating a richer model. Band-confinement does **not** downgrade C to
+honest-by-construction: streaming particles still imply persistent currents the ~90 %-reversible flux does not
+produce, so the disclaimer is mandatory and carries the *mostly-sloshes / net-is-the-small-κ-residual* clause.
+(3) **Steady stream from the saturated frame** (nearest `saturation_period`) — the *Perpetual-Ocean* look, a
+lean one-field payload. **Verification, per the carve-out** (`planet/tests/test_flow_globe.py`, 6 fast + 1
+slow): physics-fidelity **relaxes** (no byte-golden, no transport proof — a figure is never in the correctness
+path); **documentation verification tightens** — the disclaimer is a *visible* DOM element (`<div
+class="disclaimer">`), and the machine-checked test asserts it carries **both** honesty clauses and is never
+hidden (`display:none`/`visibility:hidden`/`opacity:0`). Plus the always-green guards: headless-import,
+coverage-is-a-bounded-midlat-band-not-global, self-contained-with-three.js-inlined (no external `src=`). The
+GPU ping-pong advection seam stays **named-not-built** (CPU `BufferGeometry` v1 is responsive at this
+resolution; trigger = <~30 fps at GCM scale). **The one thing not headlessly self-verifiable** (no WebGL here)
+is the actual browser play-through — handed to the user to eyeball (acceptance: particles stream along one
+tilted band, rest of globe bare, disclaimer legible, drag/zoom responsive); same hand-off Rung B took. Gate:
+303 fast-lane tests pass.
 
 ---
 
@@ -1441,7 +1474,7 @@ next increment**; no code shipped this session (the spike finding above is what 
   `[[shallow-water-source]]`. See `[[planet-rung3-phaseB-outcropping]]`, `[[planet-rung3-scoped]]`.
 
 **Visualization rungs A/B/C — DECIDED to build all three (animated eddy flow; 2026-06-11;
-rungs A+B BUILT — A 2026-06-11, B 2026-06-12; C pending — build detail in §9.5).** A forward decision (user): animate the emergent eddy life cycle across three
+rungs A+B+C BUILT — A 2026-06-11, B 2026-06-12, C 2026-06-13; build detail in §9.5).** A forward decision (user): animate the emergent eddy life cycle across three
 rising-cost **visualization** rungs (distinct from the §5 GCM staircase) — **A** a matplotlib
 two-panel mechanism animation (the repo's first time-animation primitive, finally the §9.4
 rule-of-three third consumer), **B** a Plotly-globe animation (existing `[webviz]` stack), and
@@ -1456,7 +1489,7 @@ stirring movie overclaim transport. Recommended build order is **A first** (hone
 construction, in-repo, CI-testable), then judge B-vs-C after seeing real frames move. Full
 roadmap, the rungs table, and the named scope edges: **§9.5**.
 
-**Rung C — build approach decided, then amended to a true 3-D sphere; not yet built (2026-06-12).** A
+**Rung C — build approach decided, then amended to a true 3-D sphere; BUILT 2026-06-13 (full record in §9.5).** A
 forward decision (user): build the showcase as a **general-purpose flow-on-a-globe renderer** aimed at
 *one day* visualizing a full **GCM / ESM** field — rendering lesser models (today, the one eddy band) in
 the meantime. The renderer was first locked as an *original Canvas2D orthographic* globe, then **amended the
@@ -1478,8 +1511,10 @@ Asymmetric verification: **physics-fidelity relaxes** (approximate is fine, no b
 never in the correctness path, ADR 0002 #2) but **documentation tightens** — a test machine-checks the
 on-screen disclaimer (now a DOM overlay over the WebGL canvas) is present, *because the disclaimer is the
 entire license*. Carve-out is narrow (showcase renderer only; science + A/B untouched). Doctrine recorded in
-**§9.5** + **§9.3** + ADR 0002 status note; build deliverables listed in §9.5. **Plan only this session —
-not executed.**
+**§9.5** + **§9.3** + ADR 0002 status note; build deliverables listed in §9.5. **BUILT 2026-06-13 exactly as
+locked** (`planet/flow_globe.py` generic renderer + `FlowField` contract, `demo_eddy_particles.py`,
+`docs/figures/planet-eddy-particles.html`, `NOTICE` with three.js' full MIT body, `planet/vendor/three.min.js`
+r137 UMD, structural + disclaimer tests; the browser play-through handed to the user to eyeball) — see §9.5.
 
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
