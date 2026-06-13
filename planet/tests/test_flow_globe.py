@@ -14,6 +14,7 @@ band-vs-globe honesty edge carried *in the data* (the coverage extent). The brow
 is the one thing not headlessly self-verifiable (no WebGL here) — handed to the user to eyeball.
 """
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -132,6 +133,24 @@ def test_html_carries_both_gpu_pipeline_and_cpu_fallback():
     assert "EXT_color_buffer_float" in html                           # the float-render feature gate
     # the CPU fallback: the JS step loop is built and wired, with a console reason when the GPU path is out.
     assert "buildCPU" in html and "CPU advection fallback active" in html
+
+
+def test_emitted_app_js_parses(tmp_path):
+    # The in-browser app is one big inlined <script>. A single JS syntax slip kills the ENTIRE block →
+    # a blank canvas: no planet, no particles (the WebGL setup never runs). This bit once — a stray
+    # backtick inside a GLSL template literal closed the literal early. We cannot run WebGL here, but we
+    # CAN parse the JS: `node --check` catches exactly this class of error headlessly, closing the gap
+    # between "renders an HTML string" and "that string's script is valid". Skips where node is absent
+    # (the browser play-through stays the backstop), so it never blocks a node-less CI.
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node not available — JS syntax check skipped")
+    html = fg.flow_globe_html(fg.flow_field_from_eddy(_synthetic_eddy()))
+    app = re.findall(r"<script>(.*?)</script>", html, re.S)[-1]   # the app block is emitted last
+    js = tmp_path / "app.js"
+    js.write_text("var window = {};\n" + app, encoding="utf-8")
+    r = subprocess.run([node, "--check", str(js)], capture_output=True, text=True)
+    assert r.returncode == 0, f"emitted app JS failed to parse:\n{r.stderr}"
 
 
 @pytest.mark.slow

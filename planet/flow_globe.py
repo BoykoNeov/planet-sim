@@ -407,7 +407,7 @@ uniform float uOpacity, uSharp; varying vec3 vColor; varying float vFade;
 void main() {
   float r = length(gl_PointCoord - 0.5) * 2.0;             // 0 at centre → 1 at the sprite edge
   if (r > 1.0) discard;                                    // round, not a square GL point
-  float core = clamp(uSharp, 0.0, 0.97);                   // opaque out to `core`, then linear to 0 at the rim
+  float core = clamp(uSharp, 0.0, 0.97);                   // opaque out to the core radius, then linear to 0
   float a = 1.0 - clamp((r - core) / max(1e-4, 1.0 - core), 0.0, 1.0);
   float alpha = a * vFade * uOpacity;
   if (alpha < 0.01) discard;
