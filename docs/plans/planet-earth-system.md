@@ -425,8 +425,10 @@ is the **rung-5** exit from the zonal-mean planet — new transport that leaves 
 (Phase 3 / rung 3) are the *same idealized model family* the literature uses for **gas-giant
 atmospheres** (banded jets, the Great Red Spot). A feasibility sketch — three tiers (β-plane mechanism =
 ~one rung on `baroclinic_qg.py`; sphere-correct globe = a new geometry engine; deep convective interior
-= out of scope), the load-bearing "isotropic condensate ≠ zonal jets" correction, and off-the-shelf
-options (pyqg / Dedalus / EPIC) — is recorded in
+= a *steeper reach, not out of scope* — the Busse-annulus QG model and rotating Rayleigh–Bénard are
+reduced laptop-scale entries, only the realistic anelastic-deep-shell + dynamo regime is the wall), the
+load-bearing "isotropic condensate ≠ zonal jets" correction, and off-the-shelf options
+(pyqg / Dedalus / EPIC / MagIC) — is recorded in
 [`docs/explorations/gas-giant-atmosphere.md`](../explorations/gas-giant-atmosphere.md).
 
 ---

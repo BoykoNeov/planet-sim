@@ -9,8 +9,10 @@ this repo already owns, or with off-the-shelf engines?
 
 **The verdict in one line.** The *idealized mechanism* (banded jets + long-lived vortices) is genuinely
 feasible — about **one rung** on top of [[planet-rung3-qg-built]]. A recognizably-Jovian *globe* is
-**not** (it needs spherical geometry we don't have). The *deep convective interior* is **out of scope
-entirely** (a different physics class).
+**not** (it needs spherical geometry we don't have). The *deep convective interior* is a **heavier,
+steeper reach — not out of scope**: it has reduced, laptop-scale entry points (the Busse annulus,
+rotating Rayleigh–Bénard), with only the *realistic* anelastic deep-shell-plus-dynamo regime as the
+frontier / HPC end.
 
 ## Why the match is close
 
@@ -60,20 +62,37 @@ cyclone clusters, and the prograde equatorial jet all need **spherical geometry*
 cubed-sphere shallow water or QG. That is a genuine new geometry engine (a real multi-step build, not a
 tweak). And **equatorial-superrotation *sign* is a known-hard problem** even for the specialists.
 
-### Tier 3 — deep convective interior: out of scope
+### Tier 3 — deep convective interior: a heavier reach, but explorable (not a wall)
 
-The Juno "jets ~3000 km deep" / Busse-column picture is rotating **compressible (anelastic) convection
-in a deep spherical shell**, MHD-adjacent (Gastine / Heimpel / Aurnou). A different physics class; we
-have nothing for it.
+The Juno "jets ~3000 km deep" / Busse-column picture is rotating convection in a deep rotating shell —
+a *different physics container* (3-D convection, not 2-D layered geostrophy). But the project's own ethos
+is **"deferrals, not foreclosures"** (ARCHITECTURE.md §8), and this regime has genuine **reduced,
+laptop-scale entry points**:
+
+- **The Busse annulus** (Busse 1976 / 1986) — a *quasi-geostrophic* model of deep convection in a
+  rotating annulus whose **sloping ends supply a topographic β**; convective Reynolds stresses drive
+  zonal jets. This is **QG-adjacent** — the same rotating-turbulence / Rhines family as tier 1, just in a
+  convective container — so it sits *closer* to our existing spectral-QG machinery than "a different
+  class" implies. A real, explorable reduced model and the cleanest conceptual bridge: the *deep* jets
+  are still Rhines/zonostrophic physics, in a 3-D rotating container.
+- **Rotating Rayleigh–Bénard convection** (Boussinesq, rotating plane layer or box) — the canonical
+  idealized deep-convection regime (Taylor columns, geostrophic turbulence). Runs in 2-D or a small box
+  at modest Ekman & Rayleigh numbers; a tractable hand build or a Dedalus problem.
+
+What stays **frontier / leaves the laptop** is the *realistic* end: full **anelastic (compressible)
+convection in a deep spherical shell** at planetary parameters, plus the **MHD dynamo** coupling (the
+Juno gravity-inferred deep-jet truncation by magnetic drag) — Gastine / Heimpel / Aurnou / Jones
+territory, the **MagIC / Rayleigh** codes. So tier 3 is a *steep* rung with a heavy top, **not out of
+scope**: the reduced entry is explorable now; only the realistic deep-shell + dynamo regime is the wall.
 
 ## Already-ready engines, if hand-rolling is not the point
 
 | Tool | Tier | Note |
 |---|---|---|
 | **pyqg** | 1 | Drop-in two-layer QG spectral turbulence; the published version of `baroclinic_qg.py`. |
-| **Dedalus** | 2 | Python spectral PDE framework; does shallow water / QG *on the sphere* with arbitrary forcing — the cleanest path to a global model. |
+| **Dedalus** | 2 & 3-reduced | Python spectral PDE framework; shallow water / QG *on the sphere* (tier 2) **and** Boussinesq/anelastic rotating convection incl. spherical shells (the reduced tier-3 entry — rotating Rayleigh–Bénard / Busse-annulus-style). The most reusable single tool here. |
 | **EPIC** (Dowling) | 1–2 | The specialist planetary isentropic-coordinate GCM, purpose-built for Jupiter/Saturn. |
-| **MagIC / Rayleigh** | 3 | Deep-shell rotating convection / dynamo, if tier 3 were ever wanted. |
+| **MagIC / Rayleigh** | 3-realistic | Deep-shell **anelastic** convection + MHD dynamo at planetary parameters — the frontier / HPC end of tier 3. |
 
 ## Recommendation
 
@@ -89,4 +108,6 @@ count, GRS, superrotation), that is a sphere — a new engine — and at that po
 Williams 1978 (planetary geostrophic turbulence / Jovian jets); Rhines 1975 (the β-arrest scale); Cho &
 Polvani 1996 and Scott & Polvani 2007 (forced-dissipative shallow-water turbulence on the sphere);
 Marcus 1988 / Dowling & Ingersoll 1989 (GRS as a shallow-water vortex); Held & Larichev 1996 (the two-
-layer QG basis we already cite); Galperin et al. (the zonostrophy index). Extends [[shallow-water-source]].
+layer QG basis we already cite); Galperin et al. (the zonostrophy index). For tier 3: Busse 1976/1986
+(the rotating-annulus QG deep-convection model); Kaspi et al. 2018 (the Juno gravity inversion → ~3000-km
+deep jets); Gastine / Heimpel / Aurnou (deep-shell anelastic convection). Extends [[shallow-water-source]].
