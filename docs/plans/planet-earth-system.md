@@ -1420,6 +1420,14 @@ next increment**; no code shipped this session (the spike finding above is what 
   down-gradient eddy thickness diffusivity** → the **now-non-vacuous reduction-to-EBM** (direction +
   irreversibility banked; magnitude dimensionless / config-tuned). *plumbing* — zero shear ⟹ no eddies
   (decay); `q↔ψ` round-trips.
+- **Day-one build order + the K=0 trap (advisor de-risk).** **Sequence the linear anchor FIRST:** before
+  any turbulence run, reproduce the linear growth rate against the spike's QG-Phillips cross-check — it
+  catches the two things most likely wrong on day one cheaply (the **mean-PV-gradient sign**
+  `∂q̄_k/∂y = β ∓ F_k U_s`, a convention-dependent flip, and the inversion). **Pin the K=0 inversion
+  singularity:** the 2×2 determinant is `K²(K²+F_1+F_2)` — well-conditioned for all `K>0` but **zero at
+  `K=0`**, so the **domain-mean ψ is undetermined from q** and must be handled explicitly (set domain-mean
+  `ψ=0`, or carry the barotropic domain-mean as a separately drag-damped quantity) — the #1 day-one
+  spectral-QG trap.
 - **Honest edges (named).** A **new model OUTSIDE `engines/fluid`** (pseudospectral, not the C-grid) →
   **no bit-for-bit single-layer reduction; Phase A and Phase B validate *different* models** — the bridge
   between them is the **shared two-layer linear instability** (SW solver ↔ QG agree to <0.5 % in the
