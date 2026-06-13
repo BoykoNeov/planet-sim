@@ -421,6 +421,14 @@ geography → regional climate, orographic precip, rain shadows** (the user's no
 is the **rung-5** exit from the zonal-mean planet — new transport that leaves the
 1-D engine. Until those rungs, an imported/edited geography is **inert** (§9.3).
 
+**A sibling growth axis — off Earth (scoped, not built).** The shallow-water and two-layer-QG engines
+(Phase 3 / rung 3) are the *same idealized model family* the literature uses for **gas-giant
+atmospheres** (banded jets, the Great Red Spot). A feasibility sketch — three tiers (β-plane mechanism =
+~one rung on `baroclinic_qg.py`; sphere-correct globe = a new geometry engine; deep convective interior
+= out of scope), the load-bearing "isotropic condensate ≠ zonal jets" correction, and off-the-shelf
+options (pyqg / Dedalus / EPIC) — is recorded in
+[`docs/explorations/gas-giant-atmosphere.md`](../explorations/gas-giant-atmosphere.md).
+
 ---
 
 ## 6. Terms-of-use status
