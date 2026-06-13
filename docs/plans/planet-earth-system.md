@@ -1584,8 +1584,9 @@ fast; the linear-reduction + saturated-flux checks slow); full fast-lane gate gr
   `κ(y)`; a meridional channel (the operator-shape test) is the named BC extension. (6) Resolution
   **nx=96 ≈ 3.5 pts/L_d** is marginal at the deformation scale (the condensate lives at well-resolved
   large scales; the spectrum's clean dissipation tail shows no grid-scale pileup, and the dimensionless
-  ratio is already robust across the *drag* sweep); a higher-resolution firm-up is the named secondary
-  check (the dimensionless ratio is the banked quantity, never the dimensional κ). Held–Suarez
+  ratio is already robust across the *drag* sweep); the **nx=128 firm-up (4.7 pts/L_d) holds the
+  dimensionless ratio** (`κ/(v'L_d)=1.10`, `irr=1.00`) while the *dimensional* κ shifts ~45 % with
+  resolution (`1.44→2.10×10⁶`) — exactly why only the dimensionless ratio is banked. Held–Suarez
   (sphere primitive-eq) stays **rung 5**. Sources pinned: **Held &
   Larichev 1996**, Phillips 1954 / Eady 1949, Vallis 2017 *AOFD*; extends `[[shallow-water-source]]`. See
   `[[planet-rung3-qg-built]]`, `[[planet-rung3-phaseB-outcropping]]`, `[[planet-rung3-scoped]]`.

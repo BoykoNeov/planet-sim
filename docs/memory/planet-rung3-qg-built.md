@@ -61,8 +61,9 @@ per-layer thicknesses) — so I dropped it as a validation leg. (4) **New model 
 cross-check. (5) **Homogeneous box → a domain-bulk κ**, not `κ(y)`; a meridional channel (the operator-shape
 test) is the named BC extension. (6) **Resolution nx=96 ≈ 3.5 pts/L_d** marginal at the deformation scale
 (condensate lives at well-resolved large scales; clean dissipation tail = no grid-scale pileup; the
-dimensionless ratio is already robust across the drag sweep); a higher-res firm-up is the named secondary
-check (the banked quantity is the dimensionless ratio, never the dimensional κ).
+dimensionless ratio is already robust across the drag sweep); **nx=128 firm-up (4.7 pts/L_d) HOLDS the
+dimensionless ratio** (`κ/(v'L_d)=1.10`, `irr=1.00`) while the dimensional κ shifts ~45 % with res
+(`1.44→2.10e6`) — exactly why only the dimensionless ratio is banked, never the magnitude.
 
 **Tests:** `planet/tests/test_baroclinic_qg.py` — tight (Phillips 2e-15, cutoff, `U_crit=β/F`, zero-shear
 neutral, SW↔QG rigid-lid <0.5 %) + plumbing (`q↔ψ` machine-exact, zero-shear decay, CFL guard) fast; the
