@@ -1390,6 +1390,59 @@ which set the honest altitude (below). Sources pinned at build (the `[[…-sourc
   band relocates). Tests: `planet/tests/test_sphere_ebm.py` (15: tight/unlock/plumbing fast + 2 slow); full
   gate **399 passed, 1 skip**. `ebm.py`/`moist.py` untouched; `precip.py` additive (default-preserving).
 
+**Rung 2 — the Hadley moisture-convergence fix BUILT (the literal deep-tropical backwards-`P−E`;
+`planet/moist.py`, 2026-06-14).** The last named rung-2 deferral (the one rung 2.x explicitly *left*
+deferred — it fixed ITCZ *position*, this fixes the deep-tropical *sign*). The eddy-only
+`moisture_convergence` (`P−E=(D/c_p)·∂/∂x[(1−x²)∂q/∂x]`) is **structurally** backwards at the moist equator:
+down-gradient diffusion *exports* moisture from a maximum — there is **no diffusive way to converge moisture
+at the ITCZ** (advisor-confirmed: not gettable by tuning `D`; the mean-circulation term is genuinely
+needed). Built **spike-first** (`outputs/rung2_hadley_moisture_spike.py`, gitignored) + advisor-pressure-
+tested **before** the build (the honesty classification was set up front — the load-bearing move). The fix
+adds the **mean Hadley circulation** as an **opt-in** term (`hadley_moisture_convergence`; `moisture_budget(
+..., hadley=True)`), eddy-only stays the **default** (every existing benchmark test stays green — the
+opt-in/independent-diff discipline of `energy_constrained_precip_field` / `circ_precip` / `itcz_center_deg`).
+- **The model.** A **prescribed** tropical overturning: the northward MMC moisture flux `F(x)=−strength·
+  ψ(x)·q(x)` is **equatorward** in the tropics (the low-level moist branch flows toward the ascent; dry-
+  upper-branch `Δq≈q_surface`), with ψ the normalized cell (`hadley_streamfunction`) and `q=RH·q_sat(T)`.
+  Convergence `P−E=−∂F/∂x` in **conservative face form** (`_mean_flux_convergence`, the MMC analogue of the
+  diffusive `_spherical_flux_divergence`) ⟹ `∫(P−E)=0` **machine-exact** (a conserving *budget*, ITCZ
+  convergence paid for by the descending dry belt — not a painted band). Ascent **pinned at the equator**
+  (hemisphere model; rung 2.x owns *migration*). The cell vanishes poleward of its edge ⟹ the extratropical
+  eddy budget is **untouched** (asserted identical with/without).
+- **THE HONESTY CLASSIFICATION (advisor, load-bearing — set up front).** Convergence-at-ITCZ / divergence-
+  under-descent is **GUARANTEED BY CONSTRUCTION** for any prescribed equatorward flux ⟹ that is **plumbing,
+  NOT a benchmark win** (the same "guaranteed result" trap as QG down-gradient+irr~1 and the 2.x warm-ward
+  shift-direction). `HADLEY_STRENGTH≈4.2e-4 kg/m²/s` is the named, **prescribed WALL** (calibrated to
+  observed *order* ~1–2 m/yr, **NOT** derived; calibrated **transparently** — not tuned-then-cited). **The
+  genuinely emergent, non-vacuous nugget = the AMPLITUDE:** `q(T)` is carried from the EBM, so the ITCZ
+  convergence **intensifies at the ~C–C moisture rate (~6.6 %/K)** under warming — *faster* than the energy-
+  constrained global mean (~2.5 %/K) — the observed **"rich-get-richer" P−E scaling** (Held & Soden 2006).
+  That is a prediction, not a prescription, and it is the bankable physics.
+- **THE TRADE (advisor warned, the cubic profile REVEALED — record it):** the fix flips the ITCZ **sign**
+  robustly but does **NOT relocate the desert**. The emergent dry belt comes out **equatorward (~12°) of the
+  canonical 25–35° subtropics**: the hyper-peaked fixed-RH C–C `q` pulls the moisture flux `ψ·q` equatorward
+  — the **same** mislocation the eddy budget has (`test_subtropical_evaporative_belt_is_not_reproduced`), so
+  25–35° stays `P>E` on **both** paths. **A half-sine ψ first *appeared* to fix 25–35° — but only via an
+  edge-discontinuity artifact** (ψ′(edge)≠0 ⟹ a ~210 cm/yr jump in `P−E` at 30°); switching to the **cubic
+  `ψ=(27/4)u(1−u)²`** (ψ′(0)>0 strong ITCZ, ψ′(edge)=0 smooth merge) removed the jump **and** exposed that
+  the canonical-subtropics flip was artifactual. Relocating the desert needs a realistic (less peaked) `q` =
+  moist dynamics / the resolved vertical, **rung 3+** (where the **gross-moist-stability / overturning**
+  route — the fully *emergent* cell, not an imposed ψ — is the honest framework; GMS in a column model just
+  moves the prescription onto vertical-structure quantities it doesn't have, and deep-tropics is where GMS→0
+  — named, NOT built). The pinned subtropical test's NOTE updated to say the mislocation **persists** past
+  this fix.
+- **Triad.** *Plumbing (by-construction)* — the ψ cell shape (0 at ascent & edge, smooth merge); `∫=0`
+  machine-exact; `strength=0` ⟹ eddy-only **bit-for-bit**; tropics-confined ⟹ extratropics identical; the
+  ITCZ **sign flip** itself. *Real-but-loose (the emergent unlock)* — the ~C–C-rate intensification (faster
+  than the energy-constrained mean); equatorial convergence of observed *order* (~1–2 m/yr, loose band, not
+  a tuned match). *Named trade* — the desert is NOT relocated (equatorward dry belt; canonical 25–35° still
+  `P>E`). **Demo banked + CI-guarded** (`planet/demo_hadley_moisture.py` → `docs/figures/planet-hadley-
+  moisture.png`: before/after `P−E` + the rate-bar; the `slow` `test_demo_reproduces_the_hadley_fix_headline`
+  pins sign-flip + dry-belt-equatorward + conservation + emergent-rate). Tests: `planet/tests/test_moist.py`
+  (+9 fast Hadley + 1 slow demo guard; full file 29 incl slow). No engine edit; `sphere_ebm.py` breadcrumb
+  updated; `precip.py` untouched. Sources extend [[moist-ebm-source]] (Held & Soden 2006 rich-get-richer;
+  the diffusive-moist-EBM + mean-circulation moisture budget — Hartmann GPC; Hwang & Frierson 2010).
+
 **Rung 3 — SCOPED + spike-validated (vertical structure → baroclinic instability; 2026-06-12).** The
 biggest jump on the §5 staircase: the **first *structural* edit to a shared engine** since Phase 3 (so it
 triggers the full-repo gate + the import-drift guard, ADR 0003) and the **first compute wall**. A

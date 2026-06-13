@@ -182,12 +182,16 @@ def test_extratropics_converge_precip_exceeds_evaporation(climate):
 
 
 def test_subtropical_evaporative_belt_is_not_reproduced(climate):
-    # HONEST LIMITATION (pinned): the steep equator–pole contrast hyper-peaks C–C q at the equator, so
-    # the moisture-flux maximum sits equatorward of the canonical subtropics and the subtropics come out
-    # as P > E — NOT the observed evaporative E > P. This is why no test asserts subtropical E > P.
-    # NOTE: this pins a KNOWN-WRONG sign as current behaviour. When rung 2.5/3 reproduces the evaporative
-    # belt (correct E > P here), this test SHOULD fail — update it *deliberately* then; a red here after
-    # that work is the guard doing its job, not a regression.
+    # HONEST LIMITATION (pinned) of the EDDY-ONLY DEFAULT: the steep equator–pole contrast hyper-peaks C–C
+    # q at the equator, so the moisture-flux maximum sits equatorward of the canonical subtropics and the
+    # subtropics come out as P > E — NOT the observed evaporative E > P. This is why no test asserts
+    # subtropical E > P for the default path.
+    # NOTE: the mislocation PERSISTS past the Hadley fix. The opt-in Hadley path
+    # (moisture_budget(..., hadley=True)) flips the ITCZ sign and DOES make a dry belt — but equatorward of
+    # 25–35° (~10–15°), because the hyper-peaked fixed-RH q pulls the moisture flux equatorward. So 25–35°
+    # stays P>E on BOTH paths (test_hadley_creates_an_equatorward_dry_belt_but_does_not_relocate_the_desert).
+    # Relocating the desert to the canonical subtropics needs a realistic q (moist dynamics / vertical) =
+    # rung 3+. This test pins the limitation for the default; it stays green by design.
     b = moist.moisture_budget(climate)
     phi = b.phi
     subtropics = (phi >= 25.0) & (phi <= 35.0)
@@ -203,3 +207,122 @@ def test_moisture_budget_is_a_pure_diagnostic(climate):
     assert b.mean_precip == pytest.approx(
         moist.GLOBAL_PRECIP_REF_CMYR * moist.energy_constrained_factor(climate.global_mean_T))
     assert b.energy_rate == pytest.approx(moist.energy_constrained_rate())
+
+
+# --------------------------------------------------------------------------- #
+# THE HADLEY MOISTURE-CONVERGENCE FIX (opt-in) — the deferred deep-tropical mean-circulation term.
+# Honesty classification (the advisor's framing): convergence-at-ITCZ / divergence-in-subtropics is
+# BY-CONSTRUCTION (plumbing, not a win — HADLEY_STRENGTH is the prescribed wall); the genuinely emergent,
+# non-vacuous claim is the AMPLITUDE — q(T) from the EBM ⟹ the ITCZ convergence intensifies at the ~C–C
+# rate ("rich-get-richer" P−E, faster than the energy-constrained global mean).
+# --------------------------------------------------------------------------- #
+def test_hadley_streamfunction_is_a_tropics_confined_cell():
+    # PLUMBING (by-construction): ψ(x) = 0 at the equatorial ascent AND the subtropical-edge descent,
+    # positive between, exactly 0 in the extratropics (the prescribed single cell).
+    x = np.linspace(0.0, 1.0, 200)
+    psi = moist.hadley_streamfunction(x)
+    x_edge = np.sin(np.radians(moist.HADLEY_EDGE_DEG))
+    assert psi[0] == pytest.approx(0.0)                         # ascent at the equator
+    assert np.all(psi[x >= x_edge] == 0.0)                      # nothing poleward of the cell edge
+    assert np.all(psi[(x > 0.02) & (x < x_edge - 0.02)] > 0.0)  # a positive overturning in between
+    assert psi.max() == pytest.approx(1.0, abs=1e-3)            # normalized peak
+
+
+def test_hadley_convergence_conserves_water_machine_exact(climate):
+    # PLUMBING: the conservative face form ⟹ ∫(P−E)_Hadley dx = 0 (the ITCZ convergence is exactly paid
+    # for by subtropical divergence — a budget, not a painted band).
+    had = moist.hadley_moisture_convergence(climate)
+    assert abs(float(np.mean(had))) < 1e-9
+
+
+def test_hadley_convergence_is_confined_to_the_tropics(climate):
+    # The mean cell vanishes poleward of its edge ⟹ the extratropical eddy budget is UNTOUCHED.
+    had = moist.hadley_moisture_convergence(climate)
+    phi = climate.latitude_deg()
+    assert np.all(had[phi >= moist.HADLEY_EDGE_DEG + 1.0] == 0.0)
+
+
+def test_hadley_reduces_to_eddy_only_at_zero_strength(climate):
+    # REDUCTION (by-construction): strength = 0 ⟹ the Hadley term is identically zero, and the opt-in
+    # budget is the eddy-only default bit-for-bit (the independent-diff discipline).
+    assert np.array_equal(moist.hadley_moisture_convergence(climate, strength=0.0),
+                          np.zeros_like(climate.x))
+    off = moist.moisture_budget(climate)
+    on0 = moist.moisture_budget(climate, hadley=True, strength=0.0)
+    assert np.array_equal(off.p_minus_e, on0.p_minus_e)
+
+
+def test_hadley_flips_the_deep_tropical_sign_to_convergence(climate):
+    # THE FIX (the headline): the eddy-only default EXPORTS at the equator (P<E, backwards); adding the
+    # mean Hadley convergence flips it to CONVERGENCE (P>E) at the ITCZ. The SIGN FLIP is the deliverable;
+    # the magnitude is calibrated (observed order only — HADLEY_STRENGTH is the prescribed wall).
+    eddy = moist.moisture_budget(climate)
+    full = moist.moisture_budget(climate, hadley=True)
+    assert eddy.equatorial_export < 0.0                        # was backwards (the named trade)
+    assert full.equatorial_export > 0.0                        # now converges (the fix)
+    assert full.hadley is True
+    # observed ITCZ order (~1–2 m/yr = 100–200 cm/yr); a loose band, NOT a tuned match
+    assert 50.0 < full.equatorial_export < 350.0
+
+
+def test_hadley_leaves_the_extratropical_budget_unchanged(climate):
+    # The fix is local to the tropics: the extratropical convergence (the leg the eddy diffusion gets
+    # right) is identical with and without the Hadley term.
+    eddy = moist.moisture_budget(climate)
+    full = moist.moisture_budget(climate, hadley=True)
+    assert full.extratropical_convergence == pytest.approx(eddy.extratropical_convergence)
+
+
+def test_hadley_creates_an_equatorward_dry_belt_but_does_not_relocate_the_desert(climate):
+    # THE TRADE (named, honest): the descending branch produces a dry belt (E>P) — but EQUATORWARD of the
+    # canonical 25–35° subtropics (~10–15°), because the hyper-peaked fixed-RH C–C q pulls the moisture
+    # flux ψ·q equatorward (the SAME mislocation the eddy budget has). So the Hadley path flips the ITCZ
+    # SIGN robustly but does NOT relocate the desert: the canonical subtropics stay P>E on BOTH paths.
+    full = moist.moisture_budget(climate, hadley=True)
+    phi = full.phi
+    dry = (phi >= 8.0) & (phi <= 20.0)
+    assert full.p_minus_e[dry].mean() < 0.0                    # an off-equator dry belt (E>P) emerges
+    assert full.subtropical_balance > 0.0                      # but 25–35° stays P>E (desert NOT relocated)
+    # the dry belt sits equatorward of the canonical subtropics (the persistent hyper-peaked-q limitation)
+    desert_lat = phi[np.argmin(np.where(phi < 35.0, full.p_minus_e, np.inf))]
+    assert desert_lat < 25.0
+
+
+def test_hadley_itcz_convergence_intensifies_at_the_cc_rate(climate):
+    # REAL-BUT-LOOSE — the non-vacuous EMERGENT nugget (advisor): the cell strength is FIXED, so any
+    # warming response is carried entirely by q(T) from the EBM. The ITCZ convergence intensifies at the
+    # ~Clausius–Clapeyron moisture rate (~7 %/K) — the "rich-get-richer" P−E scaling — and is FASTER than
+    # the energy-constrained global-mean rate (~2.5 %/K). This is emergent, not prescribed.
+    from dataclasses import replace
+    dT = 4.0
+    warm = replace(climate, T=climate.T + dT, global_mean_T=climate.global_mean_T + dT)
+    eq_now = moist.hadley_moisture_convergence(climate)[0]
+    eq_warm = moist.hadley_moisture_convergence(warm)[0]        # SAME strength — only q(T) moved
+    rate = (eq_warm / eq_now - 1.0) / dT
+    assert 0.04 < rate < 0.09                                   # C–C moisture order (~7 %/K)
+    assert rate > moist.energy_constrained_rate()              # faster than the energy-constrained mean
+
+
+def test_hadley_convergence_is_a_pure_diagnostic(climate):
+    # Like the eddy budget: the mean-circulation term must not perturb the rung-0 climate.
+    T_before = climate.T.copy()
+    moist.hadley_moisture_convergence(climate)
+    moist.moisture_budget(climate, hadley=True)
+    assert np.array_equal(climate.T, T_before)
+
+
+@pytest.mark.slow
+def test_demo_reproduces_the_hadley_fix_headline():
+    # Guards the committed figure (planet-hadley-moisture.png): a fresh clone reproduces the headline, not
+    # just reads it — the deep-tropical sign FLIP (export → convergence), the conserving budget, and the
+    # EMERGENT ~C–C-order intensification (faster than the energy-constrained global mean).
+    from planet import demo_hadley_moisture as demo
+    r = demo.compute()
+    assert r.eq_eddy < 0.0                                      # eddy-only: backwards ITCZ (export)
+    assert r.eq_full > 0.0                                      # + Hadley: the fix (convergence)
+    assert 50.0 < r.eq_full < 350.0                             # observed ITCZ order (~1–2 m/yr), loose
+    assert r.dry_belt_min < 0.0 and r.dry_belt_lat < 25.0       # a dry belt emerges, equatorward of 25–35°
+    assert r.subtropics_full > 0.0                              # canonical 25–35° NOT relocated (the trade)
+    assert abs(r.net_full) < 1e-9                               # water conserved (a budget, not a band)
+    assert 0.04 < r.itcz_rate < 0.09                            # emergent ~C–C rate ("rich-get-richer")
+    assert r.itcz_rate > r.energy_rate                          # faster than the global-mean rate

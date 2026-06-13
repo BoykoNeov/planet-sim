@@ -1,8 +1,10 @@
 ---
 name: planet-rung2x-itcz
 description: "Planet rung 2.x (full-sphere EBM + the energetic ITCZ) BUILT 2026-06-14 (planet/sphere_ebm.py): pole-to-pole sibling, ebm.py/moist.py UNTOUCHED; ITCZ = energy-flux-equator migrates toward warm hemisphere; sensitivity is a CLOSED-FORM consequence of the calibrated D (~5–6 deg/PW, factor ~2 above observed ~3), NOT an emergent prediction; the chosen slice of the ITCZ/Hadley deferral"
-metadata:
+metadata: 
+  node_type: memory
   type: project
+  originSessionId: d1abcdcc-5ec6-4b7a-8c87-7f05451c89e9
 ---
 
 Planet **rung 2.x** — the **full-sphere EBM + the energetic ITCZ** — **BUILT 2026-06-14**
@@ -47,8 +49,9 @@ rung-0 at `φ_EFE=0` **bit-for-bit**.
 **`itcz_center_deg`** seam (default 0 → rung-0 **bit-for-bit**; the ITCZ band now uses *signed* latitude so
 it can migrate; midlat bands still symmetric); `sphere_ebm.itcz_informed_precip` feeds it `φ_EFE`. **Honest
 scope: a DRY model RELOCATES A PRESCRIBED BAND — NOT emergent rainfall**, opt-in like [[planet-rung1-two-way-coupler]]'s
-`circ_precip`. **`moist.py`'s `moisture_convergence` stays backwards in the deep tropics** — this rung adds
-ITCZ **position**, the Hadley moisture-convergence fix (the literal backwards-`P−E`) is **STILL DEFERRED**.
+`circ_precip`. **`moist.py`'s `moisture_convergence` stays backwards in the deep tropics by DEFAULT** — this
+rung adds ITCZ **position**; the Hadley moisture-convergence fix (the backwards-`P−E` *sign*) was then BUILT
+2026-06-14 as an opt-in mean-circulation term → [[planet-rung2-hadley-fix]].
 Other edges: asymmetry **imposed** (Q-flux/albedo, not an ocean); annual-mean (no seasonal migration).
 
 **Demo banked + CI-guarded:** `planet/demo_sphere_itcz.py` → `docs/figures/planet-sphere-itcz.png` (H(x)+EFE;

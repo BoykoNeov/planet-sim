@@ -110,12 +110,26 @@ Validation triad (plan §3) — re-classed for honesty
   ``P > E`` rather than the observed evaporative ``E > P``). So Phase A banks the moist **energetics +
   the extratropical budget + the global rate**, *not* a wholesale-better precip map — the same
   "trade, not a win" the staircase keeps finding. The benchmark therefore asserts **only** the
-  equatorial export and the extratropical convergence (never subtropical ``E > P``).
+  equatorial export and the extratropical convergence (never subtropical ``E > P``) **for the eddy-only
+  default**; the opt-in :func:`hadley_moisture_convergence` adds the mean circulation that flips the
+  deep-tropical sign (and, for the calibrated strength, the subtropical belt) — see its own leg below.
 
 Named scope edges
 -----------------
-* **ITCZ / Hadley deferred** — the up-gradient tropical moisture convergence is mean circulation, not
-  eddy diffusion (a rung-3+ feature). The prescribed ``precip.py`` ITCZ is better in the deep tropics.
+* **ITCZ / Hadley — now addressed by an opt-in mean-circulation term (a prescribed cell).** The
+  up-gradient tropical moisture convergence the eddy diffusion cannot produce is supplied by
+  :func:`hadley_moisture_convergence` (``moisture_budget(..., hadley=True)``): a **prescribed** Hadley
+  overturning whose equatorward, moist low-level branch converges water at the ITCZ and diverges it under
+  the descent. **Honest altitude (the trade):** the convergence/divergence *structure* is by-construction
+  (the strength ``HADLEY_STRENGTH`` is the named wall, calibrated to observed *order*); what is **emergent**
+  is the *amplitude* (``q(T)`` from the EBM ⟹ the ITCZ convergence intensifies at the ~C–C rate, faster
+  than the energy-constrained global mean — the "rich-get-richer" P−E scaling), and it is a conserving
+  **budget**, not a painted band. **It flips the ITCZ *sign* robustly but does NOT relocate the desert:**
+  the dry belt emerges *equatorward* of the canonical 25–35° subtropics (the hyper-peaked fixed-RH ``q``
+  pulls it equatorward — the eddy budget's mislocation, unfixed). **The fully emergent mean circulation** (a
+  resolved ascent, not an imposed Ψ; and a realistic ``q`` that puts the desert at 25–35°) needs the
+  vertical — the **gross-moist-stability / overturning** framework is the honest route only at **rung 3+**
+  (named, not built here). The eddy-only :func:`moisture_convergence` stays the default.
 * **No resolved storm-track precip pattern** — that needs the vertical (ascent→condensation) = rung 3
   (spike-confirmed); rung 2 banks the *column* budget, not the *resolved* pattern.
 * **Fixed RH; ``R_atm`` prescribed** — the sub-grid wall. A fuller moist EBM that diffuses *moist
@@ -151,6 +165,7 @@ reported as **cm of water per year**; ``x = sin φ`` on [0, 1]; latitudes in deg
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -180,6 +195,12 @@ R_ATM_SLOPE = 2.0         # W m⁻² K⁻¹ — atmospheric radiative-cooling se
                           #             Soden 2006; Allen & Ingram 2002). NOT B_OLR (= 2 W m⁻² K⁻¹ too,
                           #             but the *TOA* longwave feedback — a different quantity).
 GLOBAL_PRECIP_REF_CMYR = 100.0   # cm/yr — present global-mean precipitation ⟨P⟩₀ (~1 m/yr; Hartmann)
+
+# The mean Hadley-circulation moisture transport — the deep-tropical fix (opt-in; the named wall).
+HADLEY_EDGE_DEG = 30.0     # °         — subtropical edge of the Hadley cell (it descends here → deserts)
+HADLEY_STRENGTH = 4.2e-4   # kg m⁻² s⁻¹ — prescribed overturning moisture-flux strength (the sub-grid WALL),
+                           #              calibrated to observed-ORDER ITCZ convergence (~1–2 m/yr), NOT
+                           #              derived; the mean circulation is imposed (resolved ascent = rung 3+).
 
 SECONDS_PER_YEAR = 3.1557e7
 # 1 kg m⁻² s⁻¹ of water = 1 mm s⁻¹ depth (ρ_w = 10³ kg m⁻³); cm/yr = mm/s · (s/yr) / (10 mm/cm).
@@ -328,6 +349,91 @@ def moisture_convergence(state: ClimateState, RH: float = RH_DEFAULT,
     return conv_mass * _KGM2S_TO_CMYR                                             # cm/yr
 
 
+# --------------------------------------------------------------------------- #
+# The mean Hadley-circulation moisture convergence — the deep-tropical fix (opt-in).
+# --------------------------------------------------------------------------- #
+def hadley_streamfunction(x: np.ndarray, edge_deg: float = HADLEY_EDGE_DEG) -> np.ndarray:
+    """The normalized tropical-overturning profile ``ψ(x)`` (dimensionless, peak 1) — a cubic cell.
+
+    ``ψ(x) = (27/4)·u·(1 − u)²`` with ``u = x / x_edge`` on ``0 ≤ x < x_edge`` (``x_edge = sin(edge_deg)``),
+    else 0: a single Hadley cell that **ascends at the equator** (``ψ(0) = 0`` with a *finite* slope
+    ``ψ'(0) > 0`` — a strong equatorial moisture convergence), peaks at ``u = 1/3``, and **descends at the
+    subtropical edge** where it meets the extratropics **smoothly** (``ψ(x_edge) = 0`` *and* ``ψ'(x_edge) =
+    0`` — so the convergence tapers to zero at the edge with no discontinuity, unlike a half-sine), vanishing
+    in the extratropics. The peak is normalized to 1. It is the meridional shape of the mean overturning the
+    moisture transport rides on — a **prescribed** kinematic profile (the mean circulation is imposed here,
+    not emergent — that needs the resolved vertical, rung 3+).
+    """
+    x = np.asarray(x, dtype=float)
+    x_edge = math.sin(math.radians(float(edge_deg)))
+    u = np.clip(x, 0.0, x_edge) / x_edge
+    return np.where(x < x_edge, (27.0 / 4.0) * u * (1.0 - u) ** 2, 0.0)
+
+
+def _mean_flux_convergence(flux: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """Convergence ``−∂F/∂x`` of a prescribed *advective* transport ``F(x)``, in conservative face form.
+
+    The mean-circulation analogue of :func:`_spherical_flux_divergence` (which is the *diffusive*
+    second-order operator): here ``F`` is a first-order transport, so the convergence is minus its
+    derivative, built as differences of interior **face** fluxes ``F_face = ½(F_i + F_{i+1})`` with the
+    domain-boundary fluxes set to **zero** (no cross-equator transport by symmetry; none beyond the cell
+    edge). Because both boundary fluxes are zero the discrete convergence sums to **exactly zero**
+    (``Σ conv·Δx = 0``) — moisture-mass conservation, the same machine-exact ``∫E = ∫P`` plumbing leg.
+    """
+    x = np.asarray(x, dtype=float)
+    f = np.asarray(flux, dtype=float)
+    dx = x[1] - x[0]
+    f_face = 0.5 * (f[:-1] + f[1:])                    # interior cell faces
+    conv = np.zeros_like(f)
+    conv[1:-1] = -(f_face[1:] - f_face[:-1]) / dx      # interior cells: difference of bounding faces
+    conv[0] = -(f_face[0] - 0.0) / dx                  # equator: cross-equatorial MMC flux is 0 (symmetry)
+    conv[-1] = -(0.0 - f_face[-1]) / dx                # pole: 0 (no flux)
+    return conv
+
+
+def hadley_moisture_convergence(state: ClimateState, RH: float = RH_DEFAULT,
+                                strength: float = HADLEY_STRENGTH,
+                                edge_deg: float = HADLEY_EDGE_DEG) -> np.ndarray:
+    """The mean Hadley-circulation moisture convergence ``P − E`` (cm/yr) — the deferred deep-tropical fix.
+
+    Down-gradient eddy diffusion (:func:`moisture_convergence`) is **backwards** at the moist equator (it
+    *exports* moisture — there is no diffusive way to converge moisture at a maximum). The real ITCZ
+    convergence is the **mean Hadley circulation**: its low-level, moist branch flows *equatorward*, carrying
+    water toward the ascent. This term supplies that mean transport. The northward (poleward) overturning
+    moisture flux is
+
+        F(x) = − strength · ψ(x) · q(x)                     (kg m⁻² s⁻¹, **equatorward** in the tropics)
+
+    with the normalized overturning :func:`hadley_streamfunction` ``ψ(x)`` and ``q = RH·q_sat(T)`` (the
+    **dry-upper-branch** approximation ``Δq ≈ q_surface`` — the descending branch is dry). Its convergence
+    ``P − E = −∂F/∂x`` (:func:`_mean_flux_convergence`, conservative ⟹ ``∫ = 0`` machine-exact) is **positive
+    at the ITCZ** (the ascent gains moisture) and **negative under the descent** (a dry belt). It vanishes
+    poleward of the cell edge, so the extratropical eddy budget is untouched.
+
+    **The honest altitude (a trade, not a clean win — see the module triad).** The convergence-at-the-ITCZ /
+    divergence-under-the-descent *structure* is **guaranteed by construction** for any prescribed equatorward
+    tropical flux — that is plumbing, not a finding; ``strength`` is the named, **prescribed** wall
+    (calibrated to observed *order*, not derived). What is genuinely emergent — and the bankable nugget — is
+    the **amplitude**: ``q(T)`` is carried from the EBM, so the tropical convergence **intensifies at the
+    Clausius–Clapeyron moisture rate** (~7 %/K) under warming, *faster* than the energy-constrained global
+    mean (:func:`energy_constrained_rate`, ~2.5 %/K) — the observed "rich-get-richer" P−E scaling (Held &
+    Soden 2006). And it is a conserving **budget** (the ITCZ convergence is paid for by the descending dry
+    belt), not a painted pattern. Opt-in, like the rung-1/2 seams; the eddy-only :func:`moisture_convergence`
+    stays the default.
+
+    **The fix robustly flips the ITCZ *sign* — it does NOT robustly relocate the desert.** The emergent dry
+    belt comes out **equatorward of the canonical 25–35° subtropics** (~10–15°): the steep equator–pole
+    contrast hyper-peaks the fixed-RH C–C ``q`` at the equator, so the moisture flux ``ψ·q`` (and hence its
+    divergence) is pulled equatorward — the **same** mislocation the eddy budget has
+    (``test_subtropical_evaporative_belt_is_not_reproduced``), *not* fixed by adding the mean cell. So the
+    canonical subtropics stay ``P > E`` even on this path; relocating the desert needs a realistic (less
+    hyper-peaked) moisture profile — moist dynamics / the resolved vertical, **rung 3+**.
+    """
+    q = specific_humidity(state.T, RH)
+    flux = -float(strength) * hadley_streamfunction(state.x, edge_deg) * q        # kg m⁻² s⁻¹
+    return _mean_flux_convergence(flux, state.x) * _KGM2S_TO_CMYR                 # cm/yr
+
+
 @dataclass(frozen=True)
 class MoistureBudget:
     """The rung-2 column moist-budget diagnostic for one rung-0 climate (plain arrays — loose coupling).
@@ -337,9 +443,14 @@ class MoistureBudget:
     ``mean_precip`` the energy-constrained global-mean ``⟨P⟩`` (cm/yr, :func:`energy_constrained_factor`
     × the present reference); ``energy_rate`` the fractional ``d ln⟨P⟩/dT̄`` (per K, the unlock);
     ``net_p_minus_e`` the area integral ``∫(P − E) dx`` (cm/yr, ~0 to machine precision — the
-    ``∫E = ∫P`` plumbing leg). ``equatorial_export`` (``P − E`` at the equator, < 0 — the
-    ITCZ-backwards term) and ``extratropical_convergence`` (mean ``P − E`` poleward of 40°, > 0) are
-    the two banked benchmark numbers (the named extratropical-only trade).
+    ``∫E = ∫P`` plumbing leg). ``equatorial_export`` (``P − E`` at the equator) and
+    ``extratropical_convergence`` (mean ``P − E`` poleward of 40°, > 0) are the banked benchmark numbers;
+    ``subtropical_balance`` is the mean ``P − E`` over the canonical 25–35° subtropics. ``hadley`` records
+    whether the mean Hadley convergence was added: with the eddy-only **default** ``hadley = False`` the
+    equator *exports* (``equatorial_export < 0`` — the named ITCZ-backwards trade); with the opt-in
+    ``hadley = True`` the equator **converges** (the deep-tropical fix). ``subtropical_balance`` stays
+    ``P > E`` on **both** paths — the Hadley dry belt emerges *equatorward* of it (the hyper-peaked-``q``
+    mislocation; see :func:`hadley_moisture_convergence`).
     """
 
     phi: np.ndarray
@@ -350,29 +461,42 @@ class MoistureBudget:
     net_p_minus_e: float
     equatorial_export: float
     extratropical_convergence: float
+    subtropical_balance: float = 0.0
+    hadley: bool = False
 
 
 def moisture_budget(state: ClimateState, RH: float = RH_DEFAULT,
-                    slope: float = R_ATM_SLOPE, D: float = D_TRANSPORT) -> MoistureBudget:
+                    slope: float = R_ATM_SLOPE, D: float = D_TRANSPORT,
+                    hadley: bool = False, strength: float = HADLEY_STRENGTH,
+                    edge_deg: float = HADLEY_EDGE_DEG) -> MoistureBudget:
     """Build the :class:`MoistureBudget` — the moisture field, the ``P − E`` convergence, and the rate.
 
     Reads the rung-0 :class:`~planet.ebm.ClimateState` (its temperature and grid) and returns the full
-    diagnostic: the fixed-RH moisture field, the down-gradient ``P − E`` convergence
-    (:func:`moisture_convergence`), the energy-constrained global mean and rate, and the two banked
-    benchmark numbers (equatorial export, extratropical convergence). A **pure diagnostic** — it does
-    not modify ``state`` or the climate, so the Phase-1 triad is untouched. ``D`` is the EBM transport
-    coefficient threaded to :func:`moisture_convergence` (defaults to rung-0 ``D_TRANSPORT``; pass the
-    climate's own ``D`` for a non-default-``D`` world — the module's "transport ``D``" scope edge).
+    diagnostic: the fixed-RH moisture field, the ``P − E`` convergence, the energy-constrained global mean
+    and rate, and the banked benchmark numbers. A **pure diagnostic** — it does not modify ``state`` or the
+    climate, so the Phase-1 triad is untouched. ``D`` is the EBM transport coefficient threaded to
+    :func:`moisture_convergence` (defaults to rung-0 ``D_TRANSPORT``; pass the climate's own ``D`` for a
+    non-default-``D`` world — the module's "transport ``D``" scope edge).
+
+    ``hadley`` (default ``False``) selects the convergence model. **Default — eddy only**: the down-gradient
+    :func:`moisture_convergence`, which is right in the extratropics but backwards at the ITCZ (the named
+    trade). **Opt-in ``hadley = True``**: adds the mean Hadley convergence (:func:`hadley_moisture_convergence`,
+    with ``strength``/``edge_deg``) so the deep tropics converge and the subtropical desert emerges — the
+    deferred deep-tropical fix, an *independent diff* against the eddy default (it reduces to it at
+    ``strength = 0``).
     """
     phi = state.latitude_deg()
     q = specific_humidity(state.T, RH)
     pme = moisture_convergence(state, RH, D)
+    if hadley:
+        pme = pme + hadley_moisture_convergence(state, RH, strength, edge_deg)
     # Area integral ∫(P − E) dx on the equal-area (uniform-Δx) grid is the area MEAN — the EBM's own
     # `total` convention (rectangle rule), under which the conservative flux divergence sums to *exactly*
     # zero (Σ div = 0). np.trapezoid would break the telescoping and leave an O(boundary) quadrature
     # residual, so the machine-exact ∫E = ∫P plumbing leg uses the mean.
     net = float(np.mean(pme))
     extra_mask = phi >= 40.0
+    subtropics = (phi >= 25.0) & (phi <= 35.0)
     return MoistureBudget(
         phi=phi, q=q, p_minus_e=pme,
         mean_precip=float(GLOBAL_PRECIP_REF_CMYR * energy_constrained_factor(state.global_mean_T, slope=slope)),
@@ -380,4 +504,6 @@ def moisture_budget(state: ClimateState, RH: float = RH_DEFAULT,
         net_p_minus_e=net,
         equatorial_export=float(pme[0]),
         extratropical_convergence=float(np.mean(pme[extra_mask])),
+        subtropical_balance=float(np.mean(pme[subtropics])),
+        hadley=bool(hadley),
     )

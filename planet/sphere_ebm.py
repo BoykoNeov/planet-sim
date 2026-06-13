@@ -32,8 +32,10 @@ that identification and named so the rung is not over-read:
   is simply the latitude of the **temperature maximum** (``∂T/∂x = 0``). Calling it "the ITCZ" is an
   *identification* by appeal to external moist theory, not an emergent rain belt. Wiring it into the
   prescribed precipitation band (:func:`itcz_informed_precip`) **relocates** that band to the
-  energetically-warmest latitude; it does **not** make rainfall emergent, and
-  :func:`planet.moist.moisture_convergence` stays backwards in the deep tropics exactly as before.
+  energetically-warmest latitude; it does **not** make rainfall emergent. (The *moisture-convergence* sign
+  in the deep tropics is a separate fix — the eddy-only :func:`planet.moist.moisture_convergence` stays
+  backwards there by default; the opt-in :func:`planet.moist.hadley_moisture_convergence` adds the mean
+  Hadley cell that flips it. This rung is about ITCZ *position*, that one about the deep-tropical *sign*.)
 * **The asymmetry is IMPOSED, not emergent.** The interhemispheric imbalance that moves the EFE is a knob
   — a prescribed cross-equatorial energy flux ``Q(x)`` (``∫Q dx = 0``) or an antisymmetric albedo — not
   the output of an ocean model (the coupler's synthetic-gradient precedent, :mod:`planet.circ_precip`).
