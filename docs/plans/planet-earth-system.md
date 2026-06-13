@@ -877,10 +877,13 @@ RGB now stays full-brightness `cmap(t)` *always*, alpha = `fadeIn × fadeOut` (t
 so particles fade fully to transparent at both ends). (2) **Round soft particles** via a generated radial-gradient
 `CanvasTexture` as `material.map` — square GL points were the amateur tell; the white sprite preserves the
 per-vertex temperature colour and rounds the dot (the single biggest *showcase* upgrade, answering the "shape"
-ask as a better *default*, not a knob). (3) **Two live sliders** (particle size + opacity) — cheap because
-`material.size`/`.opacity` are live-mutable; their initial positions flow from `particle_size`/`particle_opacity`
+ask as a better *default*, not a knob). (3) **Three live sliders** (particle size + opacity + edge sharpness) —
+the first two are cheap because `material.size`/`.opacity` are live-mutable; **edge sharpness** (added the same day
+after the user found the round sprite *too* defocused) rebuilds the cheap 64² `CanvasTexture` live and disposes the
+old one — it sets the sprite's opaque-core radius (`0` = soft bloom, `1` = near-hard disc, capped at 0.97 for a 1-px
+anti-aliased rim). All three initial positions flow from `particle_size`/`particle_opacity`/`particle_sharpness`
 Python kwargs (one source feeding both the material init via `FLOW_DATA` and the slider `value=`, no drift), so a
-notebook can ship a different default while a viewer fine-tunes in-browser without regenerating. **Deferred as a
+notebook can ship different defaults while a viewer fine-tunes in-browser without regenerating. **Deferred as a
 named seam:** the open-ended remainder — colour ramps, particle density presets, trail length, shape menus — is
 speculative with no second consumer, so it stays named-not-built. No test changes (the carve-out keeps the
 disclaimer the only machine-checked thing; the 6 structural tests pass untouched); artifact re-banked, gate still

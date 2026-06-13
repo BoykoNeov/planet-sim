@@ -60,8 +60,9 @@ _THREE_JS_PATH = _VENDOR_DIR / "three.min.js"
 
 DEFAULT_N_PARTICLES = 6500       # streaming points — reads as flow without taxing the per-frame JS loop
 _BAND_CROSSING_SECONDS = 6.0     # wall-clock seconds for the fastest particle to cross the band's width
-DEFAULT_PARTICLE_SIZE = 0.035    # point size in sphere-radius units (the size slider's initial value)
-DEFAULT_PARTICLE_OPACITY = 0.95  # overall particle opacity ceiling (the opacity slider's initial value)
+DEFAULT_PARTICLE_SIZE = 0.035      # point size in sphere-radius units (the size slider's initial value)
+DEFAULT_PARTICLE_OPACITY = 0.95    # overall particle opacity ceiling (the opacity slider's initial value)
+DEFAULT_PARTICLE_SHARPNESS = 0.55  # sprite edge: 0 = soft bloom, 1 = hard disc (the sharpness slider's start)
 
 
 # --------------------------------------------------------------------------------------------------- #
@@ -158,8 +159,8 @@ def _three_js() -> str:
     return _THREE_JS_PATH.read_text(encoding="utf-8")
 
 
-def _build_data(field: FlowField, n_particles: int,
-                particle_size: float, particle_opacity: float) -> dict:
+def _build_data(field: FlowField, n_particles: int, particle_size: float,
+                particle_opacity: float, particle_sharpness: float) -> dict:
     """Pack a :class:`FlowField` into the JSON the in-browser renderer consumes (compact, rounded)."""
     lat = np.asarray(field.lat, dtype=float)
     lon = np.asarray(field.lon, dtype=float)
@@ -201,6 +202,7 @@ def _build_data(field: FlowField, n_particles: int,
         "n_particles": int(n_particles),
         "particle_size": float(particle_size),
         "particle_opacity": float(particle_opacity),
+        "particle_sharpness": float(particle_sharpness),
     }
 
 
@@ -316,15 +318,18 @@ function spawn(i) {
 }
 for (let i = 0; i < N; i++) spawn(i);
 
-// a soft ROUND particle sprite (a radial alpha falloff): square GL points are the amateur tell, and a
-// round sprite is the single biggest "showcase" upgrade. The sprite is white, so the per-vertex
-// temperature colour survives (final rgb = vColor·white); its radial alpha rounds off the dot.
-function particleSprite() {
+// a ROUND particle sprite (a radial alpha falloff): square GL points are the amateur tell, and a round
+// sprite is the single biggest "showcase" upgrade. The sprite is white, so the per-vertex temperature
+// colour survives (final rgb = vColor·white); its radial alpha rounds off the dot. `sharp` ∈ [0,1] sets
+// the opaque-core radius: 0 = fade from the centre (soft bloom), ~1 = full alpha out to a near-hard disc
+// edge (sharp). Cheap to regenerate (a 64² canvas), so the sharpness slider just rebuilds the texture.
+function particleSprite(sharp) {
   const s = 64, cvs = document.createElement("canvas"); cvs.width = cvs.height = s;
   const g = cvs.getContext("2d");
+  const core = Math.max(0, Math.min(0.97, sharp));   // 0.97 cap keeps a 1-px anti-aliased rim (no jaggies)
   const grd = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
   grd.addColorStop(0.0, "rgba(255,255,255,1)");
-  grd.addColorStop(0.45, "rgba(255,255,255,0.85)");
+  grd.addColorStop(core, "rgba(255,255,255,1)");     // opaque out to `core`, then fall to transparent
   grd.addColorStop(1.0, "rgba(255,255,255,0)");
   g.fillStyle = grd; g.fillRect(0, 0, s, s);
   return new T.CanvasTexture(cvs);
@@ -332,8 +337,9 @@ function particleSprite() {
 const geo = new T.BufferGeometry();
 geo.setAttribute("position", new T.BufferAttribute(pos, 3));
 geo.setAttribute("color", new T.BufferAttribute(col, 4));            // RGBA: the 4th channel is the spawn/death fade
-const pmat = new T.PointsMaterial({ size: D.particle_size, map: particleSprite(), vertexColors: true,
-                                    transparent: true, opacity: D.particle_opacity, depthWrite: false });
+const pmat = new T.PointsMaterial({ size: D.particle_size, map: particleSprite(D.particle_sharpness),
+                                    vertexColors: true, transparent: true, opacity: D.particle_opacity,
+                                    depthWrite: false });
 const points = new T.Points(geo, pmat);
 scene.add(points);
 
@@ -388,12 +394,20 @@ window.addEventListener("resize", () => {
   [W, H] = size(); renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix();
 });
 
-// --- live appearance controls: size + opacity are live-mutable on the material (no re-render of the data).
-// The open-ended rest — colour ramps, particle density, trail length, shape menus — is a deliberately
-// deferred seam: speculative, with no second consumer yet, so it stays named-not-built. --- #
+// --- live appearance controls: size + opacity mutate the material directly; sharpness rebuilds the
+// (cheap) sprite texture and disposes the old one. All three touch only appearance — no re-render of the
+// field data. The open-ended rest — colour ramps, particle density, trail length, shape menus — is a
+// deliberately deferred seam: speculative, with no second consumer yet, so it stays named-not-built. --- #
 const sizeR = document.getElementById("sizeRange"), opacR = document.getElementById("opacityRange");
+const sharpR = document.getElementById("sharpRange");
 if (sizeR) sizeR.addEventListener("input", () => { pmat.size = parseFloat(sizeR.value); });
 if (opacR) opacR.addEventListener("input", () => { pmat.opacity = parseFloat(opacR.value); });
+if (sharpR) sharpR.addEventListener("input", () => {
+  const old = pmat.map;
+  pmat.map = particleSprite(parseFloat(sharpR.value));   // a sharper/softer rim, regenerated live
+  pmat.needsUpdate = true;
+  if (old) old.dispose();                                 // free the replaced GPU texture
+});
 
 let last = performance.now();
 function loop(now) {
@@ -409,19 +423,22 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
                                     "planet (§9.5 Rung C — the showcase)",
                     n_particles: int = DEFAULT_N_PARTICLES,
                     particle_size: float = DEFAULT_PARTICLE_SIZE,
-                    particle_opacity: float = DEFAULT_PARTICLE_OPACITY) -> str:
+                    particle_opacity: float = DEFAULT_PARTICLE_OPACITY,
+                    particle_sharpness: float = DEFAULT_PARTICLE_SHARPNESS) -> str:
     """Render ``field`` as one deterministic, self-contained three.js HTML page (data + three.js inlined).
 
     The disclaimer (``field.honesty``) is written into a **visible** ``<div class="disclaimer">`` in the
     static DOM — not merely a JS comment — because under the honest-by-disclosure carve-out it *is* the
     entire license, and is the one thing machine-checked. Opens straight off ``file://`` (no network).
 
-    ``particle_size`` / ``particle_opacity`` set the shipped *defaults*; they flow to both the material
-    init and the live size/opacity sliders' initial positions (one source, no drift), so a viewer can
-    fine-tune appearance in the browser without regenerating, and a notebook can ship a different default.
+    ``particle_size`` / ``particle_opacity`` / ``particle_sharpness`` set the shipped *defaults*; each
+    flows to both the material init and its live slider's initial position (one source, no drift), so a
+    viewer can fine-tune appearance in the browser without regenerating, and a notebook can ship different
+    defaults. Sharpness ∈ [0,1] is the sprite's opaque-core radius (0 = soft bloom, 1 = near-hard disc).
     """
-    data_json = json.dumps(_build_data(field, n_particles, particle_size, particle_opacity),
-                           separators=(",", ":"), ensure_ascii=False)
+    data_json = json.dumps(
+        _build_data(field, n_particles, particle_size, particle_opacity, particle_sharpness),
+        separators=(",", ":"), ensure_ascii=False)
     disclaimer = html.escape(field.honesty)
     return (
         "<!doctype html>\n<html lang=\"en\">\n<head>\n"
@@ -438,6 +455,8 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
         f"step=\"0.005\" value=\"{particle_size}\"></label>\n"
         f"    <label>Opacity<input id=\"opacityRange\" type=\"range\" min=\"0.1\" max=\"1\" "
         f"step=\"0.05\" value=\"{particle_opacity}\"></label>\n"
+        f"    <label>Edge sharpness<input id=\"sharpRange\" type=\"range\" min=\"0\" max=\"1\" "
+        f"step=\"0.05\" value=\"{particle_sharpness}\"></label>\n"
         "  </div>\n"
         f"  <div class=\"disclaimer\" id=\"disclaimer\"><strong>Illustrative showcase — read this.</strong> "
         f"{disclaimer}</div>\n"
