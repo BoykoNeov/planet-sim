@@ -1349,6 +1349,47 @@ backbone** (recorded below).
   `planet/tests/test_moist_ebm.py` (12, all **fast**, incl. a `.converged` guard); full planet gate
   **261 passed, 1 skip**. No engine edit; `uses` unchanged.
 
+**Rung 2.x — BUILT (the full-sphere EBM + the energetic ITCZ; `planet/sphere_ebm.py`, 2026-06-14).** The
+chosen slice of the user's "ITCZ/Hadley + moist precip pattern" deferral. Rung-0's EBM is **hemisphere-only**
+(`x=sinφ∈[0,1]`, equatorial-symmetry BC) — so an ITCZ that **migrates off the equator breaks that symmetry
+by construction** and *cannot* be represented; this rung lifts rung 0 to the **full sphere** `x∈[−1,1]`
+(two real poles, equator interior) and adds the **energetic ITCZ**: the latitude where the emergent
+atmospheric energy transport `H(x)=−2πa²·D(1−x²)∂ₓT` crosses zero — the **energy-flux equator (EFE)**, which
+migrates toward the warmer hemisphere under an interhemispheric imbalance (Kang+2008; Bischoff–Schneider
+2014; Schneider–Bischoff–Haug 2014; Donohoe+2013). **A SIBLING model — `ebm.py`/`moist.py` UNTOUCHED** (the
+`moist_ebm`/`baroclinic_qg` discipline): "re-validate Phase-1" = a **cross-model reduction check** (sibling
+reproduces hemisphere `ebm.py` to **1e-9** under symmetric forcing), the SW↔QG-bridge pattern. Built
+**spike-first** (`outputs/rung_itcz_fullsphere_spike.py`, gitignored) + **advisor-pressure-tested twice**,
+which set the honest altitude (below). Sources pinned at build (the `[[…-source]]` discipline).
+- **Banked (tight):** the full-sphere sibling; reduction to `ebm.py` (1e-9); North two-mode via the direct
+  `steady_linear` (constant albedo, **harmonic-face polar floor ~0.16 °C — NOT clean 2nd order**, same as
+  `ebm.py`); the **closed form `δ/AHT = 1/(2πa²·D·T̄ₓₓ(0))` reproduced by the engine**; EFE=0 exactly for
+  symmetric forcing; global energy balance machine-exact. The EFE diagnostic + the opt-in **`itcz_center_deg`
+  precip seam** (`precip.precip_pattern`/`precipitation` gain it, default 0 → rung-0 **bit-for-bit**; the
+  ITCZ band uses *signed* latitude so it can migrate; `sphere_ebm.itcz_informed_precip` feeds it `φ_EFE`,
+  the rung-1 `circ_precip` pattern for the ITCZ).
+- **Banked at the LOWER altitude (the unlock — advisor's load-bearing catch):** the ITCZ sensitivity is a
+  **closed-form consequence of the already-calibrated `D` and the mean-state curvature**, **NOT an emergent
+  prediction**. In a dry EBM the EFE is just the **temperature maximum** (`∂ₓT=0`), so the sensitivity is the
+  algebraic `1/(2πa²·D·T̄ₓₓ(0))`; the forcing-independence (Q-flux and albedo-asymmetry give the **same**
+  number) is a **linear-operator identity, not robustness**, and the shift **direction is by-construction**
+  (the "guaranteed result" trap the QG rung carried). Values: **≈ −6.3 deg/PW (no-ice, splitting-free) and
+  ~ −5 deg/PW (present-day ice)** — the **same ORDER** as the observed **~3 deg/PW** but a **factor ~1.5–2
+  high**, and `∝ (6+B/D)` (curvature `∝1/(6D+B)`, so a *pure function of D*, **not** the naive "∝1/D"). The
+  honest one-liner: ***"corroborates that `D` is realistic," NOT "predicts the ITCZ migration."*** (The
+  spike's first −3.78, suspiciously near observed-3, was an **operator-splitting artifact** at the default
+  `n_tau=0.5`; the EFE/sensitivity must be read off a **converged** profile — `steady_linear` or small
+  `n_tau` — a real gotcha, code- and test-enforced.)
+- **Named edges (every one carried):** **dry EBM** → the EFE is *identified* with the ITCZ via external moist
+  theory and the wire **relocates a prescribed band, NOT emergent rainfall**; the asymmetry is **imposed**
+  (Q-flux/albedo, the coupler's synthetic-gradient precedent), not from an ocean model; **`moist.py`'s
+  `moisture_convergence` stays backwards in the deep tropics** — this rung adds ITCZ **position**, the Hadley
+  moisture-convergence fix (the literal backwards-`P−E`) is **still deferred**; annual-mean (no seasonal
+  migration). **Demo banked + CI-guarded** (`planet/demo_sphere_itcz.py` → `docs/figures/planet-sphere-itcz.png`;
+  the `slow` `test_demo_reproduces_the_banked_headline` pins engine==closed-form, observed-order, right sign,
+  band relocates). Tests: `planet/tests/test_sphere_ebm.py` (15: tight/unlock/plumbing fast + 2 slow); full
+  gate **399 passed, 1 skip**. `ebm.py`/`moist.py` untouched; `precip.py` additive (default-preserving).
+
 **Rung 3 — SCOPED + spike-validated (vertical structure → baroclinic instability; 2026-06-12).** The
 biggest jump on the §5 staircase: the **first *structural* edit to a shared engine** since Phase 3 (so it
 triggers the full-repo gate + the import-drift guard, ADR 0003) and the **first compute wall**. A

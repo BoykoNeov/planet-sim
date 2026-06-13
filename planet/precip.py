@@ -112,26 +112,33 @@ PRECIP_REF_TEMP_C = 15.0      # °C  — reference global-mean T where the patte
 
 
 def precip_pattern(lat_deg: np.ndarray | float,
-                   midlat_center_deg: float = MIDLAT_CENTER_DEG) -> np.ndarray:
+                   midlat_center_deg: float = MIDLAT_CENTER_DEG,
+                   itcz_center_deg: float = ITCZ_CENTER_DEG) -> np.ndarray:
     """The circulation-set precipitation pattern ``pattern(φ)`` (cm/yr) at the reference climate.
 
-    A sum of Gaussian latitude bands over a polar/desert baseline: the wet equatorial **ITCZ** peak,
-    plus the two **midlatitude** storm-track peaks at ``±midlat_center_deg``. The dry **subtropics**
-    (~25–30°) are the *emergent trough* between the ITCZ and midlatitude bands; the **poles** decay to
-    the baseline. Symmetric in latitude (annual-mean, hemispherically symmetric), so ``|φ|`` is used.
+    A sum of Gaussian latitude bands over a polar/desert baseline: the wet **ITCZ** peak (at
+    ``itcz_center_deg``), plus the two **midlatitude** storm-track peaks at ``±midlat_center_deg``. The dry
+    **subtropics** (~25–30°) are the *emergent trough* between the ITCZ and midlatitude bands; the
+    **poles** decay to the baseline. The midlatitude bands are symmetric (``|φ|`` is used); the **ITCZ band
+    uses the *signed* latitude**, so it can sit off the equator without breaking the midlatitude symmetry.
     This is *where* it rains; the thermodynamic amplitude is applied by :func:`clausius_clapeyron_factor`.
 
-    ``midlat_center_deg`` is the **storm-track band centre** — the **rung-1 circulation seam**. It
-    defaults to the cited :data:`MIDLAT_CENTER_DEG` (so the rung-0 pattern is recovered *bit-for-bit by
-    construction*), and the rung-1 module :mod:`planet.circ_precip` overrides it with the **emergent jet
-    latitude** so the band tracks the dynamically-selected circulation rather than a hardcoded constant
-    (see that module for the honest scope — it is a *trade*, not an accuracy gain). The ITCZ and
-    subtropical centres stay fixed: the midlatitude channel circulation does not represent the Hadley
-    cell (the tropics/subtropics are out of its band).
+    Two band-centre seams, each defaulting to its cited constant so the rung-0 pattern is recovered
+    **bit-for-bit by construction**:
+
+    * ``midlat_center_deg`` — the **storm-track centre**, the **rung-1 circulation seam**. The rung-1
+      module :mod:`planet.circ_precip` overrides it with the **emergent jet latitude** (a *trade*, not an
+      accuracy gain — see that module).
+    * ``itcz_center_deg`` — the **ITCZ centre**, the **rung-2.x energetic seam**. The full-sphere model
+      :mod:`planet.sphere_ebm` overrides it with the **energy-flux equator** (:func:`planet.sphere_ebm.itcz_informed_precip`)
+      so the rain belt migrates with the energetics. **Honest scope (see that module): a *dry* EBM
+      relocates a *prescribed* band — not emergent rainfall.** The subtropical centres stay emergent
+      troughs between the (now movable) bands.
     """
-    phi = np.abs(np.asarray(lat_deg, dtype=float))
-    itcz = ITCZ_AMP_CM * np.exp(-(((phi - ITCZ_CENTER_DEG) / ITCZ_WIDTH_DEG) ** 2))
-    midlat = MIDLAT_AMP_CM * np.exp(-(((phi - midlat_center_deg) / MIDLAT_WIDTH_DEG) ** 2))
+    lat = np.asarray(lat_deg, dtype=float)
+    aphi = np.abs(lat)
+    itcz = ITCZ_AMP_CM * np.exp(-(((lat - itcz_center_deg) / ITCZ_WIDTH_DEG) ** 2))      # signed (migratable)
+    midlat = MIDLAT_AMP_CM * np.exp(-(((aphi - midlat_center_deg) / MIDLAT_WIDTH_DEG) ** 2))
     return P_BASELINE_CM + itcz + midlat
 
 
@@ -149,17 +156,19 @@ def clausius_clapeyron_factor(global_mean_T: float, ref_T: float = PRECIP_REF_TE
 
 
 def precipitation(lat_deg: np.ndarray | float, global_mean_T: float = PRECIP_REF_TEMP_C,
-                  midlat_center_deg: float = MIDLAT_CENTER_DEG) -> np.ndarray:
+                  midlat_center_deg: float = MIDLAT_CENTER_DEG,
+                  itcz_center_deg: float = ITCZ_CENTER_DEG) -> np.ndarray:
     """Diagnostic annual precipitation ``P(φ, T̄) = pattern(φ)·CC(T̄)`` (cm/yr).
 
     The circulation-set latitudinal pattern (:func:`precip_pattern`) times the global C–C moisture
     amplitude (:func:`clausius_clapeyron_factor`). Always non-negative (both factors are). This is the
     second input — beside the EBM temperature — the Whittaker classifier (:mod:`planet.biomes`)
     consumes. Pass the climate's ``global_mean_T`` to intensify the bands as the planet warms; the
-    default reference leaves the pattern at its present-day calibration. ``midlat_center_deg`` is the
-    rung-1 circulation seam (:func:`precip_pattern`); its default recovers the rung-0 field exactly.
+    default reference leaves the pattern at its present-day calibration. ``midlat_center_deg`` (rung-1
+    circulation) and ``itcz_center_deg`` (rung-2.x energetics) are the band-centre seams of
+    :func:`precip_pattern`; their defaults recover the rung-0 field exactly.
     """
-    return precip_pattern(lat_deg, midlat_center_deg) * clausius_clapeyron_factor(global_mean_T)
+    return precip_pattern(lat_deg, midlat_center_deg, itcz_center_deg) * clausius_clapeyron_factor(global_mean_T)
 
 
 def precip_field(state: ClimateState) -> np.ndarray:
