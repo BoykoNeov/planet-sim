@@ -1390,6 +1390,48 @@ bit-for-bit reduction — Phase A and B would validate *different* models). QG m
 **possible**; it does **not** pre-guarantee the κ comes out irreversible / well-scaled — that stays the
 open bet, finally testable. See `[[planet-rung3-phaseB-outcropping]]`.
 
+**Rung 3 Phase B — next build: two-layer QG, SCOPED (2026-06-13; user picked "bank + scope," not "build
+now").** The Phase-B payoff is re-routed to the **canonical Held–Larichev 1996 doubly-periodic two-layer
+QG turbulence model** — the standard tool for exactly this experiment. This is the **plan of record for the
+next increment**; no code shipped this session (the spike finding above is what was banked).
+- **The model.** Two layers of QG potential vorticity `q_k = ∇²ψ_k + (−1)^k F_k(ψ_1−ψ_2) + βy`,
+  `F_k = f₀²/(g'H_k)`, on a doubly-periodic plane. Prognostic = the PV anomaly advected by its own flow;
+  **ψ is recovered from q by a 2×2 *spectral* inversion** — at each wavenumber the coupled
+  `(−K²−F_k)ψ̂_k + F_kψ̂_{3−k} = q̂_k` is a 2×2 solve (FFT-diagonalized, vectorized). Pseudospectral
+  Jacobian advection with the 2/3 dealias rule; RK3/4 in time. ~200 lines. The fixed thermal-wind shear
+  `(U_1−U_2)` is the background APE reservoir (as in the SW engine's `background`); **β returns** (β-plane
+  QG, vs the SW f-plane) — it sets the **Rhines arrest** of the inverse cascade and restores a **finite
+  critical shear** `U_crit=β/F` (the named β-item from Phase A, natural in QG).
+- **Why it works where SW failed.** QG is **linearized in the thickness** → the interface displacement has
+  **no layer-depth floor**, so saturation is **well-posed (no outcropping)**; and the **rigid lid filters
+  the fast barotropic gravity wave** → **no external-mode CFL** (timestep set by the slow advective speed),
+  so long post-saturation runs are cheap. Exactly the two stiffnesses the free-surface model paid.
+- **Reuse + the dissipation already de-risked.** Port the spike's **hyperviscosity `−ν₄∇⁴q` + linear
+  bottom Ekman drag `−r∇²ψ_2`** (built, mass/PV-clean, CFL-aware) — both default-off. Reuse the **κ→D
+  bridge** (`planet/transport.py`) and the **pre-registered discriminators** unchanged: emergent thickness
+  diffusivity `κ = −⟨v'τ'⟩/(dτ̄/dy)` (`τ ∝ ψ_1−ψ_2` the interface/buoyancy), the **homogeneous-turbulence
+  κ** (the clean GM/thickness-diffusivity definition — **no operator-shape test**, that needs a meridional
+  channel = the named BC extension), **irr fraction O(1)** (vs rung-1 ~0.1) and **κ_eff/(v'_rms·L_d)
+  O(0.1–10)** (vs rung-1 ~1e-3), **validated dimensionless** (idealized `κ_ML` is intrinsically 15–60×
+  below Earth's `κ₀=2.2e6`).
+- **The triad (projected).** *tight* — the QG **linear stability = the spike's QG-Phillips cross-check**
+  (most-unstable `λ~L_d`, the `K²=2F` short-wave cutoff, `U_crit=β/F`); the spectral inversion is exact;
+  zero-shear → neutral. *real-but-loose (the unlock)* — the emergent **saturated, irreversible,
+  down-gradient eddy thickness diffusivity** → the **now-non-vacuous reduction-to-EBM** (direction +
+  irreversibility banked; magnitude dimensionless / config-tuned). *plumbing* — zero shear ⟹ no eddies
+  (decay); `q↔ψ` round-trips.
+- **Honest edges (named).** A **new model OUTSIDE `engines/fluid`** (pseudospectral, not the C-grid) →
+  **no bit-for-bit single-layer reduction; Phase A and Phase B validate *different* models** — the bridge
+  between them is the **shared two-layer linear instability** (SW solver ↔ QG agree to <0.5 % in the
+  rigid-lid limit, per the spike). Home is a **scope decision for next session**: a planet module
+  (`planet/baroclinic_qg.py`, single-consumer) **vs** a third shared engine (`engines/spectral/`,
+  reusable) — lean planet-module first (rule-of-three not yet met). **QG makes the experiment *possible*,
+  not pre-guaranteed:** the saturated κ coming out irreversible / well-scaled is **still the open bet**
+  (the class downgraded@rung1 / overturned@rung2), now finally *testable*. Held–Suarez (sphere
+  primitive-eq) stays **rung 5**. Sources to pin at build: **Held & Larichev 1996** (two-layer QG
+  turbulence + the diffusivity scaling), Phillips 1954 / Eady 1949, Vallis 2017 *AOFD*; extends
+  `[[shallow-water-source]]`. See `[[planet-rung3-phaseB-outcropping]]`, `[[planet-rung3-scoped]]`.
+
 **Visualization rungs A/B/C — DECIDED to build all three (animated eddy flow; 2026-06-11;
 rungs A+B BUILT — A 2026-06-11, B 2026-06-12; C pending — build detail in §9.5).** A forward decision (user): animate the emergent eddy life cycle across three
 rising-cost **visualization** rungs (distinct from the §5 GCM staircase) — **A** a matplotlib

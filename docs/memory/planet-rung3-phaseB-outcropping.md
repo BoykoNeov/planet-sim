@@ -62,9 +62,12 @@ anchor already exists** = the spike's **QG-Phillips cross-check** ([[planet-rung
 C-grid reuse, no bit-for-bit single-layer reduction) → **Phase A and Phase B would validate *different*
 models** (the coherence price). And **QG makes the experiment POSSIBLE, it does NOT pre-guarantee** the
 emergent `κ` comes out irreversible / down-gradient / well-scaled — **that is still the open bet, finally
-*testable***. **SURFACED to the user as a scope fork** (A bank-and-scope-QG / B build-QG-now / C
-deep-layer-SW-marginal); lean A. Pre-registered discriminators carried forward to whichever path: **irr
-fraction O(1)** (vs rung-1 ~0.1) and **`κ_eff/(v'_rms·L_d)` O(0.1–10)** (vs rung-1 ~1e-3) — validate
+*testable***. **USER PICKED A (bank + scope QG)** 2026-06-13 over build-QG-now / deep-layer-SW — so the **QG build is now
+SCOPED in plan §10** (model = `q_k=∇²ψ_k+(−1)^k F_k(ψ_1−ψ_2)+βy`, 2×2 spectral PV inversion, β-plane for
+Rhines arrest + critical shear `U_crit=β/F`, porting the spike's dissipation; triad/edges named) but **NOT
+built this session**. Home TBD next session: `planet/baroclinic_qg.py` (single-consumer, lean) vs
+`engines/spectral/` (reusable). Pre-registered discriminators carried forward: **irr fraction O(1)** (vs
+rung-1 ~0.1) and **`κ_eff/(v'_rms·L_d)` O(0.1–10)** (vs rung-1 ~1e-3) — validate
 **dimensionless** (idealized `κ_ML~v'·L_d` is intrinsically 15–60× below Earth's `κ₀=2.2e6`; a direct
 compare manufactures a false failure). Sources: **Held & Larichev 1996** (two-layer QG turbulence),
 Phillips 1954 / Eady 1949, Vallis 2017. See [[planet-rung3-scoped]], [[planet-rung1-two-way-coupler]],
