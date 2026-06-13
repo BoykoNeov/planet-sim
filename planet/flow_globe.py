@@ -60,6 +60,8 @@ _THREE_JS_PATH = _VENDOR_DIR / "three.min.js"
 
 DEFAULT_N_PARTICLES = 6500       # streaming points — reads as flow without taxing the per-frame JS loop
 _BAND_CROSSING_SECONDS = 6.0     # wall-clock seconds for the fastest particle to cross the band's width
+DEFAULT_PARTICLE_SIZE = 0.035    # point size in sphere-radius units (the size slider's initial value)
+DEFAULT_PARTICLE_OPACITY = 0.95  # overall particle opacity ceiling (the opacity slider's initial value)
 
 
 # --------------------------------------------------------------------------------------------------- #
@@ -156,7 +158,8 @@ def _three_js() -> str:
     return _THREE_JS_PATH.read_text(encoding="utf-8")
 
 
-def _build_data(field: FlowField, n_particles: int) -> dict:
+def _build_data(field: FlowField, n_particles: int,
+                particle_size: float, particle_opacity: float) -> dict:
     """Pack a :class:`FlowField` into the JSON the in-browser renderer consumes (compact, rounded)."""
     lat = np.asarray(field.lat, dtype=float)
     lon = np.asarray(field.lon, dtype=float)
@@ -196,6 +199,8 @@ def _build_data(field: FlowField, n_particles: int) -> dict:
         },
         "center_lat": round(center_lat, 4), "center_lon": round(center_lon, 4),
         "n_particles": int(n_particles),
+        "particle_size": float(particle_size),
+        "particle_opacity": float(particle_opacity),
     }
 
 
@@ -219,6 +224,12 @@ body { font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
               border: 1px solid #36406a; border-radius: 10px; padding: .7rem 1rem;
               color: #d8e0f2; font-size: .84rem; line-height: 1.45; }
 .disclaimer strong { color: #ffd166; }
+.controls { position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column;
+            gap: .45rem; background: rgba(12, 18, 38, .82); border: 1px solid #2a3358;
+            border-radius: 10px; padding: .6rem .75rem; font-size: .76rem; color: #c4cde2;
+            text-shadow: 0 1px 6px #000a; }
+.controls label { display: flex; align-items: center; gap: .6rem; justify-content: space-between; }
+.controls input[type="range"] { width: 9rem; accent-color: #ffd166; }
 """
 
 # The in-browser app. Plain JS (no f-string — the braces are JS). DATA + three.js are inlined ahead of
@@ -294,7 +305,7 @@ function cmap(t) {
 
 // deterministic particles (a fixed-seed LCG → a reproducible artifact even without a byte-golden test).
 const N = D.n_particles;
-const pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+const pos = new Float32Array(N * 3), col = new Float32Array(N * 4);   // colour is RGBA — alpha carries the fade
 const pLat = new Float32Array(N), pLon = new Float32Array(N), pAge = new Float32Array(N), pLife = new Float32Array(N);
 let seed = 1234567;
 function rnd() { seed = (1103515245 * seed + 12345) % 2147483648; return seed / 2147483648; }
@@ -305,10 +316,25 @@ function spawn(i) {
 }
 for (let i = 0; i < N; i++) spawn(i);
 
+// a soft ROUND particle sprite (a radial alpha falloff): square GL points are the amateur tell, and a
+// round sprite is the single biggest "showcase" upgrade. The sprite is white, so the per-vertex
+// temperature colour survives (final rgb = vColor·white); its radial alpha rounds off the dot.
+function particleSprite() {
+  const s = 64, cvs = document.createElement("canvas"); cvs.width = cvs.height = s;
+  const g = cvs.getContext("2d");
+  const grd = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  grd.addColorStop(0.0, "rgba(255,255,255,1)");
+  grd.addColorStop(0.45, "rgba(255,255,255,0.85)");
+  grd.addColorStop(1.0, "rgba(255,255,255,0)");
+  g.fillStyle = grd; g.fillRect(0, 0, s, s);
+  return new T.CanvasTexture(cvs);
+}
 const geo = new T.BufferGeometry();
 geo.setAttribute("position", new T.BufferAttribute(pos, 3));
-geo.setAttribute("color", new T.BufferAttribute(col, 3));
-const points = new T.Points(geo, new T.PointsMaterial({ size: 0.018, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false }));
+geo.setAttribute("color", new T.BufferAttribute(col, 4));            // RGBA: the 4th channel is the spawn/death fade
+const pmat = new T.PointsMaterial({ size: D.particle_size, map: particleSprite(), vertexColors: true,
+                                    transparent: true, opacity: D.particle_opacity, depthWrite: false });
+const points = new T.Points(geo, pmat);
 scene.add(points);
 
 function step(dt) {
@@ -325,9 +351,11 @@ function step(dt) {
     pos[i * 3] = xyz[0]; pos[i * 3 + 1] = xyz[1]; pos[i * 3 + 2] = xyz[2];
     let t = S ? (sample(S, pLat[i], pLon[i]) - smin) / ((smax - smin) || 1) : 0.5;
     t = Math.max(0, Math.min(1, t));
-    const c = cmap(t);
-    const fade = Math.min(1, pAge[i] / 0.3) * Math.min(1, (pLife[i] - pAge[i]) / 0.5 + 0.15);
-    col[i * 3] = c[0] * fade; col[i * 3 + 1] = c[1] * fade; col[i * 3 + 2] = c[2] * fade;
+    const c = cmap(t);                                 // full-brightness colour, ALWAYS (never dimmed toward black)
+    // the fade lives in ALPHA, not RGB: a fresh particle fades in from transparent (not from a dark dot),
+    // and a dying one fades fully out — both ends clean against whatever sits behind them.
+    const alpha = Math.min(1, pAge[i] / 0.3) * Math.min(1, (pLife[i] - pAge[i]) / 0.5);
+    col[i * 4] = c[0]; col[i * 4 + 1] = c[1]; col[i * 4 + 2] = c[2]; col[i * 4 + 3] = alpha;
   }
   geo.attributes.position.needsUpdate = true;
   geo.attributes.color.needsUpdate = true;
@@ -360,6 +388,13 @@ window.addEventListener("resize", () => {
   [W, H] = size(); renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix();
 });
 
+// --- live appearance controls: size + opacity are live-mutable on the material (no re-render of the data).
+// The open-ended rest — colour ramps, particle density, trail length, shape menus — is a deliberately
+// deferred seam: speculative, with no second consumer yet, so it stays named-not-built. --- #
+const sizeR = document.getElementById("sizeRange"), opacR = document.getElementById("opacityRange");
+if (sizeR) sizeR.addEventListener("input", () => { pmat.size = parseFloat(sizeR.value); });
+if (opacR) opacR.addEventListener("input", () => { pmat.opacity = parseFloat(opacR.value); });
+
 let last = performance.now();
 function loop(now) {
   let dt = (now - last) / 1000; last = now; if (dt > 0.1) dt = 0.1;
@@ -372,14 +407,21 @@ requestAnimationFrame(loop);
 def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-globe (showcase)",
                     subtitle: str = "the emergent eddy life cycle as a particle flow on a real, rotatable "
                                     "planet (§9.5 Rung C — the showcase)",
-                    n_particles: int = DEFAULT_N_PARTICLES) -> str:
+                    n_particles: int = DEFAULT_N_PARTICLES,
+                    particle_size: float = DEFAULT_PARTICLE_SIZE,
+                    particle_opacity: float = DEFAULT_PARTICLE_OPACITY) -> str:
     """Render ``field`` as one deterministic, self-contained three.js HTML page (data + three.js inlined).
 
     The disclaimer (``field.honesty``) is written into a **visible** ``<div class="disclaimer">`` in the
     static DOM — not merely a JS comment — because under the honest-by-disclosure carve-out it *is* the
     entire license, and is the one thing machine-checked. Opens straight off ``file://`` (no network).
+
+    ``particle_size`` / ``particle_opacity`` set the shipped *defaults*; they flow to both the material
+    init and the live size/opacity sliders' initial positions (one source, no drift), so a viewer can
+    fine-tune appearance in the browser without regenerating, and a notebook can ship a different default.
     """
-    data_json = json.dumps(_build_data(field, n_particles), separators=(",", ":"), ensure_ascii=False)
+    data_json = json.dumps(_build_data(field, n_particles, particle_size, particle_opacity),
+                           separators=(",", ":"), ensure_ascii=False)
     disclaimer = html.escape(field.honesty)
     return (
         "<!doctype html>\n<html lang=\"en\">\n<head>\n"
@@ -391,6 +433,12 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
         "  <canvas id=\"globe\"></canvas>\n"
         f"  <div class=\"title\"><h1>{html.escape(title)}</h1><p>{html.escape(subtitle)}</p></div>\n"
         "  <div class=\"hint\">drag to rotate · scroll to zoom</div>\n"
+        "  <div class=\"controls\">\n"
+        f"    <label>Particle size<input id=\"sizeRange\" type=\"range\" min=\"0.01\" max=\"0.1\" "
+        f"step=\"0.005\" value=\"{particle_size}\"></label>\n"
+        f"    <label>Opacity<input id=\"opacityRange\" type=\"range\" min=\"0.1\" max=\"1\" "
+        f"step=\"0.05\" value=\"{particle_opacity}\"></label>\n"
+        "  </div>\n"
         f"  <div class=\"disclaimer\" id=\"disclaimer\"><strong>Illustrative showcase — read this.</strong> "
         f"{disclaimer}</div>\n"
         "</div>\n"

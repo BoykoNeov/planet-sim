@@ -869,6 +869,23 @@ is the actual browser play-through — handed to the user to eyeball (acceptance
 tilted band, rest of globe bare, disclaimer legible, drag/zoom responsive); same hand-off Rung B took. Gate:
 303 fast-lane tests pass.
 
+**Polish pass (2026-06-13, after the user's browser play-through).** Three cheap appearance wins, advisor-blessed:
+(1) **Dark-spawn/death fix.** The fade lived in *RGB* (colour multiplied toward black over the first/last fraction
+of a particle's life), so fresh and dying particles read as distracting **dark dots** against the dark globe. Moved
+the fade into a **4th alpha channel** (vertex colour → RGBA, `USE_COLOR_ALPHA` confirmed in the vendored r137):
+RGB now stays full-brightness `cmap(t)` *always*, alpha = `fadeIn × fadeOut` (the `+0.15` death-floor dropped too,
+so particles fade fully to transparent at both ends). (2) **Round soft particles** via a generated radial-gradient
+`CanvasTexture` as `material.map` — square GL points were the amateur tell; the white sprite preserves the
+per-vertex temperature colour and rounds the dot (the single biggest *showcase* upgrade, answering the "shape"
+ask as a better *default*, not a knob). (3) **Two live sliders** (particle size + opacity) — cheap because
+`material.size`/`.opacity` are live-mutable; their initial positions flow from `particle_size`/`particle_opacity`
+Python kwargs (one source feeding both the material init via `FLOW_DATA` and the slider `value=`, no drift), so a
+notebook can ship a different default while a viewer fine-tunes in-browser without regenerating. **Deferred as a
+named seam:** the open-ended remainder — colour ramps, particle density presets, trail length, shape menus — is
+speculative with no second consumer, so it stays named-not-built. No test changes (the carve-out keeps the
+disclaimer the only machine-checked thing; the 6 structural tests pass untouched); artifact re-banked, gate still
+303 fast-lane pass.
+
 ---
 
 ## 10. Immediate next step
