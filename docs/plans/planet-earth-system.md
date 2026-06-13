@@ -1526,6 +1526,70 @@ next increment**; no code shipped this session (the spike finding above is what 
   turbulence + the diffusivity scaling), Phillips 1954 / Eady 1949, Vallis 2017 *AOFD*; extends
   `[[shallow-water-source]]`. See `[[planet-rung3-phaseB-outcropping]]`, `[[planet-rung3-scoped]]`.
 
+**Rung 3 Phase B — BUILT 2026-06-13: two-layer QG turbulence, and THE OPEN BET IS WON.** The
+re-routed Phase-B engine is built (`planet/baroclinic_qg.py` — the **home scope-decision settled to the
+lean single-consumer planet module**, not `engines/spectral/`; rule-of-three unmet) and the saturated,
+irreversible, down-gradient baroclinic eddy thickness flux comes out at an **order-unity dimensionless
+mixing efficiency** → the rung-1 reduction-to-diffusive-EBM is **finally non-vacuous**. This is the claim
+class downgraded@rung1 (barotropic flux ~1000× too weak, ~90 % reversible) and overturned@rung2 — *won*
+at rung 3, as the staircase predicted. Tests: `planet/tests/test_baroclinic_qg.py` (tight + plumbing
+fast; the linear-reduction + saturated-flux checks slow); full fast-lane gate green.
+- **The engine.** A doubly-periodic two-layer QG model: the PV anomaly `q_k` (a `QGState`, leading layer
+  axis) advected by its own flow, **ψ recovered by a 2×2 *spectral* PV inversion** (`det = K²(K²+F₁+F₂)`,
+  the `K=0` domain-mean gauge set to `ψ=0`), a **pseudospectral 2/3-dealiased Jacobian** for the
+  eddy–eddy nonlinearity, **SSP-RK3** (mirroring `engines/fluid`), the mean shear `(U_k, ∂q̄_k/∂y)` as
+  **background coefficients** (eddies = the prognostic fields, same design as the SW engine's
+  `background`), **β-plane**, and the spike's **hyperviscosity `−ν₄∇⁴q` + lower-layer bottom Ekman drag
+  `−r∇²ψ_2`**, all **default-off**. ~430 lines incl. docstrings.
+- **Why QG won where the free-surface SW engine outcropped.** QG is linearized in the thickness → the
+  interface has **no layer-depth floor** (saturation well-posed, **never outcrops** — pinned by a test),
+  and the rigid lid **filters the fast external gravity wave** (no external-mode CFL — the advective step
+  is far larger), so the long saturated runs are affordable. Both stiffnesses the SW engine paid are gone.
+- **The tight leg (linear anchor first — advisor's day-one sequencing).** The rooted 2×2 QG dispersion
+  equals the **analytic Phillips closed form to 2e-15** (equal layers — *the same equations*; advisor:
+  the bar is ~1e-9 **not** "a few %" — the ~4 % I'd carried forward was the free-surface-SW-vs-Phillips
+  gap, which does not exist here, and a loose tolerance would hide a partially-compensated PV-gradient
+  sign bug). The `K²=2F` short-wave cutoff, **neutral at zero shear** (machine ε), and — **β's re-entry,
+  the thing the f-plane SW solver could not test** — a finite **Charney–Stern critical shear `U_crit=β/F`**
+  (sub-critical neutral, super-critical growing; the lower-layer mean PV gradient `β−F·U_s` reverses sign).
+  The **cross-model bridge** to Phase A: the SW 6×6 solver (`TwoLayerStability`) in the rigid-lid limit
+  (`g→∞`) converges to the QG rate, **σ_SW/σ_QG → 1 to <0.5 %** — *asserted*, since it is the only tie
+  between the Phase-A (SW) and Phase-B (QG) models (no bit-for-bit reduction across the model boundary).
+  The full **nonlinear** engine reduces to this linear operator: a single growing eigenmode grows at the
+  analytic σ to **0.1 %**.
+- **The WIN (the open bet) — and what actually decides it (advisor, load-bearing).** A drag sweep
+  `r∈{0.5,1,2}σ` at the saturated state gives `κ>0` (down-gradient), `irr=|⟨F⟩_t|/⟨|F|⟩_t = 0.96–1.00`
+  (vs rung-1 ~0.1), and **`κ/(v'_rms·L_d) = 0.71–1.27`** (vs rung-1 ~1e-3) — robust across drag. **BUT the
+  advisor's catch is the headline:** down-gradient + `irr≈1` are *guaranteed* for **any** sustained
+  baroclinic state (the flux *is* the APE→EKE conversion that powers the eddies; sign-pinned + spatially
+  averaged ⟹ `irr≈1` automatically) — they are **necessary, not sufficient**, and cannot distinguish
+  developed turbulence from a quasi-steady wave (exactly the **P2 "irr~1 trivial *without sloshing*"**
+  rejection carried from the spike). So the bet is won **only by showing genuine turbulent mixing**, which
+  the **weak-drag (`r=0.5σ`) condensate candidate** (`v'_rms≈16 ≫ U_s=4`) does on three independent
+  diagnostics: **EKE(t) irregular + drifting** (`std/mean≈0.25`, not flat), an **isotropic KE spectrum
+  that is an inverse-cascade condensate** (84 % of the energy below the injection band, the peak migrated
+  to the box scale `0.33k*`, broadband-continuous with a clean dissipation tail — *not* spikes at
+  `k*,2k*,3k*`), and a **PV snapshot of coherent vortices + rolled-up filaments across scales** (not a
+  wave train). The dimensionless `κ/(v'L_d)~O(1)` is the discriminating quantity; the qualitative
+  inverse-cascade is what makes it turbulence, not a wave.
+- **Honest edges (advisor, banked — do NOT overclaim).** (1) The banked claim is **dimensionless +
+  qualitative**; the **dimensional `κ ≈ 0.7–4×10⁶ m²/s`** happens to land in Earth's observed band
+  (1–5×10⁶) but that is **coincidental and box/drag-dependent** (varies 5× across the sweep) — *not* a
+  reproduction of Earth's κ. (2) The large-scale **condensate dominates `v'_rms`**, so read
+  `κ/(v'L_d)~1` as "mixing length ~ L_d-ish," not a precise efficiency. (3) **`κ₁=κ₂` is an estimator
+  identity** (`F₁−F₂=⟨½∂_x(τ²)⟩=0` on a periodic domain), *not* an independent cross-layer check (it was
+  for the SW spike's separate per-layer thicknesses). (4) A **new model outside `engines/fluid`**
+  (pseudospectral, not the C-grid) → no bit-for-bit reduction; Phase A and B validate *different* models,
+  bridged by the <0.5 % rigid-lid linear cross-check. (5) **Homogeneous box → a domain-bulk κ**, not
+  `κ(y)`; a meridional channel (the operator-shape test) is the named BC extension. (6) Resolution
+  **nx=96 ≈ 3.5 pts/L_d** is marginal at the deformation scale (the condensate lives at well-resolved
+  large scales; the spectrum's clean dissipation tail shows no grid-scale pileup, and the dimensionless
+  ratio is already robust across the *drag* sweep); a higher-resolution firm-up is the named secondary
+  check (the dimensionless ratio is the banked quantity, never the dimensional κ). Held–Suarez
+  (sphere primitive-eq) stays **rung 5**. Sources pinned: **Held &
+  Larichev 1996**, Phillips 1954 / Eady 1949, Vallis 2017 *AOFD*; extends `[[shallow-water-source]]`. See
+  `[[planet-rung3-qg-built]]`, `[[planet-rung3-phaseB-outcropping]]`, `[[planet-rung3-scoped]]`.
+
 **Visualization rungs A/B/C — DECIDED to build all three (animated eddy flow; 2026-06-11;
 rungs A+B+C BUILT — A 2026-06-11, B 2026-06-12, C 2026-06-13; build detail in §9.5).** A forward decision (user): animate the emergent eddy life cycle across three
 rising-cost **visualization** rungs (distinct from the §5 GCM staircase) — **A** a matplotlib

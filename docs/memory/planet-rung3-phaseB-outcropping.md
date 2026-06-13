@@ -72,3 +72,10 @@ rung-1 ~0.1) and **`κ_eff/(v'_rms·L_d)` O(0.1–10)** (vs rung-1 ~1e-3) — va
 compare manufactures a false failure). Sources: **Held & Larichev 1996** (two-layer QG turbulence),
 Phillips 1954 / Eady 1949, Vallis 2017. See [[planet-rung3-scoped]], [[planet-rung1-two-way-coupler]],
 [[planet-plan]]; plan §10.
+
+**→ BUILT 2026-06-13 and THE BET IS WON: [[planet-rung3-qg-built]].** The QG engine
+(`planet/baroclinic_qg.py`) was built; the saturated turbulent flux comes out down-gradient,
+irreversible (irr~1), at order-unity dimensionless `κ/(v'L_d)` — the reduction-to-EBM is non-vacuous.
+The advisor sharpened P2's lesson: down-gradient + irr~1 are *guaranteed* for any sustained baroclinic
+state, so the win is established by **showing turbulence** (the inverse-cascade condensate), not by the
+flux sign alone. Banked dimensionless; the home settled to the lean planet module.
