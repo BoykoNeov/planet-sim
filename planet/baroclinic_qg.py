@@ -440,6 +440,26 @@ class TwoLayerQG:
         _, v = self.velocities(self.invert(state.q))
         return float(np.sqrt(np.mean(v ** 2)))
 
+    def ke_spectrum(self, state: QGState) -> tuple[np.ndarray, np.ndarray]:
+        """Azimuthally-binned isotropic KE spectral density ``(K_centers, E(K))`` (summed over layers).
+
+        ``E(K) = Σ_shell ½ K²|ψ̂_k|²`` binned by ``|K|`` (square-box fundamental ``2π/L_x``). The
+        **turbulence vs steady-wave discriminator**: a developed **inverse cascade** peaks *below* the
+        injection wavenumber ``k*`` (energy transferred **upscale** toward the box/Rhines scale), with a
+        broadband continuous fall-off — whereas a quasi-steady finite-amplitude wave peaks **at ``k*``**
+        with discrete harmonics. (The full visual evidence — the PV vortex/filament field — is in
+        :mod:`planet.demo_baroclinic_qg`.)
+        """
+        psih = np.fft.fft2(self.invert(state.q), axes=(-2, -1)) / (self.nx * self.ny)
+        ke = 0.5 * self.K2 * np.sum(np.abs(psih) ** 2, axis=0)
+        Kmag = np.sqrt(self.K2)
+        kbox = 2.0 * np.pi / self.Lx
+        bins = np.arange(0.5, self.nx // 2 + 1) * kbox
+        idx = np.digitize(Kmag.ravel(), bins)
+        E = np.array([ke.ravel()[idx == i].sum() for i in range(len(bins) + 1)])
+        Kc = np.concatenate([[0.0], 0.5 * (bins[:-1] + bins[1:]), [bins[-1]]])
+        return Kc, E
+
     def bulk_eddy_flux(self, state: QGState) -> tuple[float, float]:
         """Per-layer domain-bulk meridional eddy flux of the baroclinic streamfunction ``⟨v_k'·τ'⟩``.
 

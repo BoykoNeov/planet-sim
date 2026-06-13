@@ -233,7 +233,7 @@ def test_saturated_flux_is_down_gradient_and_non_vacuous():
     s = m.random_state(amplitude=1e-3, seed=0)
     t_end, t_avg = 18.0 / sig, 8.0 / sig
     t, n = 0.0, 0
-    fluxes, vrms = [], []
+    fluxes, vrms, spec = [], [], None
     while t < t_end:
         dt = m.max_dt(s, 0.3)
         s = m.step(s, dt)
@@ -244,11 +244,19 @@ def test_saturated_flux_is_down_gradient_and_non_vacuous():
             f1, f2 = m.bulk_eddy_flux(s)
             fluxes.append(0.5 * (f1 + f2))
             vrms.append(m.v_rms(s))
+            Kc, E = m.ke_spectrum(s)
+            spec = E if spec is None else spec + E
     fluxes = np.array(fluxes)
     kappa = fluxes.mean() / m.Us
     irr = abs(fluxes.mean()) / np.abs(fluxes).mean()
     ratio = kappa / (np.mean(vrms) * m.Ld)
+    k_peak = Kc[np.argmax(spec)]                      # time-mean spectral peak
     assert kappa > 0.0                               # down-gradient
     assert irr > 0.8                                 # irreversible (rung-1 ~0.1)
     assert 0.1 < ratio < 10.0                        # O(1) mixing efficiency (rung-1 ~1e-3)
-    assert np.mean(vrms) > m.Us                       # turbulent eddies exceed the mean shear (condensate)
+    assert np.mean(vrms) > m.Us                       # eddies exceed the mean shear (v'/U_s ≈ 1.8 here)
+    # the SUFFICIENT check (advisor): the others are necessary-but-not-sufficient (any sustained
+    # baroclinic state is down-gradient with irr≈1). A developed inverse cascade peaks BELOW the
+    # injection wavenumber k* — energy transferred upscale — which a quasi-steady wave (peak AT k*)
+    # cannot do. This is what makes the saturated state genuine turbulence, not a finite-amplitude wave.
+    assert k_peak < kstar
