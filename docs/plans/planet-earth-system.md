@@ -1349,8 +1349,46 @@ the saturated nonlinear field may want a channel = the named BC extension); the 
 **Sources to pin at build** (the `[[…-source]]` discipline — extending `[[shallow-water-source]]`):
 baroclinic instability → **Phillips 1954 / Eady 1949 / Charney 1947**; the two-layer SW formulation →
 **Vallis 2017 (*AOFD*) / Cushman-Roisin & Beckers**; Held–Suarez (named-deferred) → **Held & Suarez 1994**.
-No code shipped yet — this entry is the **de-risked plan of record**; the engine extension (Phase A) is the
-first build increment.
+**Rung 3 Phase A — BUILT (2026-06-12; the linear growth rate).** `engines/fluid/layered.py`
+(`LayeredShallowWater` + `LayeredState` + `ThermalWindBackground`) + `engines/fluid/stability.py`
+(`TwoLayerStability`), 22 tests: the unstable two-layer mode grows at the analytic rate within ~4 %,
+converging with resolution; the single-layer `nl=1` reduction is **byte-identical** to `ShallowWater`;
+the basic state enters as constant background coefficients (the periodicity resolution). First
+*structural* `engines/fluid` edit → the full-repo gate. See `[[planet-rung3-scoped]]`.
+
+**Rung 3 Phase B — SPIKE FINDING: the free-surface SW engine OUTCROPS at saturation; the payoff needs
+two-layer QG (2026-06-13).** Phase B was de-risked **spike-first**
+(`outputs/rung3_baroclinic_phaseB_spike.py`, gitignored) *before* any production code — and the spike
+returned a clear **negative result** that re-routes the build (spike-first doing exactly its job). The
+dissipation the plan named was built in the spike (**hyperviscosity on momentum *and* thickness +
+linear bottom Ekman drag**, both default-off → the Phase-A engine bit-for-bit; per-layer mass stays
+machine-exact with dissipation on), and the advisor's under-specification was confirmed: **a fixed-`G`
+background is an infinite APE reservoir, so hyperviscosity (a small-scale enstrophy sink) cannot
+saturate it — linear bottom drag (Held–Larichev 1996) is required to arrest the inverse cascade.** But
+the deeper blocker is the **free surface**: at the idealized parameters the saturated/overshoot
+interface displacement reaches the layer depth and the layer **outcrops** (`h→0` ⟹ `PV=(f+ζ)/h`
+detonates). The control parameter is the **Froude ratio `Fr = U_s/√(g'H) ≈ η_sat/H`**; empirically the
+first-saturation **overshoot** drives the peak displacement to **`η/H ≈ 12·Fr`** (far above the ~4–5×
+RMS vortex-tail factor — the first baroclinic life cycle dumps mean APE into eddies before
+equilibrating). The outcropping is **robust** across `g'∈{0.2,0.8,1,2}`, `H∈{400,500}`, `U_s∈{2,4}`,
+drag `r∈{0.5…3σ}`: stronger drag only **delays** the overshoot (`r=3σ` still `η/H=0.91`); stronger
+stratification gives a **bigger** overshoot (more stored APE). Avoiding it needs `Fr≲0.04` ⟹ `U_s≲1` ⟹
+e-fold `≳370 h` — full **QG-regime cost in the tool worst-suited to it**. The linear growth rate is
+reproduced at every config tried (growth-err 2.2–2.6 %), so this is **not** leaving the validated regime
+— it is the **finite-amplitude free-surface wall**. **Interpretation:** this is the empirical reason
+two-layer turbulence is done in **QG** (Held–Larichev 1996 *is* two-layer QG); the free-surface explicit
+SW model has a hard thickness floor QG does not, so **the saturated payoff does not live in this
+engine**. The plan **pre-named** the rigid-lid/QG fork as the within-rung upgrade "if the saturated runs
+make the penalty bite" — they bit, **via outcropping** (not just the CFL). The pre-outcrop
+finite-amplitude flux was considered and **rejected as the headline** (near-vacuous: an unstable mode
+fluxes down-gradient *by definition* and `irr~1` is trivial without sloshing to overcome — no meaningful
+contrast with rung-1's reversible barotropic finding). **Status:** Phase A banked; **Phase B remains the
+OPEN BET**, now with a sharpened obstacle — it requires the **two-layer QG (rigid-lid) solver**: an
+FFT-based 2×2 spectral PV-inversion model (~200 lines, canonical Held–Larichev; the linear anchor is the
+spike's QG-Phillips cross-check), a **new model outside `engines/fluid`** (no C-grid reuse, no
+bit-for-bit reduction — Phase A and B would validate *different* models). QG makes the experiment
+**possible**; it does **not** pre-guarantee the κ comes out irreversible / well-scaled — that stays the
+open bet, finally testable. See `[[planet-rung3-phaseB-outcropping]]`.
 
 **Visualization rungs A/B/C — DECIDED to build all three (animated eddy flow; 2026-06-11;
 rungs A+B BUILT — A 2026-06-11, B 2026-06-12; C pending — build detail in §9.5).** A forward decision (user): animate the emergent eddy life cycle across three
