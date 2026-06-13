@@ -67,9 +67,13 @@ dimensionless ratio** (`κ/(v'L_d)=1.10`, `irr=1.00`) while the dimensional κ s
 
 **Tests:** `planet/tests/test_baroclinic_qg.py` — tight (Phillips 2e-15, cutoff, `U_crit=β/F`, zero-shear
 neutral, SW↔QG rigid-lid <0.5 %) + plumbing (`q↔ψ` machine-exact, zero-shear decay, CFL guard) fast; the
-nonlinear→linear reduction (0.1 %) + the saturated-flux discriminators (κ>0, irr>0.8, 0.1<ratio<10,
-v'>U_s, never outcrops) slow. **Full fast-lane gate green** (~349 tests). The turbulence-vs-wave
-characterization (spectrum + PV snapshot) lives in the gitignored spike `outputs/rung3_qg_turbulence_check.py`.
+nonlinear→linear reduction (0.1 %) + the saturated-flux discriminators slow. **Advisor done-check
+closed:** the flux test pinned only NECESSARY-not-sufficient conditions (κ>0 + irr~1 are guaranteed for
+any sustained baroclinic state) → added the **SUFFICIENT** assertion `k_peak < k*` (the inverse-cascade
+spectral peak, via new `TwoLayerQG.ke_spectrum`) so CI guards *turbulence* not just sustained flux; the
+**evidence is now durable** (committed demo `planet/demo_baroclinic_qg.py` → `docs/figures/planet-baroclinic-qg-turbulence.png`,
+the PV-vortex fields + inverse-cascade KE spectrum, reproducible from a fresh clone), not a gitignored
+spike. **Full pytest (all slow, `-n auto`) green: 386 passed, 1 skip.**
 Sources: **Held & Larichev 1996** (two-layer QG turbulence + diffusivity scaling), Phillips 1954 / Eady 1949,
 Vallis 2017 *AOFD*; extends [[shallow-water-source]]. Plan §10. **Rung 3 (vertical structure → baroclinic
 instability) is now COMPLETE: Phase A (linear, banked) + Phase B (saturated flux, bet won).**

@@ -1533,7 +1533,13 @@ irreversible, down-gradient baroclinic eddy thickness flux comes out at an **ord
 mixing efficiency** → the rung-1 reduction-to-diffusive-EBM is **finally non-vacuous**. This is the claim
 class downgraded@rung1 (barotropic flux ~1000× too weak, ~90 % reversible) and overturned@rung2 — *won*
 at rung 3, as the staircase predicted. Tests: `planet/tests/test_baroclinic_qg.py` (tight + plumbing
-fast; the linear-reduction + saturated-flux checks slow); full fast-lane gate green.
+fast; the linear-reduction + saturated-flux checks slow). The advisor done-check caught that the flux
+test pinned only **necessary-not-sufficient** conditions (κ>0 + irr~1 hold for *any* sustained baroclinic
+state) → added the **sufficient** assertion `k_peak < k*` (the inverse-cascade spectral peak, via
+`TwoLayerQG.ke_spectrum`) so CI guards *turbulence*, and made the evidence **durable**: a committed demo
+(`planet/demo_baroclinic_qg.py` → `docs/figures/planet-baroclinic-qg-turbulence.png` — the PV-vortex
+fields + inverse-cascade KE spectrum) reproducible from a fresh clone, not a gitignored spike. **Full
+pytest (all slow, `-n auto`): 386 passed, 1 skipped.**
 - **The engine.** A doubly-periodic two-layer QG model: the PV anomaly `q_k` (a `QGState`, leading layer
   axis) advected by its own flow, **ψ recovered by a 2×2 *spectral* PV inversion** (`det = K²(K²+F₁+F₂)`,
   the `K=0` domain-mean gauge set to `ψ=0`), a **pseudospectral 2/3-dealiased Jacobian** for the
