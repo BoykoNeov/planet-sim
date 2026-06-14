@@ -2245,10 +2245,16 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
 - [ ] **Tighten the ITCZ-migration sensitivity** · *deliverable:* re-derive `D` in `sphere_ebm.py` ·
   *anchor:* the closed-form `δ/AHT` lands within ~factor-1 of observed (currently ~2× high, rides the
   calibrated `D`) · *cost:* one re-derive. **[named refinement]** → [[planet-rung2x-itcz]].
-- [ ] **Recalibrate `D_s≈0.28` (rung 2.5)** · *deliverable:* a smaller sensible-heat `D` in `moist_ebm.py` ·
-  *anchor:* the MSE-diffusing EBM matches the dry present contrast with no latent double-count,
-  target-invariant <5% · *cost:* single-scalar re-derive. **[named upgrade]** →
-  [[planet-rung25-mse-diffusion]].
+- [x] ~~**Recalibrate `D_s≈0.28` (rung 2.5)**~~ **ALREADY BUILT** — this backlog line was **stale**: the
+  recalibration shipped *inside* the parent rung-2.5 build (`recalibrate_sensible_D` in `moist_ebm.py`,
+  commit `e65f33c`) and was upgraded to the dt-free `moist_steady_direct` path in `be61dad`. Live values
+  (RH 0.8): `D_s = 0.2784` (≈ 0.28, < the dry 0.555), present-contrast matched, endpoint PA 2.05;
+  **target-invariance is 0.81%** (contrast vs P₂ amplitude — well under the <5% anchor, confirming the
+  docstring's "<2%"). All three anchors pinned by passing tests
+  (`test_recalibration_matches_the_present_contrast`, `test_recalibrated_Ds_is_below_the_dry_default`,
+  `test_pa_is_invariant_to_the_recalibration_target`; 14/14 green). **No work was outstanding** — only this
+  checkbox. The genuine remaining rung-2.5 residual is the *structured `D(x)` shape* wall below.
+  **[named upgrade — was already BUILT]** → [[planet-rung25-mse-diffusion]].
 
 *Walls / awaits a higher rung:*
 - **Derive `R_ATM_SLOPE` (=2 W/m²/K)** · the prescribed atmospheric radiative response (cited-closure;
