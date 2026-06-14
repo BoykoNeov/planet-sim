@@ -426,7 +426,7 @@ def _hovertext(grid: Grid, layer: Layer) -> np.ndarray:
     return np.vectorize(fmt)(LAT, LON, val)
 
 
-_ARROW_LEN = 0.13                # cone length on the unit sphere — direction only (magnitude is the surface)
+_ARROW_LEN = 0.09                # cone length on the unit sphere — direction only (magnitude is the surface)
 _ARROW_LIFT = 1.04               # base radius: lift cones clear of the r=1 surface so they are not occluded
 
 
