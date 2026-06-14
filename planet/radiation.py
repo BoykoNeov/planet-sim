@@ -92,11 +92,16 @@ The **wall** is the **gray (band-independent) absorption** assumption together w
 to the present greenhouse, not derived from line-by-line spectroscopy — the cited-closure status of
 ``R_ATM_SLOPE`` at rung 2 and ``HADLEY_STRENGTH`` at the Hadley fix). Consequences, each named:
 
-* **CO₂ forcing is saturating, not logarithmic.** A *gray* band gives a concave ``OLR(τ)``
-  (:func:`co2_forcing`): the right *sign and saturating shape*, locally doubling-like near present, but
-  **not** the observed logarithmic law (Myhre ``5.35·ln C/C₀``) and at an **unrealistic magnitude**
-  (a whole-band perturbation) — the logarithmic law needs **spectral band wings**, the named within-rung
-  band upgrade.
+* **CO₂ forcing is saturating, not logarithmic — now FIXED by an opt-in spectral band.** A *gray*
+  band gives a concave ``OLR(τ)`` (:meth:`GrayRadiationColumn.co2_forcing`): the right *sign and
+  saturating shape*, locally doubling-like near present, but **not** the observed logarithmic law
+  (Myhre ``5.35·ln C/C₀``) and at an **unrealistic magnitude** (a whole-band perturbation). The
+  logarithmic law needs **spectral band wings** — built as :class:`SpectralCO2Band` (the within-rung
+  slice): resolving the CO₂ band into bins with an **exponential** wing makes the per-doubling forcing
+  **constant** (the Myhre log law) where the gray band saturates. The *functional form* is the win;
+  the magnitude rides the band parameters (calibrated to order — the same wall). The gray
+  :meth:`GrayRadiationColumn.co2_forcing` stays as the honest baseline (the band is a separate,
+  opt-in construct).
 * **Clear-sky only** (no clouds — the dominant real-world feedback uncertainty, out of scope).
 * **Lapse-rate feedback — now BUILT, opt-in (and it OVERTURNED the scoped magnitude).** The default
   column's convective lapse rate is **fixed**, so warming is a uniform profile shift and there is *no*
@@ -141,7 +146,7 @@ kelvin law) and converted to **°C** only at :func:`linearized_olr` (the ``A + B
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -522,3 +527,198 @@ def calibrate_column(wv_fraction: float = WATER_VAPOUR_FRACTION, **kw) -> GrayRa
         else:
             hi = mid
     return GrayRadiationColumn(total_tau=0.5 * (lo + hi), wv_fraction=wv_fraction, **kw)
+
+
+# --------------------------------------------------------------------------- #
+# The spectral-band log law — why the CO₂ forcing is LOGARITHMIC, not the gray SATURATING band.
+# A within-rung upgrade: it replaces the gray column's band-independent absorption (one optical
+# depth for the whole Planck spectrum) with a band-RESOLVED CO₂ absorption whose strength falls
+# off EXPONENTIALLY in the wings, and shows the per-doubling forcing flatten to a constant.
+# --------------------------------------------------------------------------- #
+# Planck radiation constants (CODATA) — for the spectral Planck flux πB_ν(T), whose integral over
+# wavenumber is σT⁴ (so summing per-bin emissions over the whole spectrum recovers the gray σT⁴,
+# the reduction-to-gray anchor below).
+PLANCK_H = 6.62607015e-34        # J s
+SPEED_OF_LIGHT = 2.99792458e8    # m s⁻¹
+BOLTZMANN_K = 1.380649e-23       # J K⁻¹
+
+# The CO₂ 15-µm band, parameterized to ORDER (the wall — the same cited-closure status as the gray
+# τ↔greenhouse mapping; these are not line-by-line spectroscopy). The band centre and the present
+# band-centre optical depth set where the saturated core sits; the WING SCALE is the one ingredient
+# that makes the forcing logarithmic (an exponential wing ⇒ the emission level spreads as l·ln C).
+CO2_BAND_CENTRE_CM = 667.0       # cm⁻¹ — the ν₂ bending-mode band centre (15 µm)
+CO2_BAND_HALF_WIDTH_CM = 217.0   # cm⁻¹ — modelled band half-extent (450–884 cm⁻¹); the far wing cutoff
+CO2_BAND_WING_CM = 8.0           # cm⁻¹ — exponential wing decay scale l: k(ν) ∝ e^(−|ν−ν₀|/l). THE
+#                                  ingredient; sets the forcing magnitude (~2l·π[B(Ts)−B_strat]).
+CO2_BAND_CENTRE_TAU = 1000.0     # — band-centre surface optical depth at present CO₂ (deeply
+#                                  saturated core, so the forcing comes only from the moving wings)
+
+# Myhre et al. (1998) simplified expression ΔF = α·ln(C/C₀) — the observed logarithmic CO₂ forcing
+# the emergent band law is order-validated against (a touchstone, NOT fitted to; the [[…-source]]
+# discipline). α ≈ 5.35 W m⁻² ⇒ ≈ 3.71 W m⁻² per doubling.
+MYHRE_COEFFICIENT = 5.35                          # W m⁻² — ΔF = MYHRE_COEFFICIENT·ln(C/C₀)
+MYHRE_PER_DOUBLING = MYHRE_COEFFICIENT * math.log(2.0)   # ≈ 3.71 W m⁻² per CO₂ doubling
+
+
+def planck_flux_per_wavenumber(wavenumber_per_m, T: float) -> np.ndarray:
+    """Spectral flux ``πB_ν(T)`` per unit wavenumber (W m⁻² / m⁻¹); wavenumber ``ν`` in m⁻¹.
+
+        πB_ν(T) = π · 2hc²ν³ / (e^{hcν/k_BT} − 1)
+
+    Integrated over all wavenumbers this equals ``σT⁴`` (the Stefan–Boltzmann law) — so summing the
+    per-bin emission ``πB_ν·Δν`` over a grid spanning the whole spectrum reproduces the gray ``σT⁴``
+    source, which is exactly the reduction that ties :class:`SpectralCO2Band` back to the gray column.
+    """
+    n = np.asarray(wavenumber_per_m, dtype=float)
+    x = PLANCK_H * SPEED_OF_LIGHT * n / (BOLTZMANN_K * T)
+    return np.pi * 2.0 * PLANCK_H * SPEED_OF_LIGHT ** 2 * n ** 3 / np.expm1(x)
+
+
+def _transmission_emission(tau: np.ndarray, surface_source: float, layer_source: np.ndarray) -> float:
+    """One band's outgoing longwave: surface seen through the column + each layer's emission.
+
+        OLR = S_surf·e^(−τ_s) + Σ_k ε_k·S_k·e^(−τ_top,k),   ε_k = 1 − e^(−Δτ_k)
+
+    The same transmission-weighted-emission kernel as :meth:`GrayRadiationColumn._olr_from`, but with
+    an explicit per-level *source* (``σT⁴`` for the gray whole-spectrum case, ``πB_ν·Δν`` for a
+    spectral bin) rather than ``σT⁴`` hard-wired. Written independently of ``_olr_from`` — feeding it
+    the gray ``σT⁴`` source reproduces ``_olr_from`` to machine precision, the cross-implementation
+    check that anchors the band machinery to the gray column (:class:`SpectralCO2Band` reduction test).
+    """
+    dtau = np.diff(tau)
+    eps = 1.0 - np.exp(-dtau)
+    trans_to_top = np.exp(-tau[:-1])
+    surface = surface_source * math.exp(-float(tau[-1]))
+    emitted = np.sum(eps * layer_source * trans_to_top)
+    return surface + float(emitted)
+
+
+@dataclass(frozen=True)
+class SpectralCO2Band:
+    """Band-resolved CO₂ forcing: an exponential-wing absorption band over the column → the log law.
+
+    The gray column treats CO₂ as a single optical depth for the *whole* Planck spectrum, so adding
+    CO₂ pushes the *entire* emission to the cold upper atmosphere and the forcing **saturates** (a
+    concave ``OLR(τ)``; per doubling ``ΔF`` 48→…→20 W m⁻², decreasing — :meth:`GrayRadiationColumn.
+    co2_forcing`). Real CO₂ absorbs in a **band** whose strength falls off in the wings; the emission
+    to space comes from the level where the band-resolved optical depth ``≈ 1``. This model resolves
+    that band into ``n_bins`` spectral bins, each a gray sub-problem solved with the *same*
+    transmission-weighted emission kernel (:func:`_transmission_emission`) over the column's fixed-``Γ``
+    temperature profile and the well-mixed ``(p/p_s)`` CO₂ vertical shape, with the spectral Planck
+    function ``πB_ν`` (:func:`planck_flux_per_wavenumber`) as the per-bin source.
+
+    The band-centre optical depth is deeply saturated (``band_centre_tau ≫ 1``), so the forcing comes
+    only from the **wings**. With an exponential wing ``k(ν) = k_c·e^(−|ν−ν₀|/l)`` the frequency at
+    which ``τ(ν) = 1`` moves outward by ``l·Δ(ln C)`` per change in CO₂, so the spectral width that
+    newly saturates is **constant per doubling** → ``ΔF`` is **constant per doubling** = the Myhre
+    logarithmic law ``ΔF = α·ln(C/C₀)`` (:data:`MYHRE_COEFFICIENT`).
+
+    **Scope — forcing only, CO₂ only.** This is the slice that fixes the *saturating-vs-logarithmic*
+    edge, which lives entirely in the CO₂ forcing; the ``B = Planck − water-vapour + lapse-rate``
+    slope decomposition is independent and stays on :class:`GrayRadiationColumn`. No water vapour here.
+
+    **Triad.**
+
+    * **Reduction (the independent anchor).** Collapsing the spectral resolution recovers the gray
+      column: the band kernel with a single whole-spectrum bin and the ``σT⁴`` source reproduces
+      :meth:`GrayRadiationColumn._olr_from` to machine precision (:func:`_transmission_emission`
+      written independently of it), and a **uniform** ``k`` (no wings) makes :meth:`co2_forcing`
+      *saturate* like gray — the exponential wing is the whole ingredient.
+    * **The unlock (real but loose).** With exponential wings the per-doubling ``ΔF`` is **constant**
+      across the realistic ``0.5×–8×`` range and lands in the **Myhre band** (:data:`MYHRE_PER_DOUBLING`
+      ≈ 3.7 W m⁻²), versus gray's decreasing 48→20. *Loose:* the magnitude rides the band parameters
+      (``l``, ``band_centre_tau``, the band half-width) — calibrated to **order**, not line-by-line
+      (the **wall**); "CO₂ wings are ≈ exponential over the relevant range" is itself an empirical input.
+    * **Derivation (consistency).** The cold-to-space (``τ = 1``) limit gives the slope
+      ``dF/d ln C ≈ 2l·π[B_ν(Ts) − B_ν(T_strat)]`` (:meth:`log_law_coefficient`) — it matches the
+      sharp emission-level estimate to ~1%; the column's finite-layer emission raises the realized
+      coefficient ~20–30% above it. A derivation/consistency leg (both assume exponential wings), *not*
+      an independent anchor.
+
+    **The range is bounded (named edges).** The log law holds only in the middle regime — band centre
+    saturated **and** wings not yet exhausted. Below ``C ≈ 1/band_centre_tau`` the band centre itself
+    un-saturates and the forcing is linear/√ (grows per doubling, not constant); above the point where
+    the active wing reaches the finite band edge the wings run out and it saturates again. Both edges
+    sit far outside ``0.5×–8×`` for the present parameters.
+    """
+
+    column: GrayRadiationColumn = field(default_factory=lambda: GrayRadiationColumn(total_tau=4.0))
+    band_centre_cm: float = CO2_BAND_CENTRE_CM
+    half_width_cm: float = CO2_BAND_HALF_WIDTH_CM
+    wing_scale_cm: float = CO2_BAND_WING_CM
+    band_centre_tau: float = CO2_BAND_CENTRE_TAU
+    n_bins: int = 300
+    uniform: bool = False               # — flatten the wings (the null): the forcing then saturates
+
+    def _grid(self):
+        """``(centres_m, dnu_m, strengths)`` — bin centres (m⁻¹), widths (m⁻¹), and band-centre τ per bin.
+
+        ``strengths[i] = band_centre_tau·e^(−|ν_i−ν₀|/l)`` (or flat if :attr:`uniform`) — the surface
+        optical depth in bin ``i`` at present CO₂; the exponential wing is the log-law ingredient.
+        """
+        lo = self.band_centre_cm - self.half_width_cm
+        hi = self.band_centre_cm + self.half_width_cm
+        edges_cm = np.linspace(lo, hi, self.n_bins + 1)
+        centres_cm = 0.5 * (edges_cm[:-1] + edges_cm[1:])
+        dnu_m = np.diff(edges_cm) * 100.0                    # cm⁻¹ → m⁻¹
+        if self.uniform:
+            strengths = np.full_like(centres_cm, self.band_centre_tau)
+        else:
+            strengths = self.band_centre_tau * np.exp(-np.abs(centres_cm - self.band_centre_cm)
+                                                      / self.wing_scale_cm)
+        return centres_cm * 100.0, dnu_m, strengths
+
+    def band_olr(self, Ts: float, co2_factor: float = 1.0) -> float:
+        """Outgoing longwave from the CO₂ band alone (W m⁻²) at surface temperature ``Ts``.
+
+        Sums each spectral bin's transmission-weighted emission over the column's fixed-``Γ`` profile,
+        with ``τ_i(p) = co2_factor·strength_i·(p/p_s)`` and the spectral Planck source ``πB_ν·Δν``. The
+        CO₂-transparent window (outside the band) is co₂-independent and omitted — it cancels in the
+        forcing, the only quantity this model is built to deliver.
+        """
+        p, T = self.column._profile(Ts)
+        shape = p / P_SURFACE
+        T_layer = 0.5 * (T[:-1] + T[1:])
+        centres_m, dnu_m, strengths = self._grid()
+        olr = 0.0
+        for nu, dn, k in zip(centres_m, dnu_m, strengths):
+            tau = co2_factor * k * shape
+            surface_source = planck_flux_per_wavenumber(nu, float(T[-1])) * dn
+            layer_source = planck_flux_per_wavenumber(nu, T_layer) * dn
+            olr += _transmission_emission(tau, surface_source, layer_source)
+        return olr
+
+    def co2_forcing(self, co2_factor: float = 2.0, Ts: float = PRESENT_SURFACE_T) -> float:
+        """Radiative forcing ``ΔF = OLR_band(1×) − OLR_band(co2_factor×)`` (W m⁻²) at fixed ``Ts``.
+
+        Same sign and convention as :meth:`GrayRadiationColumn.co2_forcing` (positive forcing = reduced
+        OLR, fixed ``Ts``, no water-vapour feedback), so the two are an apples-to-apples comparison —
+        gray saturates, this is logarithmic.
+        """
+        return self.band_olr(Ts, 1.0) - self.band_olr(Ts, co2_factor)
+
+    def forcing_per_doubling(self, factors=(0.5, 1, 2, 4, 8), Ts: float = PRESENT_SURFACE_T):
+        """``ΔF`` for each successive doubling across ``factors`` (W m⁻²) — the log-law signature.
+
+        Returns the array of consecutive forcings ``OLR(f_{i})·... → F(f_{i+1}) − F(f_i)`` per
+        ``log₂(f_{i+1}/f_i)``; **constant** (the Myhre log law) in the flat middle, versus gray's
+        decreasing sequence. ``factors`` must be ascending and spaced by doublings for the labels to read.
+        """
+        F = np.array([self.co2_forcing(f, Ts=Ts) for f in factors])
+        factors = np.asarray(factors, dtype=float)
+        n_doublings = np.log2(factors[1:] / factors[:-1])
+        return np.diff(F) / n_doublings
+
+    def log_law_coefficient(self, Ts: float = PRESENT_SURFACE_T) -> float:
+        """Analytic ``dF/d ln C ≈ 2l·π[B_ν(Ts) − B_ν(T_strat)]`` at band centre (W m⁻², the τ=1 limit).
+
+        The cold-to-space derivation: an exponential wing's ``τ = 1`` level spreads by ``l·d ln C`` per
+        wing, exposing a band of width ``2l·d ln C`` whose emission drops from the surface to the cold
+        ``T_strat`` — so the forcing slope is ``2l·π[B_ν(Ts) − B_ν(T_strat)]``. Matches the sharp
+        emission-level estimate to ~1%; the column's finite-layer emission realizes ~20–30% more. A
+        consistency/derivation check (it assumes the same exponential wing), not an independent anchor.
+        """
+        nu0_m = self.band_centre_cm * 100.0
+        contrast = (planck_flux_per_wavenumber(nu0_m, Ts)
+                    - planck_flux_per_wavenumber(nu0_m, self.column.strat_T))
+        return 2.0 * (self.wing_scale_cm * 100.0) * contrast

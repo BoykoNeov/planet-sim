@@ -145,6 +145,115 @@ def test_co2_forcing_saturates_it_is_not_logarithmic(column):
 
 
 # --------------------------------------------------------------------------- #
+# THE SPECTRAL-BAND LOG LAW (within-rung upgrade) — exponential wings make the CO₂ forcing
+# LOGARITHMIC where the gray band saturates. Gray's saturation test above is left untouched.
+# --------------------------------------------------------------------------- #
+@pytest.fixture(scope="module")
+def band():
+    return rad.SpectralCO2Band()
+
+
+def test_planck_flux_integrates_to_sigma_T4():
+    """π∫B_ν dν = σT⁴ — the spectral Planck source sums (over the whole spectrum) to the gray σT⁴.
+
+    This is what lets the per-bin spectral emission reduce to the gray column: summing πB_ν·Δν over a
+    grid spanning the spectrum reconstructs the Stefan–Boltzmann flux the gray kernel uses.
+    """
+    n = np.linspace(1.0, 4.0e5, 400_000)                     # 0..4000 cm⁻¹ in m⁻¹
+    for T in (220.0, 255.0, 288.0):
+        integ = np.trapezoid(rad.planck_flux_per_wavenumber(n, T), n)
+        assert integ == pytest.approx(rad.STEFAN_BOLTZMANN * T ** 4, rel=1e-3)
+
+
+def test_band_kernel_reduces_to_the_gray_olr_kernel(column):
+    """REDUCTION (the independent anchor): the band kernel with a σT⁴ source == the gray _olr_from.
+
+    :func:`radiation._transmission_emission` is written independently of
+    :meth:`GrayRadiationColumn._olr_from`; feeding it the gray whole-spectrum ``σT⁴`` source over the
+    same column reproduces ``_olr_from`` to machine precision (the residual is the float
+    multiplication-order ULP — exactly what two independent implementations agreeing looks like).
+    Collapsing the spectral resolution recovers gray — the cross-check that ties the band machinery to
+    the validated gray column.
+    """
+    Ts = rad.PRESENT_SURFACE_T
+    p, T = column._profile(Ts)
+    for co2 in (1.0, 2.0, 8.0):
+        tau = column._optical_depth(Ts, co2, water_vapour=False)
+        surface = rad.STEFAN_BOLTZMANN * float(T[-1]) ** 4
+        layer = rad.STEFAN_BOLTZMANN * (0.5 * (T[:-1] + T[1:])) ** 4
+        band_kernel = rad._transmission_emission(tau, surface, layer)
+        assert band_kernel == pytest.approx(column._olr_from(T, tau), rel=1e-12)
+
+
+def test_spectral_co2_forcing_is_logarithmic(band):
+    """THE UNLOCK — the mirror of gray's saturation test: per-doubling ΔF is CONSTANT (the log law).
+
+    Exponential band wings make the τ=1 emission level spread by a constant spectral width per CO₂
+    doubling, so ΔF is constant per doubling (the Myhre law) where the gray band's ΔF *decreases*.
+    Tested in the flat-middle 0.5×–8× range (the named edges sit far outside it).
+    """
+    per = band.forcing_per_doubling((0.5, 1, 2, 4, 8))
+    assert per.max() / per.min() < 1.05                      # constant per doubling (≈ 0.5% spread)
+    # and far flatter than the gray band over the same range
+    col = rad.calibrate_column()
+    olr = {m: col.outgoing_longwave(rad.PRESENT_SURFACE_T, co2_factor=m, water_vapour=False)
+           for m in (0.5, 1, 2, 4, 8)}
+    gray_per = np.array([olr[0.5] - olr[1], olr[1] - olr[2], olr[2] - olr[4], olr[4] - olr[8]])
+    assert gray_per.max() / gray_per.min() > 1.5             # gray clearly saturates over the same span
+
+
+def test_spectral_forcing_lands_in_the_myhre_band(band):
+    """The constant per-doubling forcing is order-validated against Myhre (~3.7 W m⁻²), not tuned.
+
+    Loose by design (advisor): the magnitude rides the band parameters (wing scale, band-centre τ,
+    half-width) — calibrated to order, the wall. The *functional form* (logarithmic) is the win.
+    """
+    per = band.forcing_per_doubling((0.5, 1, 2, 4, 8))
+    assert np.all((per > 2.0) & (per < 6.0))                 # the Myhre band, not gray's 20–53
+    assert 2.0 < per.mean() < 6.0
+    # same order as Myhre's 5.35·ln2 ≈ 3.71 (within a factor of ~1.6, the loose magnitude)
+    assert 0.6 < per.mean() / rad.MYHRE_PER_DOUBLING < 1.6
+
+
+def test_uniform_wings_saturate_the_wing_is_the_ingredient():
+    """REDUCTION/null: flatten the wings (uniform k) and the forcing SATURATES like gray.
+
+    Isolates the exponential wing as the whole ingredient — same column, same band, only the wing
+    shape removed. A moderate band-centre τ so the band transitions through τ=1 across the sweep.
+    """
+    flat = rad.SpectralCO2Band(uniform=True, band_centre_tau=8.0)
+    per = flat.forcing_per_doubling((2, 4, 8, 16, 32))
+    assert per[-1] < 0.6 * per[0]                            # saturates (gray's d_8_16 < 0.6·d_2_4 style)
+    # the exponential-wing band over the same span stays ~constant
+    wings = rad.SpectralCO2Band().forcing_per_doubling((2, 4, 8, 16, 32))
+    assert wings[-1] > 0.9 * wings[0]
+
+
+def test_spectral_log_law_is_range_limited_at_low_co2():
+    """NAMED EDGE: below the band-centre-saturation threshold the forcing is linear/√, not log.
+
+    With a weakly-absorbing band centre (small τ), low CO₂ leaves the whole band optically thin, so
+    ΔF GROWS per doubling (linear-in-amount) rather than holding constant — the log law's low-CO₂ edge.
+    """
+    weak = rad.SpectralCO2Band(band_centre_tau=4.0)
+    per = weak.forcing_per_doubling((0.0625, 0.125, 0.25, 0.5, 1, 2))
+    assert per[-1] > 2.0 * per[0]                            # growing, not constant → not yet logarithmic
+
+
+def test_log_law_coefficient_predicts_the_right_order(band):
+    """DERIVATION (consistency): the τ=1 wing formula 2l·π[B(Ts)−B(T_strat)] predicts ΔF to order.
+
+    The cold-to-space limit; the column's finite-layer emission realizes ~20–30% more, so this is a
+    derivation/consistency leg (it assumes the same exponential wing), not an independent anchor.
+    """
+    analytic_per_doubling = band.log_law_coefficient() * np.log(2.0)
+    column_per_doubling = band.forcing_per_doubling((1, 2)).item()
+    # analytic is the sharp-limit floor; the column sits above it but within ~30%
+    assert analytic_per_doubling < column_per_doubling
+    assert abs(analytic_per_doubling - column_per_doubling) / column_per_doubling < 0.4
+
+
+# --------------------------------------------------------------------------- #
 # PLUMBING / REDUCTION — the emergent OLR reduces to rung-0's A + B·T near present.
 # --------------------------------------------------------------------------- #
 def test_calibration_hits_the_present_operating_point(column):
@@ -211,3 +320,19 @@ def test_demo_reproduces_the_radiation_headline():
     assert 0.2 < r.wv_fraction_at_climlab < 0.5                  # climlab's 2 recovered at a plausible loading
     # the CO₂ forcing saturates: the last doubling adds less than the second (concave, not logarithmic)
     assert r.co2_per_doubling[-1] < r.co2_per_doubling[1]
+
+
+@pytest.mark.slow
+def test_demo_reproduces_the_spectral_log_law():
+    # Guards docs/figures/planet-spectral-band.png: gray's per-doubling forcing SATURATES (decreasing)
+    # while the spectral band's is CONSTANT (logarithmic) and lands in the Myhre band — and the
+    # cumulative spectral forcing tracks Myhre's 5.35·ln(C/C₀) far better than gray does.
+    from planet import demo_spectral_band as demo
+    r = demo.compute()
+    assert r.gray_per_doubling[-1] < r.gray_per_doubling[1]       # gray saturates (mirror of the gray demo)
+    assert r.band_per_doubling_mid.max() / r.band_per_doubling_mid.min() < 1.05  # spectral constant
+    assert 2.0 < r.band_per_doubling_mean < 6.0                   # the Myhre band, not gray's 20–53
+    # the spectral cumulative forcing hugs Myhre; gray departs from it badly at high CO₂
+    band_err = np.max(np.abs(r.band_forcing - r.myhre_forcing))
+    gray_err = np.max(np.abs(r.gray_forcing - r.myhre_forcing))
+    assert band_err < 0.25 * gray_err

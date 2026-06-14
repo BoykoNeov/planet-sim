@@ -1798,8 +1798,10 @@ text, local PDF); the logarithmic-CO₂ contrast → **Myhre+ 1998**.
   **τ↔GHG-column** mapping (calibrated to *order*, not line-by-line — the ``R_ATM_SLOPE``/``HADLEY_STRENGTH``
   cited-closure status). Edges, each pinned: **CO₂ forcing is SATURATING, not logarithmic** — a gray band
   gives a concave ``OLR(τ)`` (per-doubling ``ΔF`` 48→53→41→25→20 W/m², *decreasing*, not the constant-per-
-  doubling Myhre log) at an **unrealistic whole-band magnitude** → the log law + realistic magnitude are
-  **band physics = the named within-rung upgrade**; **clear-sky only** (clouds out of scope); **no
+  doubling Myhre log) at an **unrealistic whole-band magnitude** → the log law was **band physics = a
+  named within-rung upgrade, now BUILT** (`SpectralCO2Band`: exponential band wings → constant
+  per-doubling `ΔF` ~4.5 W/m² in the Myhre band; form banked, magnitude the wall; reduction-to-gray the
+  machine-precision anchor — see §12.2 + [[planet-rung4-radiation]]); **clear-sky only** (clouds out of scope); **no
   lapse-rate feedback** — the fixed convective Γ means warming is a uniform profile shift (zero LR
   feedback), which is *exactly* why the gray net sits below climlab's 2 by ``≈λ_LR`` (a moist-adiabatic Γ
   is the named upgrade that would supply it); **single column** — wiring ``OLR(Ts,τ)`` *per-latitude* into
@@ -2169,9 +2171,21 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
   (WV feedback beats Planck). `D` was **not** recalibrated (present contrast already ≈ rung-0's at the
   climlab-matched loading); the global mean is **not** pinned (Jensen). → §10 rung-4 completion;
   [[planet-rung4-radiation]].
-- [ ] **Spectral-band log law** · *deliverable:* replace gray's *saturating* concave `OLR(τ)` with
-  band-resolved absorption · *anchor:* per-doubling `ΔF` becomes **constant** (the Myhre log law) at a
-  realistic magnitude, vs gray's decreasing 48→…→20 W/m² · *cost:* band physics in the column.
+- [x] ~~**Spectral-band log law**~~ **BUILT 2026-06-14** (`planet/radiation.py`,
+  `SpectralCO2Band`) — the CO₂ 15-µm band resolved into spectral bins whose absorption falls off
+  **exponentially in the wings**, each bin a gray sub-problem solved with the *same* two-stream
+  emission kernel. The §12 anchor **held** (not overturned, the rung-4-wire/lapse-rate pattern this
+  time confirms): per-doubling `ΔF` becomes **constant** (~4.5 W/m²/doubling, the Myhre band) where
+  gray's *decreases* 48→…→20 — the exponential wing's `τ=1` level spreads a constant spectral width
+  per doubling. **Triad:** the independent anchor is **reduction-to-gray** (the band kernel
+  `_transmission_emission`, written independently, reproduces the gray `_olr_from` to machine
+  precision; a *uniform*-`k` band saturates like gray — the wing is the whole ingredient); the unlock
+  is loose (the **magnitude is the wall** — rides the wing scale `l`, band-centre τ, half-width;
+  calibrated to *order*, "wings ≈ exponential" is itself empirical — so the *functional form* is the
+  win, not the ~3.7 coefficient); the derivation `dF/dlnC=2l·π[B(Ts)−B_strat]` matches the τ=1 sharp
+  limit ~1% (the column smear realizes ~20–30% more). **Range-limited (named edges):** linear/√ below
+  band-centre saturation, saturates again above where the wings exhaust — `0.5×–8×` sits in the flat
+  middle. Demo `planet/demo_spectral_band.py` → `docs/figures/planet-spectral-band.png`.
   **[named upgrade]** → [[planet-rung4-radiation]].
 - [x] ~~**Moist-adiabatic lapse-rate feedback**~~ **BUILT 2026-06-14** (`planet/radiation.py`,
   `moist_adiabat=True` + `feedback_kernel`) — variable-Γ moist adiabat makes the lapse-rate feedback

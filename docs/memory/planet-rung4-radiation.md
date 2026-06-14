@@ -137,3 +137,47 @@ upper-trop moisture–temp coupling that links the two feedbacks in reality is a
 left: moist adiabat WITH latitudinal structure on the per-latitude wire (recovers the extratropical branch +
 global mean); spectral-band log law; clouds. Demo `planet/demo_lapse_rate.py` →
 `docs/figures/planet-lapse-rate.png`. [[moist-ebm-source]]; plan §10.
+
+---
+
+**Rung-4 spectral-band log law BUILT 2026-06-14** (`planet/radiation.py`: `SpectralCO2Band` +
+`planck_flux_per_wavenumber` + `_transmission_emission` + module band/Myhre constants; 7 fast + 1 slow
+tests in `test_radiation.py`, full planet gate green 395 pass/1 skip). The §12 within-rung slice that fixes
+the rung-4-core CO₂-forcing edge: gray's band-independent absorption SATURATES (per-doubling `ΔF`
+48→53→41→25→20, decreasing — adding CO₂ pushes the WHOLE Planck spectrum to the cold upper atmosphere), but
+the observed law is LOGARITHMIC (Myhre 5.35·ln(C/C₀) ≈ 3.7 W/m² *per doubling, constant*). **Separate
+opt-in construct; gray's `co2_forcing` + its saturation test UNTOUCHED** (advisor #5). Spike-first
+(`outputs/rung4_spectral_spike.py`, gitignored) + advisor-pressure-tested before the build.
+
+**THE §12 ANCHOR HELD (not overturned — the rung-4-wire/lapse-rate slices both overturned; this one
+confirms):** per-doubling `ΔF` becomes CONSTANT (~4.5 W/m²/doubling, the Myhre band) vs gray's decreasing
+48→20. **Model = a band-RESOLVED COLUMN** (advisor #2 let the spike pick it over the sharp τ=1 fallback):
+the CO₂ 15-µm band split into `n_bins` spectral bins with absorption `k(ν)=k_c·e^(−|ν−ν₀|/l)` (EXPONENTIAL
+WINGS = the whole ingredient), each bin a gray sub-problem solved with the SAME two-stream
+transmission-weighted emission kernel over the column's fixed-Γ profile + `(p/p_s)` CO₂ shape, spectral
+Planck `πB_ν` source. Band centre deeply saturated (`k_c=1000`) so forcing comes only from the wings; an
+exp wing's `τ=1` level spreads a CONSTANT spectral width `2l·d(lnC)` per doubling ⟹ constant `ΔF`.
+
+**Triad (advisor #3 — the tight leg here is WEAKER than the gray core's, framed honestly):** (1)
+**independent anchor = REDUCTION-TO-GRAY** — `_transmission_emission` (written independently of
+`GrayRadiationColumn._olr_from`) with the gray whole-spectrum `σT⁴` source reproduces `_olr_from` to
+MACHINE PRECISION (`rel<1e-12`, residual = float mul-order ULP — exactly what two independent
+implementations agreeing looks like); + a UNIFORM-`k` band (no wings) SATURATES like gray (the wing is the
+ingredient); + `π∫B_ν dν=σT⁴` pins the spectral Planck. (2) **the unlock (loose) = constant per-doubling in
+the Myhre band** (2–6 W/m²) vs gray's 20–53 — but the **MAGNITUDE IS THE WALL** (advisor #4): rides the
+wing scale `l`, band-centre τ, half-width — calibrated to ORDER, and "CO₂ wings ≈ exponential" is itself an
+empirical input; the **FUNCTIONAL FORM (logarithmic) is the win**, NOT the ~3.7 coefficient (the column
+realizes ~4.5, ~20% above Myhre — layer smear). (3) **derivation/consistency (NOT independent)** —
+`log_law_coefficient` = `dF/dlnC = 2l·π[B_ν(Ts)−B_ν(T_strat)]` (cold-to-space τ=1 limit) matches the SHARP
+emission-level model to ~1% (3.54 vs 3.50); the column's finite-layer emission sits ~20–30% above it (4.5).
+
+**RANGE-LIMITED — both named edges spike-confirmed (advisor #1, the #1 spike risk):** constant only in the
+flat middle (band centre saturated AND wings not exhausted). **Low-CO₂ edge** (`C≲1/k_c`): per-doubling
+GROWS (linear/√, band centre un-saturated) — pinned with a weak `k_c=4` band. **High-CO₂ edge**: per-doubling
+FALLS again once the active wing reaches the finite band edge — spike-confirmed with a narrow band. The
+realistic `0.5×–8×` test window sits solidly in the flat middle (both edges far outside at the build params).
+Demo `planet/demo_spectral_band.py` → `docs/figures/planet-spectral-band.png` (2 panels: per-doubling gray
+vs spectral vs Myhre; cumulative `F(C)` on log-x = straight line for spectral, gray bends over). Sources
+pinned: Myhre+ 1998 (the log law); Pierrehumbert *PoPC* §4 / Wilson–Gea-Banacloche 2012 (the exp-wing
+emission-level mechanism). Rung-4 within-rung upgrades left: clouds; moist adiabat with latitudinal
+structure. [[moist-ebm-source]]; plan §12.2 + §10.
