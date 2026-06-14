@@ -30,4 +30,10 @@ zonostrophy window); **anisotropic diagnostics** (current `ke_spectrum` is azimu
 shear baroclinic APE = terrestrial picture; gas-giant-idiomatic = small-scale stochastic forcing +
 large-scale drag, Scott–Polvani). Equatorial-superrotation sign = known-hard even for specialists.
 
+**Destination decided 2026-06-14 (user):** gas giants is a **spin-out — a separate sibling repo, NOT a
+within-this-repo rung** (joins the editable-ocean project in plan §12.6 "Spin-outs"). The *home* is now
+decided; the three tiers stay a **feasibility sketch** (NOT scoped to the ocean's S1–S5 depth) — tag is
+"decided — separate repo · still feasibility sketch". Kind-gap vs the ocean: gas giants = the *same* QG
+engines pointed at a new planet; the ocean = a *downstream consumer* across the R1 data seam.
+
 Same "named, not banked" altitude as [[planet-spinout-roadmap]]; extends [[shallow-water-source]].

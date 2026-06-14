@@ -1993,18 +1993,44 @@ explored + costed, not committed · **[decided — separate repo]** belongs to t
 
 ### 12.2 Within-rung upgrades on the landed rungs (1–4)
 
-**Rung 1 — two-way coupler (complete):**
-- **TVD/WENO flux limiter** · monotone tracer advection. The SSP-RK3 scheme is non-monotone (Gibbs
-  over/undershoot on sharp fronts). *Unlocks* clean fronts, no spurious extrema. Cost: a limiter in
-  `engines/fluid`. **[named upgrade]** → [[planet-rung1-two-way-coupler]].
+Split per the honesty gradient (the §12 intro's "do not flatten to TODO"): **buildable slices** are
+pick-up-able now on the current engine — written as `- [ ]` work items carrying their **done-condition
+(the anchor)**, the field that makes a slice more than a wish. **Walls / awaits a higher rung** are
+prescribed closures or caveats a *future* rung must clear — left as descriptive bullets, deliberately
+*not* checkboxed. Slice fields: *deliverable · anchor (the triad test that pins it) · cost · tag · → record.*
+
+**Rung 1 — two-way coupler (complete).**
+*Buildable slices:*
+- [ ] **TVD/WENO flux limiter** · *deliverable:* a limiter in the `engines/fluid` SSP-RK3 advection step ·
+  *anchor:* a monotonicity test (no new extrema on a step IC) green **and** the existing conservation +
+  variance-bound tests stay green · *cost:* one limiter, no new anchor. **[named upgrade]** →
+  [[planet-rung1-two-way-coupler]].
+- [ ] **Wet-get-wetter precip shape/amplitude** · *deliverable:* `q`-scaled amplitude in
+  `planet/circ_precip.py` (the band-centre←jet *position* seam is already banked) · *anchor:* amplitude
+  tracks warming with the band centre held fixed (reuses the `jet_lat` seam); rung-0 bit-for-bit at the
+  default · *cost:* prescribed→`q`-scaled shape. **[named upgrade]** → [[planet-rung1-two-way-coupler]].
+
+*Walls / awaits a higher rung:*
 - **Realistic-magnitude eddy κ** · the emergent barotropic `κ~10³` is ~1000× below rung-0's `2.2e6` and
   config/window-tuned (config can't be separated from physics). The *dimensionless* win moved to rung-3
   QG; a realistic *dimensional* magnitude on this single-layer engine stays unbankable. **[the wall]** →
   [[planet-rung1-two-way-coupler]].
-- **Wet-get-wetter precip shape/amplitude** · the position seam (band centre ← jet) is banked; the
-  shape/amplitude refinement stays prescribed. **[named upgrade]** → [[planet-rung1-two-way-coupler]].
 
-**Rung 2 — moist dynamics (complete, incl. 2.5 / 2.x / Hadley fix):**
+**Rung 2 — moist dynamics (complete, incl. 2.5 / 2.x / Hadley fix).**
+*Buildable slices:*
+- [ ] **Emergent ITCZ rain** · *deliverable:* couple precip to the moisture budget in a `sphere_ebm.py`
+  sibling (today the band is *relocated*, not *rained*) · *anchor:* rain co-locates with the emergent
+  energy-flux-equator (not a prescribed band) and `∫(P−E)=0` stays machine-exact · *cost:* moisture
+  budget → precip seam. **[named upgrade]** → [[planet-rung2x-itcz]].
+- [ ] **Tighten the ITCZ-migration sensitivity** · *deliverable:* re-derive `D` in `sphere_ebm.py` ·
+  *anchor:* the closed-form `δ/AHT` lands within ~factor-1 of observed (currently ~2× high, rides the
+  calibrated `D`) · *cost:* one re-derive. **[named refinement]** → [[planet-rung2x-itcz]].
+- [ ] **Recalibrate `D_s≈0.30` (rung 2.5)** · *deliverable:* a smaller sensible-heat `D` in `moist_ebm.py` ·
+  *anchor:* the MSE-diffusing EBM matches the dry present contrast with no latent double-count,
+  target-invariant <5% · *cost:* single-scalar re-derive. **[named upgrade]** →
+  [[planet-rung25-mse-diffusion]].
+
+*Walls / awaits a higher rung:*
 - **Derive `R_ATM_SLOPE` (=2 W/m²/K)** · the prescribed atmospheric radiative response (cited-closure;
   explicitly **not** `B_OLR`, so rung 4 did *not* retire it). **[the wall]** → [[planet-rung2-scoped]].
 - **Derive `HADLEY_STRENGTH`** · the prescribed overturning amplitude that flips the ITCZ sign
@@ -2013,34 +2039,44 @@ explored + costed, not committed · **[decided — separate repo]** belongs to t
 - **Relocate the subtropical desert** · both eddy and Hadley paths leave the dry belt ~12° equatorward of
   the canonical 25–35° (hyper-peaked C–C `q`); a real fix needs GMS-resolved moisture transport.
   **[the wall / rung 3+]** → [[planet-rung2-hadley-fix]].
-- **Emergent ITCZ rain** · the ITCZ *position* migrates emergently, but the rain there is still a
-  *prescribed* band relocated in a dry EBM, not emergent precipitation. **[named upgrade]** →
-  [[planet-rung2x-itcz]].
-- **Tighten the ITCZ-migration sensitivity** · the closed-form `δ/AHT` is observed-*order* but factor ~2
-  high (rides the calibrated `D`). **[named refinement]** → [[planet-rung2x-itcz]].
-- **Recalibrate `D_s≈0.30` (rung 2.5)** · re-derive a smaller sensible-heat `D` so the MSE-diffusing EBM
-  matches the dry present contrast with no latent double-count; a single scalar leaves a higher-moment
-  **shape residual** a structured `D(x)` would close. **[the wall + named upgrade]** →
-  [[planet-rung25-mse-diffusion]].
+- **Structured `D(x)` shape residual (rung 2.5)** · the `D_s` recalibration slice fixes the *level*; a
+  single scalar still leaves a higher-moment **shape residual** only a structured `D(x)` closes.
+  **[the wall]** → [[planet-rung25-mse-diffusion]].
 
-**Rung 3 — baroclinic instability (complete: Phase A linear + Phase B QG flux won):**
-- **N-layer QG** · 2 layers is the minimal honest baroclinic model; N-layer (multi-level vertical
-  structure) is the within-rung upgrade — no cleaner anchor above it, just more cost. **[named upgrade]**
-  → [[planet-rung3-scoped]].
+**Rung 3 — baroclinic instability (complete: Phase A linear + Phase B QG flux won).**
+*Buildable slices:*
+- [ ] **N-layer QG** · *deliverable:* extend `planet/baroclinic_qg.py` from 2 layers to N (multi-level
+  vertical structure) · *anchor:* the single-layer/low-N reduction stays exact + the multi-level
+  dispersion matches the analytic Phillips matrix (the rung-3 tight leg) · *cost:* more layers, no cleaner
+  anchor above it. **[named upgrade]** → [[planet-rung3-qg-built]].
+
+*Walls / awaits a higher rung:*
 - **Realistic dimensional κ** · the QG win is **dimensionless + qualitative**; the dimensional κ landing
   in Earth's band is coincidental + box/drag-dependent. A non-coincidental magnitude needs realistic
   forcing/geometry = rung 5. **[caveat → rung 5]** → [[planet-rung3-qg-built]].
 
-**Rung 4 — gray radiative transfer (complete):**
-- **Per-latitude EBM wire** · an opt-in sibling `RadiativeEBM` where gray `OLR(Ts,τ)` drives each band →
-  **emergent latitudinal radiative structure** (a crude radiative polar amplification, distinct from the
-  rung-2.5 *transport* one). Cost: re-opens the jointly-tuned `(A,B,D)` calibration (recalibrate `D`, as
-  rung 2.5 did). The natural rung-4 completion. **[left to user call]** → [[planet-rung4-radiation]].
-- **Spectral-band log law** · replace gray's *saturating* concave `OLR(τ)` with band physics → the Myhre
-  **logarithmic** CO₂ law + a realistic forcing magnitude. **[named upgrade]** → [[planet-rung4-radiation]].
-- **Moist-adiabatic lapse-rate feedback** · a variable Γ supplies the `λ_LR≈0.84` the fixed-Γ gray column
-  omits (the gap from the gray net `1.33` up to climlab's `2`). **[named upgrade]** → [[planet-rung4-radiation]].
-- **Clouds** · clear-sky only; cloud feedback out of scope. **[named upgrade]** → [[planet-rung4-radiation]].
+**Rung 4 — gray radiative transfer (complete).**
+*Buildable slices:*
+- [ ] **Per-latitude EBM wire** · *deliverable:* an opt-in sibling `RadiativeEBM` where gray `OLR(Ts,τ)`
+  drives each band → **emergent latitudinal radiative structure** (a crude radiative polar amplification,
+  distinct from the rung-2.5 *transport* one) · *anchor:* reduction to rung-0 at the climlab-matched
+  loading (global-mean `B=2`) + the emergent meridional profile · *cost:* re-opens the jointly-tuned
+  `(A,B,D)` calibration (recalibrate `D`, as rung 2.5 did). The natural rung-4 completion. **[left to user
+  call]** → [[planet-rung4-radiation]].
+- [ ] **Spectral-band log law** · *deliverable:* replace gray's *saturating* concave `OLR(τ)` with
+  band-resolved absorption · *anchor:* per-doubling `ΔF` becomes **constant** (the Myhre log law) at a
+  realistic magnitude, vs gray's decreasing 48→…→20 W/m² · *cost:* band physics in the column.
+  **[named upgrade]** → [[planet-rung4-radiation]].
+- [ ] **Moist-adiabatic lapse-rate feedback** · *deliverable:* a variable Γ replacing the fixed-Γ gray
+  column · *anchor:* supplies `λ_LR≈0.84` (closing the gap from the gray net `1.33` up to climlab's `2`),
+  order-validated vs Soden & Held 2006 · *cost:* moist adiabat. **[named upgrade]** →
+  [[planet-rung4-radiation]].
+- [ ] **Clouds** · *deliverable:* a cloud layer in the column (clear-sky today) · *anchor:* clear-sky
+  reduction stays exact + cloud feedback order-validated · *cost:* **large** — cloud radiative properties
+  + fraction are their own modelling problem, not a one-sitting slice. **[named upgrade — but big]** →
+  [[planet-rung4-radiation]].
+
+*Walls / awaits a higher rung:*
 - **Komabayashi–Ingersoll runaway** · the hot analogue of the snowball — a steep WV loading where the
   linearization breaks (`B` not linearized across it). An exploration, not a build. **[named edge]** →
   [[planet-rung4-radiation]].
@@ -2070,17 +2106,7 @@ explored + costed, not committed · **[decided — separate repo]** belongs to t
   supports multiple views). A follow-on to the built bucket C. **[deferred — stretch]** →
   [[pedagogy-novice-intermediate]].
 
-### 12.5 Off-Earth sibling axis — gas giants (feasibility sketch, not built)
-
-The shallow-water / two-layer-QG engines are the same model family the literature uses for gas-giant
-atmospheres. Three tiers, costed in [`docs/explorations/gas-giant-atmosphere.md`](../explorations/gas-giant-atmosphere.md):
-- **Tier 1 — β-plane banded jets** · ≈ one rung on `baroclinic_qg.py`. **[feasibility sketch]**
-- **Tier 2 — sphere-correct globe** · a new geometry engine. **[feasibility sketch]**
-- **Tier 3 — deep convective interior** · Busse-annulus QG + rotating Rayleigh–Bénard are *reduced*
-  laptop-scale entries (a steeper reach, **not** out of scope); only the realistic anelastic-deep-shell +
-  dynamo regime is the wall. **[feasibility sketch]**
-
-### 12.6 Editable geography & seasonality (§5 / §9.3)
+### 12.5 Editable geography & seasonality (§5 / §9.3)
 
 - **Cheap tier (rides rungs 0–1)** · elevation → a lapse-rate map diagnostic; land/ocean → an albedo
   difference; fraction-per-band → continentality-lite. **No engine change — buildable now.** → §9.3.
@@ -2090,8 +2116,28 @@ atmospheres. Three tiers, costed in [`docs/explorations/gas-giant-atmosphere.md`
   star) — new transport that **leaves the 1-D engine** = the rung-5 exit from the zonal-mean planet.
   **[→ rung 5]** → §5.
 
-### 12.7 The spin-out — a separate repo, not an upgrade of this one
+### 12.6 Spin-outs — separate repos, not upgrades of this one
 
-- **Editable-ocean GPU project** · a Julia / ClimaOcean + Makie repo born here across a contract seam
-  (R1's serialized, producer-agnostic schema is what it binds on); spin-out steps S1–S5, ECCO ingest at
-  S1. Provisional per the living-staircase rule (§11.4). **[decided — separate repo]** → §11.
+Two destinations now decided to live *outside* this repo. They differ in **maturity and kind** — keep them
+from reading as equally committed:
+
+- **Editable-ocean GPU project** · a Julia / ClimaOcean + Makie repo born here across a contract seam — a
+  *downstream consumer* of this repo's serialized output (R1's producer-agnostic schema is what it binds
+  on). **Roadmapped:** spin-out steps S1–S5, ECCO ingest at S1; provisional per the living-staircase rule
+  (§11.4). **[decided — separate repo · roadmapped S1–S5]** → §11; [[planet-spinout-roadmap]].
+- **Gas-giant atmosphere** · the *same* shallow-water / two-layer-QG engines pointed at a new planet —
+  destination now decided (a sibling repo, **not** a within-this-repo rung), but still a feasibility
+  sketch, *not* scoped to the ocean's S1–S5 depth. Three tiers, costed in
+  [`docs/explorations/gas-giant-atmosphere.md`](../explorations/gas-giant-atmosphere.md):
+  - **Tier 1 — β-plane banded jets** · ≈ one rung on `baroclinic_qg.py` (the Williams-1978 Jovian-jet
+    model; pyqg is its published twin). Not "turn up β" — needs scale separation (a Rhines window),
+    anisotropic diagnostics (zonal-mean `ū(y)` bands; today's azimuthal spectrum is jet-blind), and a
+    gas-giant forcing (small-scale stochastic + large-scale drag).
+  - **Tier 2 — sphere-correct globe** · global jet count / polar polygons / equatorial superrotation — a
+    new spherical-geometry engine (Dedalus / EPIC); both current engines are doubly-periodic Cartesian
+    β-planes.
+  - **Tier 3 — deep convective interior** · Busse-annulus QG + rotating Rayleigh–Bénard are *reduced*
+    laptop-scale entries (a steeper reach, **not** out of scope); only the realistic anelastic-deep-shell +
+    MHD dynamo regime is the wall.
+  - **[decided — separate repo · still feasibility sketch]** → [[gas-giant-feasibility]];
+    [[planet-spinout-roadmap]].
