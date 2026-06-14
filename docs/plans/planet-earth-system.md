@@ -344,9 +344,10 @@ BigSim/
     biomes.py                 # Whittaker classifier: (T, P) → biome map                                          (Phase 2)
     circulation.py            # planet's instantiation of engines/fluid (β-plane channel, planetary params)      (Phase 3)
     coupler.py                # one-way EBM → shallow-water forcing (cadence-based, timescale-separated)          (Phase 4)
-    plots.py                  # planet-local static figures (→ promote to viz/ by rule-of-three)
+    plots.py                  # planet-local static figures (a future planet/viz/ once a 3rd geometry consumer appears — §9.4)
     planetmap.py              # the deep-end INTERACTIVE map: a LAYER REGISTRY painted by Plotly+ipywidgets (ADR 0004 #1, §9.1)
     planet_spec.py            # the planet-spec interchange schema: export/import the layer stack; round-trip-identity tested (ADR 0004 #3-4, §9.3)
+    flow_serialize.py         # a vector flow field (u,v)+coverage+provenance THROUGH the planet-spec schema — the producer-agnostic viz/output seam (R1, §11.2)
     planet.ipynb              # single teaching notebook (sliders → climate → biome map)
     demo_snowball.py / demo_biomes.py / demo_shallowwater.py / demo_coupler.py    # banked artifacts
     climate_reference.py      # frozen climlab reference table (keeps the triad green without the [climate] extra)
@@ -550,9 +551,11 @@ state-interchange round-trip, which is a real invariant and is tested as one (be
   mask (Phase 1) → biome & precipitation fields (Phase 2) → circulation streamlines /
   jet axis (Phase 4) → elevation/bathymetry & coastlines (the geography seam, §9.3) —
   and **never edits the renderer**. This *is* the user's "show more features as the
-  phases progress" requirement made structural. The registry stays planet-local; it is
-  the **third consumer** that will eventually promote the 2-D-field / animation
-  primitives to shared `viz/` by rule-of-three (it does not pre-empt that — ADR 0004).
+  phases progress" requirement made structural. The registry stays planet-local; it would
+  be the **third consumer** that eventually promotes the 2-D-field / animation primitives
+  to a planet-internal `planet/viz/` by rule-of-three — *not* a cross-repo `viz/` (that
+  pre-split shared package stayed in the monorepo archive; §9.4 post-split note). It does
+  not pre-empt that (ADR 0004): the geometry helpers are still two-consumer (§9.4).
 - **Knobs — the "knob in, climate out" panel, and the exoplanet sandbox.** v1 sliders:
   **solar constant `S₀`** (the *amount* of radiation — already the Snowball lever),
   **CO₂** (→ lower `A`), **obliquity**, and transport `D`. Two further "exoplanet" knobs
@@ -641,6 +644,30 @@ third consumer-in-waiting. Promotion is **not** done pre-emptively (the existing
 `plots.py` share conventions, not copy-pasted code — the thin-extraction finding,
 2026-06-09). **Building visualization rung A (§9.5) is what finally trips this trigger** —
 the eddy life-cycle animation is the time-animation primitive's first real consumer.
+
+> **Post-split status (R2, 2026-06-14).** Two things this paragraph assumed are no longer
+> live, and one promotion has now landed:
+> - **No cross-repo `viz/`.** When the monorepo split into standalone repos (2026-06-10),
+>   `ARCHITECTURE.md` and the program-shared `viz/` stayed in the archive; *steel* / *chip*
+>   are separate repos now. So "promote to the **shared `viz/`** across steel/chip/planet by
+>   rule-of-three (ARCHITECTURE.md §6)" is a **dangling pre-split reference** — the relevant
+>   scope is now planet-sim-**internal** (a future `planet/viz/`, if ever), and the third
+>   consumer must be an in-repo one.
+> - **The serialization/interchange machinery did meet rule-of-three — and is now documented
+>   (R1, 2026-06-14).** `planet_spec` now serves a **third** consumer-class: the biome-map
+>   export, the two-world diff, **and** the vector-field interchange (`flow_serialize`, R1 /
+>   §11.2 — a producer-agnostic `VECTOR_OVERLAY` layer carrying coverage-extent + provenance,
+>   round-trip-pinned on two producers). That contract — *the* §9.3 schema + the §9.1 layer
+>   registry — **is** the "shared, documented contract" R2 names; it is already a clean shared
+>   module, so the promotion is **documentation, not extraction** (this note + the §11.2 R1/R2
+>   record).
+> - **The globe-geometry viz *helpers* are still two-consumer — deliberately not promoted.**
+>   `_sphere_xyz` (planetmap → eddy_globe) and `_band_geometry` / `_earth_radius` (eddy_globe
+>   → flow_globe) each have **exactly two** consumers (R1's `flow_serialize` renders through
+>   `planetmap.render`, so it added a serialization consumer, **not** a geometry-helper one).
+>   They are clean single-source imports, not copy-paste, so extracting them to a `planet/viz/`
+>   now would be the **pre-emptive promotion this very paragraph forbids** — named here, held,
+>   to re-trip when a genuine third geometry consumer appears.
 
 ### 9.5 Animated flow — the visualization rungs (decided 2026-06-11; **rungs A+B+C BUILT** — A 2026-06-11, B 2026-06-12, C 2026-06-13)
 
@@ -2088,11 +2115,51 @@ planet-sim stays **atmosphere-only** throughout — it never ships an ocean visu
   flows through the same contract as the eddy band. **Not** Rung C — this rung — is what the spin-out depends
   on. *Retarget-when-done:* the serialized schema's shape is the first input to S1's ECCO ingest; revisit it
   after seeing a real ocean field's dimensions.
+
+  > **BUILT 2026-06-14** (`planet/flow_serialize.py`, `planet/demo_flow_serialize.py`,
+  > `planet/tests/test_flow_serialize.py`; the committed globe `docs/figures/planet-flow-serialize.html`).
+  > **The seam reuses the existing schema — no new format** (ADR 0004 #3 "one structure serialized, not a
+  > second one invented"): a `FlowField` is expressed as a `VECTOR_OVERLAY` `Layer` in a
+  > `PlanetView`/`PlanetSpec`, so `planet_spec.save`/`load` round-trips it unchanged. Coverage-extent +
+  > provenance + `radius_m` + honesty ride in the JSON-safe `style` dict, **cast native** (the win32
+  > landmine: numpy ints don't `json.dumps`, and a surviving np scalar breaks the round-trip `==`). **The
+  > load-bearing proof is the round-trip identity on *both* producers** (`load(save(spec)) == spec` — the
+  > real eddy band *and* the synthetic global field), pinned in `test_flow_serialize.py` + the crown-jewel
+  > `_synthetic_spec`. Two design calls the advisor settled:
+  > - **Renderer = `planetmap.render` (the generic cone overlay), not `eddy_globe.py`.** The plan's
+  >   "already-built Rung B renderer (`eddy_globe.py`)" was a **stale reference** — `eddy_globe` consumes an
+  >   `eddy` *object* (it is not field-generic). The producer-agnostic vehicle is `planetmap.render`, which
+  >   dispatches on `LayerKind` and paints any `VECTOR_OVERLAY` as cones with no edit. (`render` gained one
+  >   backward-compatible `caption=` param so a longitudinally-structured field can carry an honest caption
+  >   instead of the biome family's zonal-mean one — the geometry renderer is otherwise untouched.) A common
+  >   **speed = |(u,v)|** scalar layer is the surface for both producers (`render` needs a scalar surface;
+  >   speed is native to any vector field → the two views are structurally parallel).
+  > - **The band is embedded on a *full-globe* grid, zeros outside its coverage box** — not a patch grid
+  >   (whose poleward `_polecapped` padding would smear the band across the sphere) and **not**
+  >   `circulation_layer`'s mirror-and-wrap (valid only for the zonal-mean jet). The emergent eddy band is
+  >   the project's only longitudinally-structured field, so it is laid **NH-only, true ~55° sector only,
+  >   zeros elsewhere** (honest-by-construction; pinned by a test). `is_global=False` on a full-globe grid is
+  >   not a contradiction — coverage records *where the data is*. This is also exactly the **ECCO target
+  >   shape** (a full-globe `(u,v)`+SST with data everywhere) — *the grid you serialize is the grid you
+  >   render*. **`frames`** (a time axis) is a **named, deferred** schema increment (orthogonal to
+  >   producer-agnosticism; trivially a stacked `.npz` later) — R1 serializes a single saturated snapshot.
 - **R2 — toolkit promotion (§9.4 rule-of-three, the natural co-rung).** With the frame side-channel, the
   flow-globe renderer, and the serialization now serving a **third** consumer (the synthetic producer / the
   spin-out), the rule-of-three is met: promote the viz+serialization machinery to a documented, shared
   contract. *Retarget-when-done:* whatever the promotion reveals as "still planet-specific" is a candidate
   cut before the seam freezes.
+
+  > **BUILT (documentation) 2026-06-14 — the promotion is *documentation, not extraction*.** R1 created the
+  > third consumer for the **serialization** machinery (`planet_spec` now serves the biome export + the
+  > two-world diff + the vector-field interchange), so that contract's rule-of-three is met — but it is
+  > *already* a clean shared module, so "promote to a documented, shared contract" = **document it**
+  > (§9.4 post-split status note + this record), not move code. **The globe-geometry viz *helpers* stay
+  > two-consumer** (`_sphere_xyz`: planetmap→eddy_globe; `_band_geometry`/`_earth_radius`:
+  > eddy_globe→flow_globe — R1 added a *serialization* consumer, not a *geometry* one), so extracting them
+  > to a `planet/viz/` now would be the **pre-emptive promotion §9.4 forbids** — named + held, to re-trip on
+  > a genuine third geometry consumer. The other half of R2: the **stale cross-repo `viz/` /
+  > ARCHITECTURE.md §6 references** (dead since the 2026-06-10 split) were refreshed to the post-split
+  > reality (§9.4, §12.3).
 - **R-parallel — Rung C (the three.js/WebGL particle showcase), OFF the critical path.** Rung C proves
   **renderer-agnosticism** (a *different* axis from R1's producer-agnosticism) and is the immersive
   *honest-by-disclosure* showcase. It is a planet-sim viz deliverable (§9.5) that **does not gate the
@@ -2332,8 +2399,13 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
   GLSL compile-validate + console diagnostics, so a GPU failure degrades to a working globe). Renderer-only:
   `FlowField`/`_build_data`/disclaimer/carve-out all unchanged. Full build record in §9.5; 7th structural
   test pins both pipelines. **[shipped — seam closed]** → [[planet-viz-animation-rungs]].
-- **§9.4 toolkit promotion (rule-of-three)** · promote the shared viz helpers to a toolkit once a third
-  consumer appears; not yet triggered. **[named, not triggered]** → §9.4.
+- [x] ~~**§9.4 toolkit promotion (rule-of-three)**~~ **LANDED (as documentation) 2026-06-14 — R1+R2.** R1
+  (`flow_serialize`) gave the **serialization** machinery its third consumer (export + diff + vector-field
+  interchange), meeting rule-of-three — but it is already a clean shared module, so the promotion is
+  **documentation** (§9.4 post-split note + §11.2 R2 record), not extraction. The globe-geometry *helpers*
+  stay **two-consumer** (deliberately not promoted — pre-emption is what §9.4 forbids). Also refreshed the
+  stale cross-repo `viz/` / ARCHITECTURE.md §6 references (dead since the 2026-06-10 monorepo split).
+  **[shipped — documented, not extracted]** → §9.4, [[planet-spinout-roadmap]].
 - **Live notebook widgets** · §2 snowball (live hysteresis / two stable states), §4 winds, §5 jet.
   Advisor flag: time the continuation/coupler sims first → `continuous_update=False` or precompute before
   promising "live". **[deferred]** → [[interactive-what-if]].

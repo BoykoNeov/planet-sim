@@ -32,7 +32,9 @@ def _synthetic_spec() -> ps.PlanetSpec:
     """A small spec exercising every field the schema must survive — fast, no EBM solve.
 
     Float temperature + **int** biome codes + a NaN-gapped ice-line annotation + an **inert** geography
-    layer + an **unknown future** layer (salinity) the versioned schema must carry forward.
+    layer + a **VECTOR_OVERLAY** flow field carrying a nested coverage-extent + provenance in its style
+    (the R1 viz/output-seam layer, §9.3) + an **unknown future** layer (salinity) the versioned schema
+    must carry forward.
     """
     lat = np.linspace(-90.0, 90.0, 9)
     lon = np.linspace(-180.0, 180.0, 5)
@@ -45,6 +47,12 @@ def _synthetic_spec() -> ps.PlanetSpec:
         pm.Layer("ice_line", pm.LayerKind.ANNOTATION,
                  np.array([[60.0, 0.0], [np.nan, np.nan], [-60.0, 0.0]]), "degrees", {}, z_order=3),
         pm.Layer("elevation", pm.LayerKind.SCALAR_FIELD, np.zeros((9, 5)), "m", {}, z_order=-1, inert=True),
+        pm.Layer("circulation", pm.LayerKind.VECTOR_OVERLAY,
+                 np.stack([np.ones((9, 5)), np.zeros((9, 5))]), "m/s",
+                 {"colorscale": "RdBu_r",
+                  "coverage": {"lat_min": 20.0, "lat_max": 60.0, "lon_min": -25.0,
+                               "lon_max": 25.0, "is_global": False},
+                  "provenance": "synthetic test field", "radius_m": 6.371e6}, z_order=2),
         pm.Layer("future_salinity", pm.LayerKind.SCALAR_FIELD, np.ones((9, 5)) * 35.0, "psu", {}, z_order=5),
     )
     knobs = dataclasses.asdict(EBMParams(n_cells=40))

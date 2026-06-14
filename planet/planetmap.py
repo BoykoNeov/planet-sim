@@ -600,7 +600,7 @@ def _field_caption(view: PlanetView, active: str) -> str:
     return _wrap_html(" ".join(parts), width=104)
 
 
-def render(view: PlanetView, active: str = "biome"):
+def render(view: PlanetView, active: str = "biome", caption: str | None = None):
     """Paint a :class:`PlanetView` as an interactive Plotly globe — the generic, kind-dispatching renderer.
 
     The ``active`` ``SCALAR_FIELD`` layer becomes the globe surface (a ``go.Surface`` on the unit
@@ -608,6 +608,12 @@ def render(view: PlanetView, active: str = "biome"):
     plus custom lat/lon/value hover); every ``ANNOTATION`` layer is overlaid as a 3-D line. The
     renderer is **generic over** :class:`LayerKind` — it dispatches, it does not special-case a phase —
     so registering a new scalar or annotation layer needs no edit here (ADR 0004 #1).
+
+    ``caption`` overrides the bottom caption. It defaults to :func:`_field_caption`, whose
+    zonal-mean-bands honesty edge is correct for the biome-map family but **wrong** for a
+    longitudinally-structured field (the serialized vector flow fields, §R1): such a caller passes its
+    own honest caption (e.g. the field's coverage/honesty text). The geometry renderer is unchanged —
+    only the prose the view cannot self-describe is made pluggable.
 
     ``VECTOR_OVERLAY`` layers are painted as flow arrows (:func:`_vector_overlay_trace` — Plotly cones on
     the sphere-tangent plane) — the Phase-4 machinery the seam deferred through Phases 1–3. Requires the
@@ -641,18 +647,19 @@ def render(view: PlanetView, active: str = "biome"):
     fig.add_annotation(
         xref="paper", yref="paper", x=0.5, y=-0.14, xanchor="center", yanchor="top",
         showarrow=False, align="left", font=dict(size=14, color="#33373b"),
-        text=_field_caption(view, active),
+        text=_wrap_html(caption) if caption is not None else _field_caption(view, active),
     )
     return fig
 
 
-def save_html(view: PlanetView, path, active: str = "biome") -> Path:
+def save_html(view: PlanetView, path, active: str = "biome", caption: str | None = None) -> Path:
     """Render ``view`` and write a standalone, viewable HTML globe — the banked artifact (Plotly only).
 
     The interactive analogue of the static ``demo_*.py`` PNGs: a self-contained HTML globe needing no
-    server and no extra dependency beyond Plotly (no kaleido/PNG export). Returns the written path.
+    server and no extra dependency beyond Plotly (no kaleido/PNG export). ``caption`` is forwarded to
+    :func:`render` (an honest override for non-zonal-mean views). Returns the written path.
     """
-    fig = render(view, active=active)
+    fig = render(view, active=active, caption=caption)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(str(path), include_plotlyjs="cdn")
