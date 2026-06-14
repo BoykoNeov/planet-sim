@@ -80,6 +80,7 @@ def test_page_is_self_contained_and_deterministic():
     assert "http://" not in html and "https://" not in html
     assert 'src="http' not in html
     assert '<canvas id="disk"' in html and '<canvas id="curve"' in html
+    assert all(f'id="{knob}"' in html for knob in ("s0", "co2", "obl"))   # all three knob sliders
 
 
 def test_inlined_data_round_trips():
@@ -95,6 +96,7 @@ def test_committed_page_is_well_formed():
     assert "window.PLANET_DATA = " in html
     assert "http://" not in html and "https://" not in html
     assert '<canvas id="disk"' in html
+    assert all(f'id="{knob}"' in html for knob in ("s0", "co2", "obl"))   # all three knob sliders
 
 
 @pytest.mark.slow
