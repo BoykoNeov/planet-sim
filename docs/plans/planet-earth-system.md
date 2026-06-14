@@ -1963,3 +1963,135 @@ against S1's real ECCO dimensions; S2's forcing seam is provisional until an S3 
 re-planned from scratch after S4. **Plan the next rung concretely, hold the rung after it loosely**, and
 **revalidate the whole chain at each landing** — the staircase is climbed one validated step at a time, with
 the banister redrawn after every step.
+
+## 12. Upgrade backlog — every named growth axis, consolidated
+
+**What this is.** A single index of every upgrade *named but not built* across the project, pulled
+together from the per-rung records in §10, the macro-staircase in §5, and the memory files — so "what
+could be built next" is one scan, not a hunt. This is an **index, not a re-derivation**: each line is
+*what it is · what it unlocks · the wall-or-cost · → the detailed record*. The physics lives in §10 / the
+`[[…]]` memory; do not duplicate it here.
+
+**Maintenance rule (or this rots).** When an upgrade ships, **strike its line here and record it in its
+§10 rung block** — the same "plan §10 + memory is the record" discipline the rest of the file runs on. No
+separate backlog file (a third record to hand-sync) and no MEMORY.md line for this section.
+
+**Status tags** preserve the project's honesty gradient — do not flatten them to "TODO":
+**[named upgrade]** buildable on the current engine, no new anchor · **[the wall]** a prescribed
+closure / cited constant a future rung would *derive* · **[left to user call]** scoped, explicitly not
+foreclosed, awaiting a go · **[scoped]** designed + pressure-tested, not built · **[feasibility sketch]**
+explored + costed, not committed · **[decided — separate repo]** belongs to the spin-out · **[deferred —
+~free]** cheap docs/notebook work, offered not asked.
+
+### 12.1 The macro-staircase — rungs 5–6 (see §5, not re-tabulated)
+
+- **Rung 5 — idealized GCM** · sphere core + convection/PBL/cloud params + slab ocean + sea ice →
+  aquaplanet GCM. The deferred **Held–Suarez 3-D sphere primitive-eq** test lives here (over-reaches the
+  rung-3 2-layer β-plane). **Leaves the laptop.** → §5 table; [[planet-rung3-scoped]].
+- **Rung 6 — full GCM / ESM** · topography + full moist physics + clouds + ocean GCM + carbon cycle. The
+  infeasible end (compute + context-coherence + validation walls). → §5 table.
+
+### 12.2 Within-rung upgrades on the landed rungs (1–4)
+
+**Rung 1 — two-way coupler (complete):**
+- **TVD/WENO flux limiter** · monotone tracer advection. The SSP-RK3 scheme is non-monotone (Gibbs
+  over/undershoot on sharp fronts). *Unlocks* clean fronts, no spurious extrema. Cost: a limiter in
+  `engines/fluid`. **[named upgrade]** → [[planet-rung1-two-way-coupler]].
+- **Realistic-magnitude eddy κ** · the emergent barotropic `κ~10³` is ~1000× below rung-0's `2.2e6` and
+  config/window-tuned (config can't be separated from physics). The *dimensionless* win moved to rung-3
+  QG; a realistic *dimensional* magnitude on this single-layer engine stays unbankable. **[the wall]** →
+  [[planet-rung1-two-way-coupler]].
+- **Wet-get-wetter precip shape/amplitude** · the position seam (band centre ← jet) is banked; the
+  shape/amplitude refinement stays prescribed. **[named upgrade]** → [[planet-rung1-two-way-coupler]].
+
+**Rung 2 — moist dynamics (complete, incl. 2.5 / 2.x / Hadley fix):**
+- **Derive `R_ATM_SLOPE` (=2 W/m²/K)** · the prescribed atmospheric radiative response (cited-closure;
+  explicitly **not** `B_OLR`, so rung 4 did *not* retire it). **[the wall]** → [[planet-rung2-scoped]].
+- **Derive `HADLEY_STRENGTH`** · the prescribed overturning amplitude that flips the ITCZ sign
+  (convergence-by-construction is plumbing). Needs **gross moist stability (GMS) = rung 3+**. **[the
+  wall]** → [[planet-rung2-hadley-fix]].
+- **Relocate the subtropical desert** · both eddy and Hadley paths leave the dry belt ~12° equatorward of
+  the canonical 25–35° (hyper-peaked C–C `q`); a real fix needs GMS-resolved moisture transport.
+  **[the wall / rung 3+]** → [[planet-rung2-hadley-fix]].
+- **Emergent ITCZ rain** · the ITCZ *position* migrates emergently, but the rain there is still a
+  *prescribed* band relocated in a dry EBM, not emergent precipitation. **[named upgrade]** →
+  [[planet-rung2x-itcz]].
+- **Tighten the ITCZ-migration sensitivity** · the closed-form `δ/AHT` is observed-*order* but factor ~2
+  high (rides the calibrated `D`). **[named refinement]** → [[planet-rung2x-itcz]].
+- **Recalibrate `D_s≈0.30` (rung 2.5)** · re-derive a smaller sensible-heat `D` so the MSE-diffusing EBM
+  matches the dry present contrast with no latent double-count; a single scalar leaves a higher-moment
+  **shape residual** a structured `D(x)` would close. **[the wall + named upgrade]** →
+  [[planet-rung25-mse-diffusion]].
+
+**Rung 3 — baroclinic instability (complete: Phase A linear + Phase B QG flux won):**
+- **N-layer QG** · 2 layers is the minimal honest baroclinic model; N-layer (multi-level vertical
+  structure) is the within-rung upgrade — no cleaner anchor above it, just more cost. **[named upgrade]**
+  → [[planet-rung3-scoped]].
+- **Realistic dimensional κ** · the QG win is **dimensionless + qualitative**; the dimensional κ landing
+  in Earth's band is coincidental + box/drag-dependent. A non-coincidental magnitude needs realistic
+  forcing/geometry = rung 5. **[caveat → rung 5]** → [[planet-rung3-qg-built]].
+
+**Rung 4 — gray radiative transfer (complete):**
+- **Per-latitude EBM wire** · an opt-in sibling `RadiativeEBM` where gray `OLR(Ts,τ)` drives each band →
+  **emergent latitudinal radiative structure** (a crude radiative polar amplification, distinct from the
+  rung-2.5 *transport* one). Cost: re-opens the jointly-tuned `(A,B,D)` calibration (recalibrate `D`, as
+  rung 2.5 did). The natural rung-4 completion. **[left to user call]** → [[planet-rung4-radiation]].
+- **Spectral-band log law** · replace gray's *saturating* concave `OLR(τ)` with band physics → the Myhre
+  **logarithmic** CO₂ law + a realistic forcing magnitude. **[named upgrade]** → [[planet-rung4-radiation]].
+- **Moist-adiabatic lapse-rate feedback** · a variable Γ supplies the `λ_LR≈0.84` the fixed-Γ gray column
+  omits (the gap from the gray net `1.33` up to climlab's `2`). **[named upgrade]** → [[planet-rung4-radiation]].
+- **Clouds** · clear-sky only; cloud feedback out of scope. **[named upgrade]** → [[planet-rung4-radiation]].
+- **Komabayashi–Ingersoll runaway** · the hot analogue of the snowball — a steep WV loading where the
+  linearization breaks (`B` not linearized across it). An exploration, not a build. **[named edge]** →
+  [[planet-rung4-radiation]].
+
+### 12.3 Visualization & interactivity
+
+- **Rung-C GPU advection** · CPU `BufferGeometry` → GPU ping-pong *within* WebGL (renderer-only; the data
+  contract is unchanged). Trigger = particle counts that drop below ~30 fps at GCM resolution. **[named
+  upgrade — seam shifted down]** → [[planet-viz-animation-rungs]].
+- **§9.4 toolkit promotion (rule-of-three)** · promote the shared viz helpers to a toolkit once a third
+  consumer appears; not yet triggered. **[named, not triggered]** → §9.4.
+- **Live notebook widgets** · §2 snowball (live hysteresis / two stable states), §4 winds, §5 jet.
+  Advisor flag: time the continuation/coupler sims first → `continuous_update=False` or precompute before
+  promising "live". **[deferred]** → [[interactive-what-if]].
+- **Browser what-if 3rd axis (obliquity)** · the 2-knob precomputed grid is structured so a tilt axis is a
+  trivial add. **[deferred — ~free]** → [[interactive-what-if]].
+
+### 12.4 Pedagogy (the notebook)
+
+- **Bucket A — predict-then-check** · one hypothesis prompt before each section's slider (concrete prompts
+  already drafted: pole-vs-equator warming, the hysteresis gotcha, desert migration, jet direction).
+  **[deferred — ~free, markdown-only]** → [[pedagogy-novice-intermediate]].
+- **Bucket B — mission cards** · goal-directed challenges read straight off the figure (freeze the planet,
+  make a desert world, find the habitable-zone edges, build an M-dwarf world); missions drafted. **[deferred
+  — cheap]** → [[pedagogy-novice-intermediate]].
+- **Two-world diff** · load two saved specs → Earth-vs-your-world side by side (the layer registry already
+  supports multiple views). A follow-on to the built bucket C. **[deferred — stretch]** →
+  [[pedagogy-novice-intermediate]].
+
+### 12.5 Off-Earth sibling axis — gas giants (feasibility sketch, not built)
+
+The shallow-water / two-layer-QG engines are the same model family the literature uses for gas-giant
+atmospheres. Three tiers, costed in [`docs/explorations/gas-giant-atmosphere.md`](../explorations/gas-giant-atmosphere.md):
+- **Tier 1 — β-plane banded jets** · ≈ one rung on `baroclinic_qg.py`. **[feasibility sketch]**
+- **Tier 2 — sphere-correct globe** · a new geometry engine. **[feasibility sketch]**
+- **Tier 3 — deep convective interior** · Busse-annulus QG + rotating Rayleigh–Bénard are *reduced*
+  laptop-scale entries (a steeper reach, **not** out of scope); only the realistic anelastic-deep-shell +
+  dynamo regime is the wall. **[feasibility sketch]**
+
+### 12.6 Editable geography & seasonality (§5 / §9.3)
+
+- **Cheap tier (rides rungs 0–1)** · elevation → a lapse-rate map diagnostic; land/ocean → an albedo
+  difference; fraction-per-band → continentality-lite. **No engine change — buildable now.** → §9.3.
+- **Seasonal cycle / ocean heat capacity** · annual-mean v1 drops `C` at equilibrium, so thermal lag +
+  continentality need a seasonal cycle first. **[named, not built — the §3 scope edge]** → §9.3.
+- **True 2-D longitudinal geography** · regional climate, orographic precip, rain shadows (the north
+  star) — new transport that **leaves the 1-D engine** = the rung-5 exit from the zonal-mean planet.
+  **[→ rung 5]** → §5.
+
+### 12.7 The spin-out — a separate repo, not an upgrade of this one
+
+- **Editable-ocean GPU project** · a Julia / ClimaOcean + Makie repo born here across a contract seam
+  (R1's serialized, producer-agnostic schema is what it binds on); spin-out steps S1–S5, ECCO ingest at
+  S1. Provisional per the living-staircase rule (§11.4). **[decided — separate repo]** → §11.
