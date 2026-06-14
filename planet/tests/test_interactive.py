@@ -18,6 +18,7 @@ import re
 import pytest
 
 from planet import interactive
+from planet.biomes import Biome
 from planet.obliquity import OBLIQUITY_EARTH
 
 # The slow golden regenerates the whole (S0 × CO2 × tilt) grid of EBM solves and compares the page
@@ -112,6 +113,56 @@ def test_disk_hover_reads_the_biome_band():
     assert 'addEventListener("mousemove"' in html      # follows the cursor over the disk
     assert "D.names[code]" in html                     # names the band it lands on
     assert "getBoundingClientRect" in html             # maps CSS px → canvas px before the |lat| math
+
+
+def test_disk_band_lookup_is_nearest_latitude_not_linear():
+    """The disk must place biome bands by *true nearest* latitude, not a linear index.
+
+    The model grid is equal-area (uniform in sin φ), so the stored latitudes are non-uniform (~2° at
+    the equator → ~6° at the pole, last band ~76°). A linear ``a/latMax·(N−1)`` index drags the warm
+    bands poleward of the true-latitude ice-line ring (forest on the ice cap). Both the fill and the
+    hover must go through one shared nearest-latitude helper so they cannot drift.
+    """
+    html = interactive.build_app_html(interactive.compute_grid(**_SMALL))
+    assert "function bandForLat(" in html              # the shared nearest-latitude helper
+    assert html.count("bandForLat(phi)") >= 2          # used by BOTH the disk fill and the hover
+    assert "latMax) * (N - 1)" not in html             # the broken linear index is gone
+
+
+def _band_for_lat(lat, phi):
+    """Python replica of the page's ``bandForLat``: index of the nearest stored latitude."""
+    a = abs(phi)
+    return min(range(len(lat)), key=lambda m: abs(lat[m] - a))
+
+
+@pytest.mark.parametrize("s0, co2, obl", [
+    (1265.0, 2.0, 35.0),            # the user-flagged dim/tilted cell that painted boreal past the ring
+    (1265.0, 0.0, OBLIQUITY_EARTH), # dim Sun, Earth tilt — ice line drops to ~40°, boreal just inside it
+    (1265.0, 9.0, OBLIQUITY_EARTH), # warmed back up — ice line ~59°, boreal hugging it
+])
+def test_disk_paints_no_forest_on_the_ice_cap(s0, co2, obl):
+    """Render-path guard: replay the pixel→band map and assert no warm biome sits poleward of the ring.
+
+    The bug hid from a *model* scan (the field is correct) because it lived in the *render*. Poleward
+    of the ice line the surface is below −10 °C, so the only valid biome is tundra (boreal ends at the
+    warmer −5 °C isotherm, which is equatorward of the ring). This replays ``drawDisk``'s fixed
+    nearest-latitude lookup over the disk's pixel rows and pins that physics on the screen.
+    """
+    grid = interactive.compute_grid(s0_values=[s0], co2_values=[co2], obliquity_values=[obl])
+    cell, lat, ice = grid["cells"][0], grid["lat"], grid["cells"][0]["ice"]
+    assert 1 < ice < 89, "this cell must have a finite ice cap for the ring to be drawn"
+    R = 144                                            # the shipped disk radius (canvas 300 → R≈144)
+    boreal_phis = []
+    for y in range(R + 1):                             # disk pixel rows, equator (0) → pole (90°)
+        phi = (y / R) * 90.0
+        code = int(cell["biome"][_band_for_lat(lat, phi)])
+        if phi > ice:
+            assert code == int(Biome.TUNDRA), (
+                f"biome {Biome(code).name} painted at |lat|≈{phi:.0f}° — poleward of the {ice:.0f}° "
+                f"ice ring (only tundra is valid below −10 °C)")
+        if code == int(Biome.BOREAL_FOREST):
+            boreal_phis.append(phi)
+    assert max(boreal_phis) < ice                      # the boreal band lies entirely equatorward of the ring
 
 
 @pytest.mark.slow

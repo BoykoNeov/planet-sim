@@ -277,21 +277,29 @@ $("obl-label").textContent = D.axes.obl.label;
 $("legend").innerHTML = Object.keys(D.names).map(k =>
   `<div><i style="background:${D.palette[k]}"></i>${D.names[k]}</div>`).join("");
 
+// |latitude| (deg) → index of the band whose stored latitude is truly nearest. The model grid is
+// equal-area (uniform in sin φ), so the stored latitudes are NOT evenly spaced — ~2° steps near the
+// equator widening to ~6° near the pole, and the last one is only ~76°, not 90°. A linear index
+// (a/latMax·(N−1)) reads a too-equatorward, too-warm band and drags the warm bands poleward —
+// painting forest outside the ice-line ring (which is drawn at its true latitude). Search instead.
+// Shared by the disk fill and the hover read-out so the two can never disagree.
+function bandForLat(phi) {
+  const lat = D.lat, N = lat.length, a = Math.abs(phi);
+  let k = 0, best = Infinity;
+  for (let m = 0; m < N; m++) { const d = Math.abs(lat[m] - a); if (d < best) { best = d; k = m; } }
+  return k;
+}
+
 // --- the planet disk: horizontal biome bands by |latitude|, clipped to a circle, lit for 3D --- #
 function drawDisk(c) {
   const cv = $("disk"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
   const R = Math.min(W, H) / 2 - 6, cx = W / 2, cy = H / 2;
-  const lat = D.lat, N = lat.length, latMax = lat[N - 1];
   ctx.clearRect(0, 0, W, H);
   ctx.save();
   ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.clip();
   for (let y = -R; y <= R; y++) {
-    const phi = (y / R) * 90;                 // top = +90°, bottom = -90°
-    const a = Math.min(Math.abs(phi), latMax);
-    // nearest stored latitude band
-    let k = Math.round((a / latMax) * (N - 1));
-    if (k > N - 1) k = N - 1;
-    const code = c.biome[k];
+    const phi = (y / R) * 90;                 // |lat| band, symmetric top/bottom
+    const code = c.biome[bandForLat(phi)];
     ctx.fillStyle = D.palette[code] || "#888";
     const half = Math.sqrt(Math.max(0, R * R - y * y));
     ctx.fillRect(cx - half, cy + y, 2 * half, 1.2);
@@ -378,12 +386,9 @@ diskEl.addEventListener("mousemove", e => {
   const R = Math.min(W, H) / 2 - 6, cx = W / 2, cy = H / 2;
   const dx = mx - cx, dy = my - cy;
   if (dx * dx + dy * dy > R * R) { tipEl.style.display = "none"; return; }   // outside the globe
-  const lat = D.lat, N = lat.length, latMax = lat[N - 1];
   const phi = (dy / R) * 90;                                     // drawDisk's mapping, exactly
-  const a = Math.min(Math.abs(phi), latMax);
-  let k = Math.round((a / latMax) * (N - 1));
-  if (k < 0) k = 0; if (k > N - 1) k = N - 1;
-  const code = current.biome[k];
+  const a = Math.abs(phi);
+  const code = current.biome[bandForLat(phi)];                   // same nearest-latitude band as the fill
   tipEl.innerHTML = `<i style="background:${D.palette[code]}"></i>${D.names[code]} · ${a.toFixed(0)}°`;
   tipEl.style.display = "block";
   tipEl.style.left = (e.clientX + 14) + "px";
