@@ -64,7 +64,11 @@ omits**: the gray net (1.3) sits *below* climlab's 2 by ~ the Soden & Held lapse
 ``|λ_LR| ≈ 0.84`` (:data:`SH_LAPSE_RATE`) — which a **fixed** convective lapse rate (a uniform profile
 shift under warming) **cannot produce** (climlab's obs-tuned ``B`` folds it, and clouds, in). Every term is
 pinned to an independent feedback estimate, so the decomposition is **non-circular** (the rung-2.5
-frozen-``D_eff`` and ITCZ closed-form attribution flavour, stronger than a bare "trade").
+frozen-``D_eff`` and ITCZ closed-form attribution flavour, stronger than a bare "trade"). **NB the ``0.84``
+here is the *imported* global-mean Soden & Held value — a touchstone for what the fixed-``Γ`` default
+omits; turning the feedback *emergent* (``moist_adiabat=True``, :meth:`feedback_kernel`) gives the
+**tropical** ``≈ 1.5`` and **overshoots** 2 (with-WV ``B ≈ 3.1``), not lands at it — see the lapse-rate
+scope edge below and :mod:`planet.demo_lapse_rate`.**
 
 Triad (plan §3) — what is asserted tight vs loose
 -------------------------------------------------
@@ -73,8 +77,10 @@ Triad (plan §3) — what is asserted tight vs loose
   (energy conservation); and the no-feedback slope sits near the ``4σTₑ³`` Planck touchstone.
 * **The unlock (real but loose).** The emergent ``B`` decomposition (Planck slope ≈ 3.4, a water-vapour
   feedback ≈ 2 dropping the net to ≈ 1.3) — **order-validated** against Soden & Held (2006) (Planck 3.2,
-  ``λ_wv`` 1.8, the residual-to-climlab ≈ the lapse-rate ``λ_LR`` 0.84), **not tuned**. Loose: the exact
-  magnitudes ride on the water-vapour optical-depth loading (:data:`WATER_VAPOUR_FRACTION`), the **wall**.
+  ``λ_wv`` 1.8, the residual-to-climlab ≈ the *imported* global-mean lapse-rate ``λ_LR`` 0.84), **not
+  tuned**. Loose: the exact magnitudes ride on the water-vapour optical-depth loading
+  (:data:`WATER_VAPOUR_FRACTION`), the **wall**. (The *emergent* ``λ_LR`` from a moist adiabat is the
+  **tropical** ``≈ 1.5`` and overshoots — :meth:`feedback_kernel`, the lapse-rate scope edge below.)
 * **Reduction / plumbing.** Near present-day the emergent ``OLR(Ts)`` is **locally affine**, so the
   rung-0 ``A + B·T`` is its tangent line (:func:`linearized_olr`) — they share the operating point by
   calibration and rung-4 *derives* the slope rung-0 *prescribes*.
@@ -174,7 +180,9 @@ WATER_VAPOUR_FRACTION = 0.5         # — the WALL: fraction of the present opti
 # gray net B to climlab's 2 ≈ SH_LAPSE_RATE (the feedback a fixed lapse rate cannot produce).
 SH_PLANCK = 3.2                     # W m⁻² K⁻¹ — |λ₀| (their −3.1…−3.2): the Planck radiative damping
 SH_WATER_VAPOUR = 1.8              # W m⁻² K⁻¹ — λ_wv: the clear-sky water-vapour feedback (largest positive)
-SH_LAPSE_RATE = 0.84               # W m⁻² K⁻¹ — |λ_LR|: the lapse-rate feedback gray's fixed Γ OMITS
+SH_LAPSE_RATE = 0.84               # W m⁻² K⁻¹ — |λ_LR|: the GLOBAL-MEAN lapse-rate feedback gray's fixed Γ
+#                                    OMITS. The emergent moist-adiabat column (feedback_kernel) OVERSHOOTS
+#                                    it (~1.5, the tropical branch) — global-mean touchstone, not a target.
 
 
 def emission_temperature(olr: float = PRESENT_OLR) -> float:

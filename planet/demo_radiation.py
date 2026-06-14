@@ -20,6 +20,9 @@ Three panels:
      tangent — the linear OLR is the *local tangent* of the computed curve.
   2. The decomposition waterfall: climlab's ``B = 2 ≈ Planck slope − water-vapour feedback + the
      lapse-rate feedback the gray column omits`` — every term at a Soden & Held (2006) order, not tuned.
+     **The lapse-rate bar here is the *imported* global-mean ``λ_LR = 0.84``** (a touchstone for what the
+     fixed-``Γ`` column omits). Making that feedback *emergent* (a moist adiabat) gives the **tropical**
+     ``≈ 1.5`` and *overshoots* 2 — that build is :mod:`planet.demo_lapse_rate` (a separate banked figure).
   3. The CO₂ forcing per doubling: it **decreases** at high CO₂ (saturating gray band), not the constant
      per-doubling logarithmic law.
 
@@ -157,6 +160,9 @@ def save_figure(r: RadiationResult) -> Path:
     ax[1].set_ylabel("OLR slope contribution B (W/m²/K)")
     ax[1].set_title(f"climlab's B = Planck − WV + lapse rate = {net:.2f} ≈ {B_OLR:.0f}\n"
                     "(every term at a Soden–Held 2006 order — not tuned)")
+    ax[1].text(0.5, 0.02, "lapse-rate bar = imported global-mean 0.84;\nemergent (moist adiabat) ≈ 1.5, "
+               "overshoots → see demo_lapse_rate", transform=ax[1].transAxes, ha="center", va="bottom",
+               fontsize=6.5, style="italic", color="0.35")
     ax[1].legend(fontsize=8, loc="upper right"); ax[1].grid(alpha=0.3, axis="y")
 
     # Panel 3 — the saturating (non-logarithmic) CO₂ forcing.
