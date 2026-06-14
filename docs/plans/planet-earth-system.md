@@ -1744,6 +1744,71 @@ locked** (`planet/flow_globe.py` generic renderer + `FlowField` contract, `demo_
 `docs/figures/planet-eddy-particles.html`, `NOTICE` with three.js' full MIT body, `planet/vendor/three.min.js`
 r137 UMD, structural + disclaimer tests; the browser play-through handed to the user to eyeball) — see §9.5.
 
+**Rung 4 — BUILT (gray radiative transfer: where the prescribed OLR ``A + B·T`` comes from;
+`planet/radiation.py`, 2026-06-14).** The named wall every rung from 2.5 on cites — **``B`` held fixed** —
+retired: the linear OLR is made **emergent** by a **gray radiative–convective column** (Schwarzschild
+two-stream over an optical depth set by the greenhouse-gas amount), a **sibling** module (``ebm.py``
+untouched, the `moist_ebm`/`sphere_ebm`/`baroclinic_qg` discipline). Built **spike-first**
+(`outputs/rung4_radiation_spike.py`, gitignored) + advisor-pressure-tested **before** the build, which
+**sharpened the headline into a decomposition** (below). Sources pinned at build: the gray-RE closed form
++ the two-stream/Eddington closure → **Pierrehumbert *PoPC* §4 / Goody & Yung**; the present operating
+point (OLR 239, Ts 288, the 33 K greenhouse) → **Trenberth–Fasullo–Kiehl 2009**; the feedback orders the
+emergent slopes are validated against (Planck/λ_wv/λ_LR) → **Soden & Held 2006** (read off the paper's own
+text, local PDF); the logarithmic-CO₂ contrast → **Myhre+ 1998**.
+- **The tight anchor (DERIVED, not recalled — the rung-3 ``K²=2F`` lesson).** The gray-RE closed form is
+  derived in-module from the two-stream equations: ``σT⁴(τ)=½σTe⁴(1+τ)``, skin ``Te/2^¼``, **ground
+  ``σTg⁴=½σTe⁴(2+τ_s)``** (the surface–air discontinuity, *exactly* where a recalled coefficient goes
+  wrong). A numerical two-stream RE solver (`solve_gray_equilibrium`, an independent radiosity relaxation
+  using *no* analytic input) reproduces the profile + skin + **ground** to **~2nd order** in layer
+  thickness with **``OLR=σTe⁴`` machine-exact** (energy conservation) — the FV-engine/C-grid "reproduces
+  analytic" pattern; the ``Tg`` → derived-coefficient convergence is the recalled-coefficient guard.
+- **THE HEADLINE — a DECOMPOSITION, not a trade (advisor's load-bearing reframe).** Present-day energy
+  balance *forces* ``OLR≈ASR≈239``; calibrating ``τ_s`` to the 33 K greenhouse makes the emergent OLR pass
+  through that operating point **by construction**, so gray and ``A+B·T`` agree in *value* at present and
+  **the slope ``B`` is the finding** (``A,B`` linked through the point, ``A=239−B·T̄`` — the *point* is
+  forced, the slope is open, not both recovered independently). The slope **decomposes**: **no-WV
+  ``B≈3.41``** sits at the ``4σTe³≈3.75`` **emission-level Planck touchstone** (the advisor's tight-ish bug
+  guard: ≈3.8 validates the radiative core, ~1.5 = a bug) — **above climlab's 2**; turning **water vapour**
+  on (``τ(Ts)`` via Clausius–Clapeyron, reusing `moist.saturation_specific_humidity`) lifts the emission
+  level to colder air and **subtracts ≈2** (to ~1.33 at the nominal 50% WV loading). So **climlab's ``B=2``
+  ≈ Planck − water-vapour + the lapse-rate feedback the gray column omits** — and every term is
+  **ORDER-VALIDATED against Soden & Held 2006, NOT tuned** (advisor's WV-hardening, sources pinned from the
+  paper itself via the local PDF): no-WV ``3.41`` ≈ Planck ``|λ₀| 3.1–3.2``; the WV feedback ``2.08`` ≈
+  ``λ_wv 1.8`` (clear-sky order); the gray net ``1.33`` ≈ the clear-sky Planck+WV ``3.2−1.8``; and the gap
+  from ``1.33`` to climlab's 2 ≈ the lapse-rate feedback ``|λ_LR| 0.84`` a **fixed** lapse rate (uniform
+  warming) **cannot produce** (climlab's obs-tuned ``B`` folds it + clouds in). The decomposition is thus
+  **non-circular** (the rung-2.5 frozen-``D_eff`` / ITCZ closed-form attribution flavour); the residual
+  tuning lives only in the *exact* magnitudes via `WATER_VAPOUR_FRACTION` (the **wall**).
+- **The named WALL + edges.** The wall = the **gray (band-independent) absorption** + the prescribed
+  **τ↔GHG-column** mapping (calibrated to *order*, not line-by-line — the ``R_ATM_SLOPE``/``HADLEY_STRENGTH``
+  cited-closure status). Edges, each pinned: **CO₂ forcing is SATURATING, not logarithmic** — a gray band
+  gives a concave ``OLR(τ)`` (per-doubling ``ΔF`` 48→53→41→25→20 W/m², *decreasing*, not the constant-per-
+  doubling Myhre log) at an **unrealistic whole-band magnitude** → the log law + realistic magnitude are
+  **band physics = the named within-rung upgrade**; **clear-sky only** (clouds out of scope); **no
+  lapse-rate feedback** — the fixed convective Γ means warming is a uniform profile shift (zero LR
+  feedback), which is *exactly* why the gray net sits below climlab's 2 by ``≈λ_LR`` (a moist-adiabatic Γ
+  is the named upgrade that would supply it); **single column** — wiring ``OLR(Ts,τ)`` *per-latitude* into
+  ``ebm.py`` (real radiation **driving** the climate as an opt-in sibling EBM) is the natural rung-4
+  completion, **left to a user call, NOT foreclosed** — deferred not because the feedback is wrong (at the
+  climlab-matched loading the global-mean ``B`` is 2 exactly) but because the emergent ``OLR(Ts)`` is
+  **nonlinear**, so the per-latitude slope differs (cold pole vs warm equator) and the wire re-opens the
+  meridional profile (a **feature** — emergent latitudinal radiative structure — as much as a risk);
+  **linearization breaks far from present** (a steep WV loading → a Komabayashi–Ingersoll runaway, the hot
+  analogue of the snowball — ``B`` not linearized across it). **Reduction:** near present ``OLR(Ts)`` is **locally affine** (rung-0's line is its tangent, residual
+  <0.5 W/m² over ±3 K; the wide-range curvature *is* the feedback), and feeding climlab's ``B=2`` through
+  the forced point recovers climlab's ``A≈210`` (the ``A/B`` linkage, asserted vs ``ebm.A_OLR``). **Triad:**
+  *tight* — the numerical solver↔analytic gray RE (2nd-order, OLR machine-exact, ground coefficient) + the
+  ``4σTe³`` Planck touchstone; *real-but-loose (the unlock)* — the ``B=Planck−WV`` decomposition (direction
+  banked, magnitude on the WV-loading wall); *plumbing* — present operating point matched by construction +
+  local affinity + the climlab-``(A,B)`` consistency. **Demo banked + CI-guarded** (`planet/demo_radiation.py`
+  → `docs/figures/planet-radiation.png`: emergent OLR + the decomposition **waterfall** (Planck − WV +
+  lapse-rate = 2.17 ≈ climlab's 2) + the saturating forcing; the `slow` `test_demo_reproduces_the_radiation_headline`
+  pins Te, the operating point, the decomposition bracket, the WV-loading recovery, and saturation, and the
+  fast `test_the_decomposition_is_order_validated_against_soden_held` pins the Soden–Held orders). Tests:
+  `planet/tests/test_radiation.py` (14 fast + 1 slow). No engine edit; `uses` unchanged. **Rung 4 core
+  COMPLETE** (the per-latitude EBM wire + the spectral-band log law + a moist-adiabatic lapse-rate feedback
+  = named within-rung upgrades).
+
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
 1969 / North 1975 / climlab defaults). Phase 2 pins **`[[whittaker-biome-source]]`** +
@@ -1751,8 +1816,10 @@ memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` �
 The §9.1 knobs pin their own when built: a **`[[stellar-spectrum-ice-albedo-source]]`** for the
 spectrum-as-albedo-modifier knob, a **`[[obliquity-insolation-source]]`** for the obliquity knob (the
 daily-mean-insolation formula — Hartmann *GPC* §2.7 / Berger 1978 / Rose's climlab notes — and the
-mean-annual Legendre context, Nadeau & McGehee 2017 / North 1975), and (rung 4) a radiative-transfer
-source if spectral radiation is ever computed rather than parameterized.
+mean-annual Legendre context, Nadeau & McGehee 2017 / North 1975). **Rung 4 pins
+[[planet-rung4-radiation]]** (the gray radiative-transfer build — Pierrehumbert *PoPC* §4 / Goody & Yung;
+Trenberth–Fasullo–Kiehl 2009; Soden & Held 2006; Myhre+ 1998); a line-by-line *spectral*-radiation source
+is still future (the named band upgrade).
 
 ## 11. Spin-out roadmap — the editable-ocean GPU project (born here, across a contract seam)
 
