@@ -101,3 +101,39 @@ symmetry of equally-robust mechanisms. Part of the 0.68 is **runaway-proximity**
 stable but near the hot edge). Null = the present *tangent* (uniform `B`, warms uniformly, `amp=1`). Demo `planet/demo_radiative_ebm.py` → `docs/figures/planet-radiative-ebm.png`.
 Remaining within-rung upgrades: spectral-band log law + moist-adiabatic lapse-rate feedback + clouds.
 [[planet-rung25-mse-diffusion]] [[moist-ebm-source]]; plan §10.
+
+---
+
+**Rung-4 lapse-rate feedback BUILT 2026-06-14** (`planet/radiation.py`: `GrayRadiationColumn(moist_adiabat=True)`
++ `moist_adiabat_temperature` + `feedback_kernel` + `LapseRateFeedback`; 9 fast + 1 slow tests
+`test_radiation_lapse_rate.py`, full planet gate green). The §12 within-rung slice that makes the lapse-rate
+feedback **EMERGENT** (rung-4 core had *imported* `λ_LR=0.84` from Soden & Held). Swaps the fixed convective
+`Γ` for a **moist adiabat** (derived by its limits — dry `→g/c_p≈9.8 K/km`, flattens to ~4 when warm) that
+**flattens as it warms** → surface warming amplifies in the upper troposphere (`ΔT_aloft/ΔTs≈2.8` peak) →
+`OLR(Ts)` steepens. **Default-off flag** (`moist_adiabat=False` = bit-for-bit the rung-4-core column).
+Spike-first (`outputs/rung4_lapse_rate_spike.py`, gitignored) + advisor-pressure-tested before AND after.
+
+**THE §12 SCOPED ANCHOR WAS OVERTURNED** (the rung-4-wire "radiative→tropical OVERTURNED" pattern). §12 said
+"supplies `λ_LR≈0.84`, closing the gap from gray net 1.33 to climlab's 2." It does **not**: emergent value
+**≈+1.5**, the moist-adiabat column **OVERSHOOTS** — with-WV `B≈3.1` sits *above* climlab's 2, not at it
+(fixed-Γ default = 1.33, below 2). **Banked TIGHT:** sign (`λ_LR>0`, adds to B); kind (upper-trop
+amplification, **measured** via `ΔT_aloft/ΔTs>1`, not assumed); **kernel closure** (advisor's load-bearing
+design — a ONE-column Soden–Held split: Planck=uniform warming τ-fixed, LR=profile's *departure* from uniform
+τ-fixed, WV=`τ(Ts)` change profile-fixed; sums to `B_total` ~9e-4, **cleaner than a two-column diff** which
+conflates LR with the Planck-base shift); resolution convergence (1.5105→1.5132, n=100→800). **Magnitude
+LOOSE, TWO named reasons (advisor):** (a) single *global* moist-adiabat column = the **TROPICAL** branch only
+(extratropics not moist-adiabatic; the extratropical bottom-heavy-warming branch pulls the global mean to
+0.84) — recovers the tropical feedback NOT the global mean; (b) rides the prescribed vertical `τ` shape +
+`WATER_VAPOUR_FRACTION` (the rung-4 wall, headline at default 0.5), which set the emission level. **Null isn't
+perfectly clean:** fixed-Γ itself shows `≈−0.25` **tropopause-migration residual** (the strat floor doesn't
+warm) — not a true LR feedback. **Reconciliation (mandatory, advisor — docstring updated):** the existing
+`λ_LR≈0.84` is a **global-mean touchstone** for what *fixed*-Γ omits; this emergent value is the **tropical
+branch** — both true about different things. **Two-column cross-check DEMOTED:** `B_WV(moist)−B_WV(fixed)=+1.79`
+= `ΔLR(1.77)+ΔPlanck(−0.01)+ΔWV(+0.03)`, `ΔLR=λ_LR(moist 1.51)−λ_LR(fixed −0.25)` — proves the kernel
+isolated LR (`B_noWV`=**Planck+LR**, NOT kernel Planck — the subtlety that made the two estimates differ;
+advisor's arithmetic correction: their `ΔPlanck=0.24` was really `Δ(Planck+LR)`). **Honesty edge (advisor):**
+clean WV/LR *separation* is partly a model artifact — `τ_wv` tracks SURFACE `Ts` not the profile, so the
+upper-trop moisture–temp coupling that links the two feedbacks in reality is absent. Within-rung upgrades
+left: moist adiabat WITH latitudinal structure on the per-latitude wire (recovers the extratropical branch +
+global mean); spectral-band log law; clouds. Demo `planet/demo_lapse_rate.py` →
+`docs/figures/planet-lapse-rate.png`. [[moist-ebm-source]]; plan §10.

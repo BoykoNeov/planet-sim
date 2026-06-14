@@ -1875,6 +1875,46 @@ text, local PDF); the logarithmic-CO₂ contrast → **Myhre+ 1998**.
   (each named): constant albedo / fixed lapse rate / clear-sky (the within-rung upgrades), uniform ``ΔA``
   forcing not ``ΔS₀``. [[planet-rung4-radiation]]; extends [[moist-ebm-source]] [[ebm-radiation-source]].
 
+**Rung 4 — the emergent lapse-rate feedback BUILT** (2026-06-14, `planet/radiation.py`:
+  `GrayRadiationColumn(moist_adiabat=True)` + `moist_adiabat_temperature` + `feedback_kernel`; 9 fast + 1
+  slow tests; the §12 "moist-adiabatic lapse-rate feedback" slice — the named within-rung upgrade that
+  *retires the omitted feedback* gray's fixed ``Γ`` left out). Swaps the constant convective ``Γ`` for a
+  **moist adiabat** (:func:`moist_adiabatic_lapse_rate`, derived by its limits — dry ``→ g/c_p ≈ 9.8 K/km``,
+  flattening to ``~4`` when warm) that **flattens as it warms**, so surface warming amplifies in the upper
+  troposphere (``ΔT_aloft/ΔTs ≈ 2.8`` peak) and ``OLR(Ts)`` steepens — making the lapse-rate feedback
+  **emergent** where rung 4 had *imported* it from Soden & Held. A **default-off flag** (`moist_adiabat=False`
+  is bit-for-bit the rung-4-core column). Spike-first (`outputs/rung4_lapse_rate_spike.py`, gitignored) +
+  advisor-pressure-tested before + after.
+
+  **THE §12 SCOPED ANCHOR WAS OVERTURNED** (the rung-4-wire "radiative→tropical OVERTURNED" pattern). §12
+  scoped it as "supplies ``λ_LR≈0.84``, closing the gap from the gray net ``1.33`` up to climlab's ``2``." It
+  does **not**: the emergent value is **``≈+1.5``** and the moist-adiabat column **OVERSHOOTS** — its
+  with-water-vapour ``B≈3.1`` sits *above* climlab's 2, not at it. **Banked tight:** the *sign* (``λ_LR>0`` —
+  it adds to ``B``), the *kind* (upper-troposphere amplification, measured not assumed via ``ΔT_aloft/ΔTs>1``),
+  the **kernel closure** (advisor's load-bearing design: a one-column Soden–Held split — Planck = uniform
+  warming, LR = the profile's *departure* from uniform, WV = the ``τ(Ts)`` change — sums to ``B_total`` at
+  ~9e-4, *cleaner* than a two-column difference which conflates LR with the Planck-base shift), and
+  **resolution convergence** (``λ_LR`` 1.5105→1.5132, n=100→800). **Magnitude LOOSE for two named reasons**
+  (advisor): (a) a single *global* moist-adiabat column applies the **tropical** mechanism everywhere, missing
+  the extratropical branch (bottom-heavy warming, opposing sign) that pulls the global mean down to ``0.84`` —
+  so the column recovers the *tropical* feedback, not the global mean; and (b) it rides the prescribed vertical
+  ``τ`` shape + :data:`WATER_VAPOUR_FRACTION` (the rung-4 wall), which set where the emission level sits — the
+  same loading the column's *null* is not perfectly clean about (fixed ``Γ`` itself shows a small ``≈−0.25``
+  **tropopause-migration residual**, not a true lapse-rate feedback). **Reconciliation with the existing
+  decomposition** (mandatory, advisor — else the record self-contradicts): the docstring's ``λ_LR≈0.84`` is a
+  **global-mean touchstone** for what the *fixed*-``Γ`` default omits; this emergent single-column value is
+  the **tropical branch** — both true about different things. **Two-column cross-check demoted** to a
+  consistency check: the ``B_WV(moist)−B_WV(fixed)=+1.79`` reconciles as ``ΔLR(1.77) + ΔPlanck(−0.01) +
+  ΔWV(+0.03)`` where ``ΔLR = λ_LR(moist 1.51) − λ_LR(fixed −0.25)`` — proving the kernel cleanly isolated LR
+  (note ``B_noWV`` is **Planck+LR**, not the kernel Planck, the subtlety that makes the two numbers differ).
+  **Honesty edge (advisor):** the clean WV/LR *separation* is partly a model artifact — here ``τ_wv`` tracks
+  the **surface** ``Ts``, not the profile, so the upper-troposphere moisture–temperature coupling that links
+  the two feedbacks in reality is absent. The remaining within-rung upgrades (a moist adiabat *with*
+  latitudinal structure on the per-latitude wire, recovering the extratropical branch and the global mean;
+  the spectral-band log law; clouds) are named. Demo `planet/demo_lapse_rate.py` →
+  `docs/figures/planet-lapse-rate.png` (the warming-amplification profile, the emergent kernel waterfall,
+  the overturn bars). [[planet-rung4-radiation]]; extends [[moist-ebm-source]].
+
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
 1969 / North 1975 / climlab defaults). Phase 2 pins **`[[whittaker-biome-source]]`** +
@@ -2133,10 +2173,14 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
   band-resolved absorption · *anchor:* per-doubling `ΔF` becomes **constant** (the Myhre log law) at a
   realistic magnitude, vs gray's decreasing 48→…→20 W/m² · *cost:* band physics in the column.
   **[named upgrade]** → [[planet-rung4-radiation]].
-- [ ] **Moist-adiabatic lapse-rate feedback** · *deliverable:* a variable Γ replacing the fixed-Γ gray
-  column · *anchor:* supplies `λ_LR≈0.84` (closing the gap from the gray net `1.33` up to climlab's `2`),
-  order-validated vs Soden & Held 2006 · *cost:* moist adiabat. **[named upgrade]** →
-  [[planet-rung4-radiation]].
+- [x] ~~**Moist-adiabatic lapse-rate feedback**~~ **BUILT 2026-06-14** (`planet/radiation.py`,
+  `moist_adiabat=True` + `feedback_kernel`) — variable-Γ moist adiabat makes the lapse-rate feedback
+  *emergent*. **The §12 anchor was OVERTURNED:** it does **not** supply `λ_LR≈0.84` to land at climlab's 2
+  — it supplies `≈+1.5` and *overshoots* (with-WV `B≈3.1`, *above* 2). Banked tight: sign + kind
+  (upper-trop amplification), kernel closure (Planck+LR+WV=B, ~1e-3), resolution convergence,
+  bit-for-bit reduction at `moist_adiabat=False`. Loose magnitude (two reasons): single *global* column =
+  the *tropical* branch only (misses the extratropical branch that pulls the global mean to 0.84) + rides
+  the τ shape & WV loading (the wall). → §10 rung-4 lapse-rate block; [[planet-rung4-radiation]].
 - [ ] **Clouds** · *deliverable:* a cloud layer in the column (clear-sky today) · *anchor:* clear-sky
   reduction stays exact + cloud feedback order-validated · *cost:* **large** — cloud radiative properties
   + fraction are their own modelling problem, not a one-sitting slice. **[named upgrade — but big]** →

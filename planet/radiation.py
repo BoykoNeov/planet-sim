@@ -92,10 +92,30 @@ to the present greenhouse, not derived from line-by-line spectroscopy — the ci
   (a whole-band perturbation) — the logarithmic law needs **spectral band wings**, the named within-rung
   band upgrade.
 * **Clear-sky only** (no clouds — the dominant real-world feedback uncertainty, out of scope).
-* **No lapse-rate feedback.** The convective lapse rate is **fixed**, so warming is a uniform profile
-  shift — which produces *no* lapse-rate feedback. That is exactly why the gray net ``B ≈ 1.3`` sits
-  below climlab's 2 by ``≈ SH_LAPSE_RATE``; a temperature-dependent (e.g. moist-adiabatic) lapse rate is
-  the named within-rung upgrade that would supply it.
+* **Lapse-rate feedback — now BUILT, opt-in (and it OVERTURNED the scoped magnitude).** The default
+  column's convective lapse rate is **fixed**, so warming is a uniform profile shift and there is *no*
+  lapse-rate feedback — which is why the *default* gray net ``B ≈ 1.3`` sits below climlab's 2. Turning
+  on a **moist adiabat** (``GrayRadiationColumn(moist_adiabat=True)``; :func:`moist_adiabat_temperature`)
+  makes the feedback **emergent**: the adiabat flattens as it warms, so the surface warming amplifies in
+  the upper troposphere and ``OLR(Ts)`` steepens. :meth:`feedback_kernel` measures it (Soden & Held
+  kernel split) and the **sign and kind are banked** (``λ_LR > 0``; kernel closes to ~1e-3; resolution-
+  converged). **But the §12 scoping guess "supplies ``λ_LR ≈ 0.84``, closing the gap to 2" was
+  OVERTURNED:** the emergent value is **``≈ +1.5``**, so the moist-adiabat column **overshoots** — its
+  with-water-vapour ``B ≈ 3.1`` sits *above* climlab's 2, not at it. **Reconciliation** (so the ``0.84``
+  above does not read as a contradiction): the Soden & Held ``0.84`` is the **global-mean** lapse-rate
+  feedback — a touchstone for what the *fixed*-``Γ`` default omits — whereas a single global moist-adiabat
+  column captures only the **tropical** branch (the deep tropics are moist-adiabatic; the extratropics are
+  not), and the tropical local feedback is ~``1.0–1.5`` *before* the model's own loadings push it higher.
+  The magnitude is therefore **loose for two named reasons**: (a) the single column applies the tropical
+  mechanism everywhere, missing the extratropical (bottom-heavy-warming) branch that pulls the global mean
+  down to ``0.84``; and (b) it rides the prescribed vertical ``τ`` shape + :data:`WATER_VAPOUR_FRACTION`
+  (the wall), which set where the emission level sits — the same loading the column's null is not perfectly
+  clean about (fixed ``Γ`` already shows a small ``≈ −0.25`` tropopause-migration residual). Note the
+  clean water-vapour/lapse-rate *separation* in :meth:`feedback_kernel` is partly a model artifact: here
+  ``τ_wv`` tracks the **surface** ``Ts``, not the profile, so the upper-troposphere moisture–temperature
+  coupling that links the two feedbacks in reality is absent. The remaining within-rung upgrades (the
+  per-latitude wire :mod:`planet.radiative_ebm`, a moist-adiabat *with* latitudinal structure) are what
+  would recover the extratropical branch and the global mean.
 * **Single column.** The headline (emergent ``B``, water-vapour feedback, forcing) lives in the column.
   Wiring ``OLR(Ts, τ)`` *per latitude* into :mod:`planet.ebm` — real radiation *driving* the climate as
   an opt-in sibling EBM — is the natural rung-4 completion, **left to a user call** (not foreclosed). It
@@ -119,7 +139,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from planet.moist import saturation_specific_humidity
+from planet.moist import (
+    EPSILON,
+    L_VAPOR,
+    R_VAPOR,
+    saturation_specific_humidity,
+    saturation_vapor_pressure,
+)
 
 # --------------------------------------------------------------------------- #
 # Pinned physical + calibration constants.
@@ -135,6 +161,7 @@ LAPSE_RATE = 6.5e-3                 # K m⁻¹ — convective-adjustment troposp
 STRATOSPHERE_T = 200.0              # K — cold-trap floor (no convective control above the tropopause)
 P_SURFACE = 1.0e5                   # Pa — reference surface pressure
 R_DRY_AIR = 287.0                   # J kg⁻¹ K⁻¹
+C_P_AIR = 1004.0                    # J kg⁻¹ K⁻¹ — specific heat of dry air at constant pressure
 GRAVITY = 9.81                      # m s⁻²
 WATER_VAPOUR_FRACTION = 0.5         # — the WALL: fraction of the present optical depth that is
 #                                     temperature-dependent water vapour (vs well-mixed CO₂). Sets the
@@ -182,6 +209,82 @@ def ground_temperature(tau_s: float, Te: float) -> float:
     converging to it.
     """
     return (0.5 * Te ** 4 * (2.0 + tau_s)) ** 0.25
+
+
+# --------------------------------------------------------------------------- #
+# The moist adiabat — the temperature-dependent lapse rate that supplies the lapse-rate feedback.
+# Derived by its LIMITS, not a recalled coefficient (the rung-3 K²=2F lesson): r_s→0 gives the dry
+# adiabat g/c_p ≈ 9.8 K/km; a warm-moist column flattens toward ~4 K/km (the tropics). Wallace & Hobbs
+# / Holton; the saturated (pseudo-)adiabatic lapse rate.
+# --------------------------------------------------------------------------- #
+def saturated_mixing_ratio(T_kelvin, p_pa):
+    """Saturation mixing ratio ``r_s = ε·e_s/(p − e_s)`` (kg/kg) at the **local** pressure ``p``.
+
+    Built from the Clausius–Clapeyron :func:`planet.moist.saturation_vapor_pressure` at the level's
+    *own* pressure — not :func:`planet.moist.saturation_specific_humidity`, which bakes in a single
+    reference pressure and would be wrong away from the surface.
+    """
+    e_s = saturation_vapor_pressure(np.asarray(T_kelvin, dtype=float) - 273.15)
+    return EPSILON * e_s / np.maximum(p_pa - e_s, 1.0)
+
+
+def moist_adiabatic_lapse_rate(T_kelvin, p_pa):
+    """Saturated moist-adiabatic lapse rate ``Γ_m`` (K m⁻¹) at temperature ``T`` and pressure ``p``.
+
+        Γ_m = g·(1 + L·r_s/(R_d·T)) / (c_p + L²·r_s/(R_v·T²))
+
+    The dry limit ``r_s → 0`` recovers ``g/c_p ≈ 9.8 K/km``; latent-heat release in a warm, moist column
+    (large ``r_s``) flattens it toward ``~4 K/km``. This temperature dependence — a flatter lapse rate
+    when warmer — is the whole mechanism: warming the surface warms the upper troposphere *more*, which
+    is the (negative) lapse-rate feedback a *fixed* ``Γ`` cannot produce.
+    """
+    r_s = saturated_mixing_ratio(T_kelvin, p_pa)
+    num = 1.0 + L_VAPOR * r_s / (R_DRY_AIR * T_kelvin)
+    den = C_P_AIR + L_VAPOR ** 2 * r_s / (R_VAPOR * T_kelvin ** 2)
+    return GRAVITY * num / den
+
+
+def moist_adiabat_temperature(Ts: float, p: np.ndarray, strat_T: float) -> np.ndarray:
+    """Temperature profile ``T(p)`` (K) integrated up a moist adiabat from the surface, capped at ``strat_T``.
+
+    ``p`` is TOA→surface (ascending pressure; index ``-1`` is the surface). Heights use the same fixed
+    scale height as :meth:`GrayRadiationColumn._profile`, so ``moist_adiabat=False`` (a constant ``Γ``)
+    and ``moist_adiabat=True`` (this) are the *same column* differing only in the lapse rate. Integrated
+    upward with a predictor–corrector (Heun) step in height; converged in ``n_levels`` (see the spike).
+    """
+    scale_height = R_DRY_AIR * emission_temperature() / GRAVITY
+    z = scale_height * np.log(P_SURFACE / p)            # z[-1] = 0 at the surface, rising toward the TOA
+    T = np.empty_like(p, dtype=float)
+    T[-1] = Ts
+    for i in range(len(p) - 2, -1, -1):
+        dz = z[i] - z[i + 1]                            # > 0 (going up)
+        g1 = moist_adiabatic_lapse_rate(T[i + 1], p[i + 1])
+        T_pred = T[i + 1] - g1 * dz
+        g2 = moist_adiabatic_lapse_rate(max(T_pred, strat_T), p[i])
+        T[i] = T[i + 1] - 0.5 * (g1 + g2) * dz
+    return np.maximum(T, strat_T)
+
+
+@dataclass(frozen=True)
+class LapseRateFeedback:
+    """Kernel split of the OLR slope ``B = dOLR/dTs`` into Planck + lapse-rate + water-vapour terms.
+
+    The clean (Soden & Held) decomposition on **one** column: ``planck`` is the response to a *uniform*
+    profile warming (τ fixed), ``lapse_rate`` is the response to the profile's *departure* from uniform
+    warming (τ fixed; ``> 0`` and the headline for a moist adiabat, ``≈ 0`` for fixed ``Γ``), and
+    ``water_vapour`` is the response to ``τ(Ts)`` alone (profile fixed; ``< 0``). They sum to ``total``
+    to first order — :attr:`closure_residual` is the (small) second-order remainder.
+    """
+
+    total: float
+    planck: float
+    lapse_rate: float
+    water_vapour: float
+
+    @property
+    def closure_residual(self) -> float:
+        """``total − (planck + lapse_rate + water_vapour)`` — the second-order closure check (≈ 0)."""
+        return self.total - (self.planck + self.lapse_rate + self.water_vapour)
 
 
 def solve_gray_equilibrium(tau_s: float, Te: float, n_layers: int,
@@ -244,6 +347,12 @@ class GrayRadiationColumn:
     when ``water_vapour`` is on. ``total_tau`` is calibrated by :func:`calibrate_column` so
     ``OLR(PRESENT_SURFACE_T) = PRESENT_OLR``; ``wv_fraction`` splits it (the wall). ``co2_factor``
     multiplies only the CO₂ part (the forcing knob).
+
+    ``moist_adiabat`` (default off → bit-for-bit the fixed-``Γ`` column above) swaps the constant ``Γ``
+    for a temperature-dependent moist adiabat (:func:`moist_adiabat_temperature`). That is the **only**
+    knob that lets the column produce a **lapse-rate feedback** (:meth:`feedback_kernel`): a moist adiabat
+    flattens as it warms, so warming the surface warms the upper troposphere *more*, steepening
+    ``OLR(Ts)``. Recalibrate ``total_tau`` for the new profile (``calibrate_column(moist_adiabat=True)``).
     """
 
     total_tau: float
@@ -251,10 +360,17 @@ class GrayRadiationColumn:
     lapse_rate: float = LAPSE_RATE
     strat_T: float = STRATOSPHERE_T
     n_levels: int = 200
+    moist_adiabat: bool = False
 
     def _profile(self, Ts: float):
-        """Pressure levels (TOA→surface, Pa) and the convective temperature profile ``T(p)`` (K)."""
+        """Pressure levels (TOA→surface, Pa) and the convective temperature profile ``T(p)`` (K).
+
+        Fixed ``Γ`` by default; a moist adiabat when ``moist_adiabat`` is on (same heights, same column —
+        only the lapse rate differs, so the off path is bit-for-bit the rung-4-core column).
+        """
         p = np.linspace(0.02 * P_SURFACE, P_SURFACE, self.n_levels)
+        if self.moist_adiabat:
+            return p, moist_adiabat_temperature(Ts, p, self.strat_T)
         scale_height = R_DRY_AIR * emission_temperature() / GRAVITY
         z = scale_height * np.log(P_SURFACE / p)
         return p, np.maximum(Ts - self.lapse_rate * z, self.strat_T)
@@ -271,6 +387,23 @@ class GrayRadiationColumn:
         tau_wv = self.wv_fraction * self.total_tau * wv_scale * (p / P_SURFACE) ** 2
         return tau_co2 + tau_wv
 
+    def _olr_from(self, T: np.ndarray, tau: np.ndarray) -> float:
+        """OLR (W m⁻²) from an *explicit* profile ``T(p)`` (K) and cumulative optical depth ``tau``.
+
+        ``OLR = σT_s⁴ e^(−τ_s) + Σ_layers ε_k σT_k⁴ e^(−τ_top,k)``. Factored out of
+        :meth:`outgoing_longwave` so :meth:`feedback_kernel` can evaluate the OLR for hand-built
+        (profile, τ) pairs — a uniformly-warmed profile at fixed τ, etc. (``T[-1]`` is the surface, which
+        equals ``Ts`` for both the fixed-``Γ`` and moist-adiabat profiles, so this is bit-for-bit the old
+        body for the default column).
+        """
+        dtau = np.diff(tau)
+        eps = 1.0 - np.exp(-dtau)
+        T_layer = 0.5 * (T[:-1] + T[1:])
+        trans_to_top = np.exp(-tau[:-1])
+        surface = STEFAN_BOLTZMANN * float(T[-1]) ** 4 * math.exp(-float(tau[-1]))
+        emitted = np.sum(eps * STEFAN_BOLTZMANN * T_layer ** 4 * trans_to_top)
+        return surface + float(emitted)
+
     def outgoing_longwave(self, Ts: float, co2_factor: float = 1.0, water_vapour: bool = True) -> float:
         """Top-of-atmosphere outgoing longwave ``OLR`` (W m⁻²) by transmission-weighted emission.
 
@@ -281,13 +414,41 @@ class GrayRadiationColumn:
         """
         p, T = self._profile(Ts)
         tau = self._optical_depth(Ts, co2_factor, water_vapour)
-        dtau = np.diff(tau)
-        eps = 1.0 - np.exp(-dtau)
-        T_layer = 0.5 * (T[:-1] + T[1:])
-        trans_to_top = np.exp(-tau[:-1])
-        surface = STEFAN_BOLTZMANN * Ts ** 4 * math.exp(-float(tau[-1]))
-        emitted = np.sum(eps * STEFAN_BOLTZMANN * T_layer ** 4 * trans_to_top)
-        return surface + float(emitted)
+        return self._olr_from(T, tau)
+
+    def feedback_kernel(self, dT: float = 1.0) -> LapseRateFeedback:
+        """Split ``B = dOLR/dTs`` into Planck + lapse-rate + water-vapour terms (Soden & Held kernels).
+
+        On **one** (recalibrated) column, the warming response is decomposed by holding pieces fixed
+        (advisor: cleaner than a two-column difference, which conflates the lapse-rate term with the
+        shift in the Planck base):
+
+        * **Planck** — warm the base profile *uniformly* (``T(p) → T(p) + dT``), ``τ`` frozen at present.
+        * **Lapse rate** — the actual profile's *departure* from that uniform warming, ``τ`` frozen.
+          ``> 0`` for a moist adiabat (upper-troposphere amplification ⇒ steeper ``OLR``), the headline
+          feedback; ``≈ 0`` for fixed ``Γ`` (the null — only a small tropopause-migration residual).
+        * **Water vapour** — the ``τ(Ts)`` change alone, base profile frozen. ``< 0``.
+
+        They sum to the full slope to first order (:attr:`LapseRateFeedback.closure_residual` ≈ 0).
+        """
+        Ts0 = PRESENT_SURFACE_T
+        _, T0 = self._profile(Ts0)
+        tau0 = self._optical_depth(Ts0, 1.0, True)
+
+        total = (self.outgoing_longwave(Ts0 + dT) - self.outgoing_longwave(Ts0 - dT)) / (2.0 * dT)
+        planck = (self._olr_from(T0 + dT, tau0) - self._olr_from(T0 - dT, tau0)) / (2.0 * dT)
+
+        def _olr_profile(Ts):                       # profile responds, τ frozen at present
+            _, T = self._profile(Ts)
+            return self._olr_from(T, tau0)
+        profile = (_olr_profile(Ts0 + dT) - _olr_profile(Ts0 - dT)) / (2.0 * dT)
+        lapse = profile - planck
+
+        def _olr_tau(Ts):                           # τ responds, base profile frozen
+            return self._olr_from(T0, self._optical_depth(Ts, 1.0, True))
+        water_vapour = (_olr_tau(Ts0 + dT) - _olr_tau(Ts0 - dT)) / (2.0 * dT)
+
+        return LapseRateFeedback(total=total, planck=planck, lapse_rate=lapse, water_vapour=water_vapour)
 
     def feedback_slope(self, water_vapour: bool = True, dT: float = 1.0, Ts: float = PRESENT_SURFACE_T) -> float:
         """Emergent OLR slope ``B = dOLR/dTs`` (W m⁻² K⁻¹) by central difference about ``Ts``.
