@@ -16,9 +16,11 @@ header h1 { margin: 0; font-size: 2rem; letter-spacing: -.02em; }
 header p { max-width: 44rem; margin: .5rem auto 0; color: #aeb7cc; }
 main { max-width: 60rem; margin: 0 auto; padding: 1rem 1.2rem 4rem; }
 .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-            gap: 1rem 1.6rem; background: #131a30; border: 1px solid #232c49; border-radius: 12px;
-            padding: 1.1rem 1.3rem; margin-bottom: 1.2rem; }
-.knob label { display: block; font-weight: 600; margin-bottom: .35rem; }
+            align-items: start; gap: 1rem 1.6rem; background: #131a30; border: 1px solid #232c49;
+            border-radius: 12px; padding: 1.1rem 1.3rem; margin-bottom: 1.2rem; }
+/* Pin the label box height so every slider starts at the same y — the three knobs sit on one
+   aligned row — and so a value string that re-wraps the label as you drag can't jog the slider. */
+.knob label { display: block; min-height: 3.4rem; font-weight: 600; margin: 0 0 .35rem; }
 .knob .val { color: #8ab4ff; font-variant-numeric: tabular-nums; }
 .knob .hint { color: #8b95ad; font-size: .82rem; margin-top: .15rem; }
 input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 8px;
@@ -36,8 +38,11 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 .viz { background: #0c1226; border: 1px solid #232c49; border-radius: 12px; padding: 1rem;
        display: flex; gap: 1rem; flex: 1 1 22rem; justify-content: center; }
 .panel { flex: 1 1 18rem; }
-.headline { font-size: 1.2rem; font-weight: 700; margin: .1rem 0 .5rem; }
-.oneline { color: #d6def0; }
+/* Reserve the worst-case prose height (headline ≤2 lines; the one-liner grows a clause per moved
+   knob — up to ~6 lines with all three) so the stats, legend and footer never jump while dragging.
+   `min-height` never clips: a longer string just grows the box, it doesn't hide text. */
+.headline { font-size: 1.2rem; font-weight: 700; margin: .1rem 0 .5rem; min-height: 3.7rem; }
+.oneline { color: #d6def0; min-height: 9.5rem; }
 .more { margin-top: .6rem; }
 .more summary { cursor: pointer; color: #8ab4ff; font-size: .9rem; }
 .more p { color: #c2cbe0; margin: .5rem 0 0; }
@@ -49,6 +54,14 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
           font-size: .82rem; color: #b9c1d6; }
 .legend i { display: inline-block; width: .8rem; height: .8rem; border-radius: 2px;
             margin-right: .4rem; vertical-align: -1px; }
+#disk { cursor: crosshair; }
+/* Hover read-out for the disk: which biome band is under the cursor. position:fixed + pointer
+   events off, so following the mouse never reflows the layout (keeps the page steady, like #2). */
+.tip { position: fixed; z-index: 10; pointer-events: none; display: none; white-space: nowrap;
+       background: #0b1020; color: #e8ecf4; border: 1px solid #2d3a63; border-radius: 6px;
+       padding: .25rem .5rem; font-size: .82rem; box-shadow: 0 2px 8px rgba(0,0,0,.45); }
+.tip i { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px;
+         margin-right: .4rem; vertical-align: -1px; }
 footer { color: #8b95ad; font-size: .88rem; margin-top: 2rem; border-top: 1px solid #232c49;
          padding-top: 1rem; }
 </style>
@@ -99,6 +112,8 @@ footer { color: #8b95ad; font-size: .88rem; margin-top: 2rem; border-top: 1px so
     </div>
   </div>
 
+  <div class="tip" id="tip"></div>
+
   <footer>
     <p>A lookup over a grid of real <code>planet.demo_biomes.compute</code> runs — the same
     validated model behind the figures. Want continuous knobs, live re-runs, and the Snowball's
@@ -115,6 +130,7 @@ const D = window.PLANET_DATA;
 const nS0 = D.axes.s0.values.length, nCo2 = D.axes.co2.values.length, nObl = D.axes.obl.values.length;
 // cells are flattened s0-outermost, co2, then obliquity innermost (compute_grid's loop order)
 const cell = (i, j, k) => D.cells[(i * nCo2 + j) * nObl + k];
+let current = null;   // the cell on screen — the disk-hover read-out names a band from it
 
 const $ = id => document.getElementById(id);
 const s0El = $("s0"), co2El = $("co2"), oblEl = $("obl");
@@ -202,6 +218,7 @@ function drawCurve(c) {
 
 function render() {
   const i = +s0El.value, j = +co2El.value, k = +oblEl.value, c = cell(i, j, k);
+  current = c;
   $("s0-val").textContent = D.axes.s0.values[i] + " " + D.axes.s0.unit;
   $("co2-val").textContent = "+" + D.axes.co2.values[j] + " " + D.axes.co2.unit;
   $("obl-val").textContent = D.axes.obl.values[k] + D.axes.obl.unit;
@@ -217,6 +234,31 @@ function render() {
 s0El.addEventListener("input", render);
 co2El.addEventListener("input", render);
 oblEl.addEventListener("input", render);
+
+// --- hover the disk → name the biome band under the cursor (same |lat|→band map as drawDisk) --- #
+const diskEl = $("disk"), tipEl = $("tip");
+diskEl.addEventListener("mousemove", e => {
+  if (!current) return;
+  const rect = diskEl.getBoundingClientRect();                  // CSS px → canvas px (in case scaled)
+  const mx = (e.clientX - rect.left) * (diskEl.width / rect.width);
+  const my = (e.clientY - rect.top) * (diskEl.height / rect.height);
+  const W = diskEl.width, H = diskEl.height;
+  const R = Math.min(W, H) / 2 - 6, cx = W / 2, cy = H / 2;
+  const dx = mx - cx, dy = my - cy;
+  if (dx * dx + dy * dy > R * R) { tipEl.style.display = "none"; return; }   // outside the globe
+  const lat = D.lat, N = lat.length, latMax = lat[N - 1];
+  const phi = (dy / R) * 90;                                     // drawDisk's mapping, exactly
+  const a = Math.min(Math.abs(phi), latMax);
+  let k = Math.round((a / latMax) * (N - 1));
+  if (k < 0) k = 0; if (k > N - 1) k = N - 1;
+  const code = current.biome[k];
+  tipEl.innerHTML = `<i style="background:${D.palette[code]}"></i>${D.names[code]} · ${a.toFixed(0)}°`;
+  tipEl.style.display = "block";
+  tipEl.style.left = (e.clientX + 14) + "px";
+  tipEl.style.top = (e.clientY + 14) + "px";
+});
+diskEl.addEventListener("mouseleave", () => { tipEl.style.display = "none"; });
+
 render();
 </script>
 </body>

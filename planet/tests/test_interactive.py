@@ -81,6 +81,7 @@ def test_page_is_self_contained_and_deterministic():
     assert 'src="http' not in html
     assert '<canvas id="disk"' in html and '<canvas id="curve"' in html
     assert all(f'id="{knob}"' in html for knob in ("s0", "co2", "obl"))   # all three knob sliders
+    assert 'id="tip"' in html and "mousemove" in html                     # the disk biome-hover read-out
 
 
 def test_inlined_data_round_trips():
@@ -97,6 +98,20 @@ def test_committed_page_is_well_formed():
     assert "http://" not in html and "https://" not in html
     assert '<canvas id="disk"' in html
     assert all(f'id="{knob}"' in html for knob in ("s0", "co2", "obl"))   # all three knob sliders
+    assert 'id="tip"' in html and "mousemove" in html                     # the disk biome-hover read-out
+
+
+def test_disk_hover_reads_the_biome_band():
+    """The disk has a hover read-out: a tooltip element, a mousemove handler, and a name lookup.
+
+    Pins the wiring (element + listener + ``D.names`` lookup) without a browser — the actual
+    cursor→band mapping reuses ``drawDisk``'s math and is eyeballed in the play-through.
+    """
+    html = interactive.build_app_html(interactive.compute_grid(**_SMALL))
+    assert '<div class="tip" id="tip">' in html        # the tooltip element
+    assert 'addEventListener("mousemove"' in html      # follows the cursor over the disk
+    assert "D.names[code]" in html                     # names the band it lands on
+    assert "getBoundingClientRect" in html             # maps CSS px → canvas px before the |lat| math
 
 
 @pytest.mark.slow
