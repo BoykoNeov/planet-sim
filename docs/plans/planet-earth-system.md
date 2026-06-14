@@ -1172,6 +1172,29 @@ reduction/migration/structure + **one** `slow` composition (band follows the eme
 off-centre gradient — the coupler's own jet-tracks-gradient proof is not re-tested), `test_circ_precip.py`.
 No engine edit; `uses` unchanged.
 
+**Rung 1 within-rung — wet-get-wetter, dry-get-drier BUILT (2026-06-14; the §12.2 amplitude slice).**
+`planet/moist.py` gains `wet_get_wetter_precip_field` (+ `_amplify_contrast`, `WetGetWetter`/`wet_get_wetter`):
+the thermodynamic **contrast sharpening** the rung-0 uniform `CC(T̄)` omits. **Home corrected by the advisor:
+`moist.py`, NOT the §12-stated `circ_precip.py`** — the §12 pointer predated the rung-2 build, and this is
+literally the **generalization** of the one-line `energy_constrained_precip_field` (which scales mean+anomaly
+*together* at one rate; this **splits** them — `P = ⟨P⟩·M(T̄) + (pattern−⟨P⟩)·W(T̄)`, the mean `M` at the
+energy-constrained ~2.5 %/K, the anomaly `W` at C–C ~7 %/K). Held & Soden 2006 "rich-get-richer" on the
+precip pattern: under warming the ITCZ/storm-track bands **intensify** while the **deserts dry** (where the
+rung-0 uniform `CC` wrongly wettens them too). **Honesty class (advisor) = a better *prescribed*
+parameterization, NOT derived:** the split *direction* and the two rates are **calibrated/cited** (the
+energy slope is the named sub-grid wall, C–C the moisture-capacity rate); what is **structurally exact** is
+the **mean-zero anomaly split** (`⟨pattern−⟨pattern⟩⟩=0` to machine precision on the equal-area grid ⟹ ⟨P⟩
+scales at the energy rate — **plumbing, by-construction, not a finding**) and the **reduction to BOTH**
+existing fields when the rates coincide (`M=W=CC`→rung-0; `M=W=energy`→energy field). **Opt-in/default-off**
+(rung-0 `precip.py` unchanged), and **deliberately not fused** with the storm-track *position* seam (the
+moisture-budget non-composition rule). Named edges: **global-`T̄`** anomaly factor (local-`q_sat(T(φ))` =
+richer named upgrade); **`P≥0` floor** (deep warming → the dry minima to total aridity, the linearization
+breaks); **thermodynamic only** (the *dynamic* circulation-driven amplification = the moisture-convergence
+path, rung 3+). Demo `planet/demo_wet_get_wetter.py` → `docs/figures/planet-wet-get-wetter.png` (the field
+panel + the ΔP warming response: rung-0 positive everywhere vs wet-get-wetter negative in the subtropics).
+Tests `test_moist.py` (7 fast + 1 `slow` demo guard); no engine edit, `uses` unchanged.
+[[planet-rung1-two-way-coupler]] [[precip-parameterization-source]]; §12.2.
+
 **Rung 2 — SCOPED (design + fork settled; NOT built), 2026-06-11.** The next staircase rung (moist
 dynamics → emergent precipitation) is **scoped and its central fork settled empirically**, ahead of any
 code (the project's spike-first discipline; advisor-pressure-tested twice). **The fork — *where moisture
@@ -2132,10 +2155,22 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
   over-amplify) — so the regression is a **reflection-symmetry** test (peak retention is *bit-identical*
   for ±x/±y on the correct scheme) plus the ±x/±y-parametrized monotone step. **[named upgrade — BUILT]** →
   [[planet-rung1-two-way-coupler]].
-- [ ] **Wet-get-wetter precip shape/amplitude** · *deliverable:* `q`-scaled amplitude in
-  `planet/circ_precip.py` (the band-centre←jet *position* seam is already banked) · *anchor:* amplitude
-  tracks warming with the band centre held fixed (reuses the `jet_lat` seam); rung-0 bit-for-bit at the
-  default · *cost:* prescribed→`q`-scaled shape. **[named upgrade]** → [[planet-rung1-two-way-coupler]].
+- [x] ~~**Wet-get-wetter precip shape/amplitude**~~ **BUILT 2026-06-14** — shipped in **`planet/moist.py`**
+  (`wet_get_wetter_precip_field` + `_amplify_contrast` + `WetGetWetter`/`wet_get_wetter`), **NOT**
+  `circ_precip.py`: the §12 pointer was **stale** (it predated the rung-2 build that added
+  `energy_constrained_factor`); the advisor sited it next to its ingredients, where it is literally the
+  **generalization** of the one-line `energy_constrained_precip_field` (that scales mean+anomaly together
+  at one rate; this **splits** them — mean at the energy rate, the wet−dry anomaly at C–C). Held & Soden
+  2006 "rich-get-richer", on the precip pattern: warming **wettens the ITCZ/storm-track while DRYING the
+  deserts** — fixing the rung-0 uniform-`CC` flaw (it wettens deserts too). **Honesty (advisor):** a
+  better *prescribed* parameterization, **not** derived — the split *direction* and the two cited rates
+  are calibrated; what is structurally exact is the **mean-zero anomaly split** (so ⟨P⟩ scales at the
+  energy rate — plumbing, not a finding) + the **reduction to BOTH** existing fields when the rates
+  coincide. Opt-in/default-off (rung-0 `precip.py` unchanged); **deliberately not fused** with the
+  storm-track position seam (the non-composition rule). Edges: global-`T̄` (local-`q_sat(T(φ))` = richer
+  named upgrade), `P≥0` floor (deep warming → total aridity), thermodynamic-only (dynamic shift = rung 3+).
+  Demo `planet/demo_wet_get_wetter.py` → `docs/figures/planet-wet-get-wetter.png`; tests in `test_moist.py`
+  (7 fast + 1 slow guard). **[named upgrade — BUILT]** → [[planet-rung1-two-way-coupler]].
 
 *Walls / awaits a higher rung:*
 - **Realistic-magnitude eddy κ** · the emergent barotropic `κ~10³` is ~1000× below rung-0's `2.2e6` and

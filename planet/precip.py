@@ -64,14 +64,17 @@ Non-circularity, named scope edge (plan §3)
     observation-calibrated 50°), and for *realistic* knobs the gradient/jet barely moves, so the
     present demo is the **migration mechanism** (decisive only under a synthetic off-centre gradient),
     not a large realistic shift. The **ITCZ/subtropical** centres stay fixed (the Hadley cell is out of
-    the midlatitude channel's band), and **band amplitudes** stay prescribed — the **wet-get-wetter**
-    pattern amplification below is still deferred (it needs the rung-2 moisture convergence).
-  - **Uniform amplitude — no "wet-get-wetter, dry-get-drier".** ``CC(T̄)`` multiplies the *whole*
-    pattern by one factor, so the dry subtropics get **wetter** under warming too. The observed
-    thermodynamic **pattern amplification** (wet regions wetten faster, dry regions dry further) is a
-    *spatial* response v1 does not model — a rung-1/2 enhancement (it needs the local moisture
-    convergence the circulation sets). Named, distinct from the band-migration deferral above (that
-    moves centres; this would sharpen the wet/dry *contrast*).
+    the midlatitude channel's band); the uniform-``CC(T̄)`` **amplitude** is the rung-1
+    *contrast-sharpening* seam, now built opt-in in :mod:`planet.moist` (the bullet below).
+  - **Uniform amplitude here — "wet-get-wetter, dry-get-drier" is the opt-in rung-1 split.** ``CC(T̄)``
+    in *this* module multiplies the *whole* pattern by one factor, so the dry subtropics get **wetter**
+    under warming too — the opposite of observed. The **thermodynamic** pattern amplification (wet bands
+    intensify faster than the mean while the deserts dry — Held & Soden 2006) is **BUILT** as the opt-in
+    :func:`planet.moist.wet_get_wetter_precip_field`: the global *mean* scales at the slow
+    energy-constrained rate, the *anomaly* (the wet−dry contrast) at the faster C–C rate. (The remaining
+    deferral is the **dynamic** amplification — a *changing circulation* sharpening the pattern — which
+    needs the circulation-set moisture convergence, rung 3+.) Named, distinct from the band-migration
+    deferral above (that moves centres; this sharpens the wet/dry *contrast*).
   - **The 7 %/K is moisture-capacity, not the global precip rate.** Global-*mean* precipitation is
     **energy-constrained** to a slower ≈ 2–3 %/K (the atmosphere can only radiate away so much latent
     heating); the C–C 7 %/K is the *moisture-content* rate. v1 scales at the C–C rate as a moisture

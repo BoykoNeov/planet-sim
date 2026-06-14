@@ -144,4 +144,21 @@ where the structure survives, centre ≳ 36°). Tests: fast reduction/migration/
 `test_circ_precip.py`. Full repo gate **214 passed, 1 skip**; no engine edit; `uses` unchanged. See
 [[precip-parameterization-source]], [[planet-phase4-coupler]].
 
+**Within-rung — WET-GET-WETTER, DRY-GET-DRIER BUILT 2026-06-14** (the §12.2 amplitude slice; `planet/moist.py`:
+`wet_get_wetter_precip_field` + `_amplify_contrast` + `WetGetWetter`/`wet_get_wetter`; `test_moist.py` 7 fast +
+1 slow guard; demo `demo_wet_get_wetter.py` → `docs/figures/planet-wet-get-wetter.png`; planet+engines gate 451
+fast green). The thermodynamic contrast-sharpening rung-0's uniform `CC(T̄)` omits. **HOME CORRECTED by advisor:
+`moist.py` NOT the §12-stated `circ_precip.py`** — §12 pointer was STALE (predated the rung-2 build); this is
+literally the GENERALIZATION of the one-line `energy_constrained_precip_field` (scales mean+anomaly *together* at
+one rate → this SPLITS them: `P=⟨P⟩·M(T̄)+(pattern−⟨P⟩)·W(T̄)`, mean `M`=energy ~2.5%/K, anomaly `W`=C–C ~7%/K).
+Held & Soden 2006 "rich-get-richer" on the precip pattern: warming intensifies the ITCZ/storm-track while DRYING
+the deserts (rung-0 uniform `CC` wrongly wettens them too). **Honesty (advisor) = better PRESCRIBED param, NOT
+derived:** the split DIRECTION + the two rates are calibrated/cited; STRUCTURALLY EXACT = the mean-zero anomaly
+split (`⟨pattern−mean⟩=0` machine-precision on the equal-area `x=sinφ` grid ⟹ ⟨P⟩ scales at energy rate =
+PLUMBING by-construction, not a finding) + the reduction to BOTH fields when rates coincide (`M=W=CC`→rung-0;
+`M=W=energy`→energy field). Opt-in/default-off (rung-0 `precip.py` untouched); **deliberately NOT fused** with the
+storm-track position seam (moist.py's non-composition rule — trade×trade). Numbers (ΔT=6): ITCZ +92, desert@25°
+−13 (vs rung-0 uniform +14). Edges: global-`T̄` (local-`q_sat(T(φ))`=richer upgrade), `P≥0` floor (deep warming→
+total aridity), thermodynamic-only (dynamic circ-driven amplification = rung 3+). See [[precip-parameterization-source]].
+
 **NEXT — rung 2 (moist dynamics):** now **SCOPED (not built), 2026-06-11** → see [[planet-rung2-scoped]].

@@ -62,9 +62,14 @@ Scope edges (named)
 * **Midlatitude band only.** Only the storm-track centre is circulation-informed; the **ITCZ and
   subtropical** centres stay prescribed — the midlatitude β-plane channel does not represent the Hadley
   cell (the tropics/subtropics are out of its band).
-* **Position, not amplitude.** The band's amplitude and width stay the prescribed Gaussian; the
-  **wet-get-wetter** pattern amplification stays deferred (scaling amplitude by eddy/jet strength is
-  un-anchored at rung 1 — the Phase-B ``κ`` *magnitude* is itself named-not-banked).
+* **Position, not amplitude (here).** *This* module is the storm-track *position* seam; the band's
+  amplitude and width stay the prescribed Gaussian. The **thermodynamic** wet-get-wetter amplitude
+  (contrast sharpening under warming) is BUILT separately as :func:`planet.moist.wet_get_wetter_precip_field`
+  — an **independent diff** against rung-0, **deliberately not fused** with this position seam (the
+  moisture-budget module's non-composition rule: a circulation-set centre × a contrast-split amplitude is
+  a trade × a trade nothing validates as better than either alone). What stays deferred is the *dynamical*
+  amplitude — scaling by eddy/jet **strength** — which is un-anchored at rung 1 (the Phase-B ``κ``
+  *magnitude* is itself named-not-banked).
 * **Large equatorward displacement merges the storm-track band into the ITCZ.** Moving the centre well
   equatorward (toward ~30°) pushes the Gaussian's tail over the ITCZ and shallows the subtropical
   trough; the band structure holds across the realistic-to-modest range (centre ≳ 36°) but degrades

@@ -30,7 +30,11 @@ not P" below), so they are kept apart:
    the gap ``precip.py`` named. The energy-constrained amplitude (:func:`energy_constrained_factor`,
    :func:`energy_constrained_precip_field`) is **opt-in** and **= 1 at the present reference**, so the
    present-day map is unchanged and rung-0 ``precip.py`` (the 7 %/K) stays the default — exactly as
-   circulation-informed precip stayed opt-in.
+   circulation-informed precip stayed opt-in. Its **generalization** is the **wet-get-wetter, dry-get-drier**
+   contrast split (:func:`wet_get_wetter_precip_field`, the §12 rung-1 slice): rather than scaling the whole
+   pattern at one rate, it scales the **mean** at the energy rate and the **anomaly** (the wet−dry contrast)
+   at the faster C–C rate, so warming sharpens the pattern (the Held & Soden "rich-get-richer", here on the
+   precip *pattern*) — and reduces to *both* rung-0 and the energy field when the two rates coincide.
 
 2. **The emergent moisture budget P−E (the trade — a diagnostic, not the default).** The atmospheric
    water budget in steady state is ``∂/∂t⟨water vapour⟩ = E − P − ∇·(moisture transport) = 0``, so
@@ -150,12 +154,15 @@ Named scope edges
   only: the array-``D(x)`` EBM the rung-1 feedback can drive is a non-goal for the column diagnostic
   (a callable raises). *Latent* today — no current caller feeds a non-default-``D`` climate here; the
   param just makes the consistent path reachable and names the edge.
-* **The two opt-ins do not compose.** :func:`energy_constrained_precip_field` (the rung-2 *rate*) and
+* **The opt-ins do not compose.** :func:`energy_constrained_precip_field` (the rung-2 *rate*),
+  :func:`wet_get_wetter_precip_field` (the rung-1 contrast *amplitude*) and
   :func:`planet.circ_precip.circulation_informed_precip` (the rung-1 storm-track *position*) are each an
   **independent diff against rung-0** — each reduces to the rung-0 field on its own. They are
-  **deliberately not fused**: a circulation-set centre × an energy-constrained amplitude is a *trade ×
-  a trade* that nothing validates as better than either alone, so no helper builds it (compose by hand
-  if ever needed — the seam is unbuilt on purpose).
+  **deliberately not fused**: a circulation-set centre × a thermodynamic amplitude is a *trade × a trade*
+  that nothing validates as better than either alone, so no helper builds the cross-product (compose by
+  hand if ever needed — the seam is unbuilt on purpose). The wet-get-wetter split *supersedes* the
+  uniform energy-rate field (it generalizes it), but both are kept: the uniform field is the simpler
+  mean-rate-only diff.
 
 Units — SI internally; P, P−E reported in **cm/yr** (the Whittaker / ``precip.py`` axis)
 ----------------------------------------------------------------------------------------
@@ -166,7 +173,7 @@ reported as **cm of water per year**; ``x = sin φ`` on [0, 1]; latitudes in deg
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -290,6 +297,133 @@ def energy_constrained_precip_field(state: ClimateState, RH: float = RH_DEFAULT,
     """
     pattern = precip.precip_pattern(state.latitude_deg())
     return pattern * energy_constrained_factor(state.global_mean_T, slope=slope)
+
+
+# --------------------------------------------------------------------------- #
+# Wet-get-wetter, dry-get-drier — the thermodynamic CONTRAST sharpening (opt-in).
+# The §12 rung-1 "wet-get-wetter precip shape/amplitude" slice. The GENERALIZATION of
+# energy_constrained_precip_field: that scales mean + anomaly *together* at one rate; this SPLITS them —
+# the global MEAN at the slow energy-constrained rate (~2.5 %/K), the ANOMALY (the wet−dry contrast) at
+# the faster Clausius–Clapeyron moisture rate (~7 %/K) — so warming sharpens the pattern. Held & Soden
+# 2006 "rich-get-richer" (the P−E scaling), here on the precip *pattern*.
+# --------------------------------------------------------------------------- #
+def _amplify_contrast(pattern: np.ndarray, mean_factor: float, anom_factor: float) -> np.ndarray:
+    """The wet-get-wetter split ``⟨P⟩·mean_factor + (P − ⟨P⟩)·anom_factor``, floored at 0 (cm/yr).
+
+    Decomposes the precipitation ``pattern`` into its **global mean** ``⟨P⟩ = mean(pattern)`` (a plain
+    ``np.mean``: the area mean on the equal-area ``x = sin φ`` grid, where ``Δx`` = equal area) and its
+    **anomaly** ``pattern − ⟨P⟩`` (the wet−dry spatial structure), then scales the two by **separate**
+    amplitude factors. The anomaly is **exactly mean-zero by construction**, so the area mean of the
+    result is ``⟨P⟩·mean_factor`` — *except where the floor bites* (deep warming drives the dry minima
+    below 0, clamped to total aridity).
+
+    With ``mean_factor == anom_factor`` this is exactly ``pattern · factor`` (uniform scaling; the floor
+    is a no-op on the non-negative pattern), so it **generalizes both** rung-0
+    :func:`planet.precip.precip_field` (both = the C–C factor) and :func:`energy_constrained_precip_field`
+    (both = the energy factor) — the split (mean = energy, anomaly = C–C) is the new content.
+    """
+    pbar = float(np.mean(pattern))                                   # ⟨P⟩ on the equal-area grid
+    return np.maximum(pbar * mean_factor + (pattern - pbar) * anom_factor, 0.0)
+
+
+def wet_get_wetter_precip_field(state: ClimateState, RH: float = RH_DEFAULT,
+                                slope: float = R_ATM_SLOPE) -> np.ndarray:
+    """Opt-in precipitation ``P(φ)`` (cm/yr) with **wet-get-wetter, dry-get-drier** contrast sharpening.
+
+    Like :func:`energy_constrained_precip_field`, but the global mean and the spatial **anomaly** warm at
+    **different** rates (:func:`_amplify_contrast`): the mean at the energy-constrained
+    :func:`energy_constrained_factor` (~2.5 %/K), the anomaly at the faster Clausius–Clapeyron
+    :func:`planet.precip.clausius_clapeyron_factor` (~7 %/K). So under warming the **wet bands intensify
+    faster than the mean while the dry subtropics dry** — the observed Held & Soden 2006 "rich-get-richer"
+    pattern, which the rung-0 *uniform* C–C amplitude gets **backwards** (it wettens the deserts too).
+    Reduces to :func:`planet.precip.precip_field` **bit-for-bit at the present reference temperature**
+    (both factors = 1 there, so ``P = pattern``); the opt-in rung-1 amplitude, rung-0 ``precip.py`` stays
+    the default. ``RH`` is unused (the pattern is prescribed) and kept for signature parallelism.
+
+    **Honesty class — a better *prescribed* parameterization, not a derived field (the ``precip.py``
+    class).** The split *direction* (the contrast grows faster than the mean) is the **prescription**,
+    not a finding; the two rates are **cited closures** (the energy-constrained slope is the named
+    sub-grid wall ``R_ATM_SLOPE``; the C–C 7 %/K is the moisture-capacity rate). What is structurally
+    exact is the **mean-zero anomaly split** (so the area mean scales at the energy rate) and the
+    **reduction** to both existing fields when the two rates coincide. Named edges: the **global-``T̄``**
+    anomaly factor (a *local* ``q_sat(T(φ))`` scaling is the richer named upgrade — :mod:`planet.precip`
+    blesses global-``T̄`` as "the simpler member"); the ``P ≥ 0`` **floor** (deep warming drives the dry
+    minima to total aridity — the linearization breaks); and **thermodynamic only** (fixed circulation —
+    the *dynamic* pattern shift is the moisture-convergence path / rung 3+). Deliberately **not fused**
+    with the rung-1 storm-track *position* seam (:mod:`planet.circ_precip`) — each is an independent diff
+    against rung-0 (the moisture-budget module's non-composition rule).
+
+    **The named overreach — it is a tropical/subtropical idealization, and it DRIES THE POLES (wrong
+    sign).** Scaling *every* below-mean anomaly at the C–C rate dries **all** latitudes drier than the
+    global mean — including the **high latitudes** (``P ≈ 20 ≪ ⟨P⟩``), which drop *harder* than the
+    deserts. But observed/projected high-latitude precipitation **increases** under warming (a robust
+    poleward-moisture-transport + C–C-on-a-low-base signal). "Wet-get-wetter, dry-get-drier" is a
+    **tropical/subtropical (Hadley) concept**; decomposing around the *global* mean and applying it
+    poleward overreaches into the regime where the real response is **dynamic and opposite** — so the
+    field is right in the subtropics (deserts dry) and **wrong at the poles** (a rung-3+ dynamic effect
+    this prescribed split cannot carry). Pinned, not papered (the ``test_subtropical_evaporative_belt``
+    discipline): :func:`planet.tests.test_moist` asserts the pole-drying as the known-wrong edge.
+    """
+    pattern = precip.precip_pattern(state.latitude_deg())
+    mean_factor = energy_constrained_factor(state.global_mean_T, slope=slope)
+    anom_factor = precip.clausius_clapeyron_factor(state.global_mean_T)
+    return _amplify_contrast(pattern, mean_factor, anom_factor)
+
+
+@dataclass(frozen=True)
+class WetGetWetter:
+    """The wet-get-wetter trade made tangible: rung-0 *uniform* C–C vs the contrast-split field (plain arrays).
+
+    All precip fields are cm/yr on the climate's own ``phi`` grid (deg). ``precip_present`` is the rung-0
+    field at the present ``T̄`` (the warming baseline); ``precip_uniform`` the rung-0 *uniform* C–C field
+    at ``T̄ + delta_T`` (the deserts wetten — the rung-0 flaw); ``precip_wgw`` the contrast-split
+    :func:`wet_get_wetter_precip_field` at the same warming. The headline numbers are *changes vs the
+    present field* at the two diagnostic latitudes: ``itcz_change_wgw`` (the equatorial ITCZ peak, ``> 0``
+    — wet-get-wetter) and ``subtropics_change_wgw`` (the subtropical trough, ``< 0`` — dry-get-drier),
+    contrasted with ``subtropics_change_uniform`` (``> 0`` — the rung-0 desert wettens). ``subtropics_lat``
+    is the trough latitude (deg) the changes are read at.
+    """
+
+    phi: np.ndarray
+    precip_present: np.ndarray
+    precip_uniform: np.ndarray
+    precip_wgw: np.ndarray
+    delta_T: float
+    subtropics_lat: float
+    itcz_change_wgw: float
+    subtropics_change_wgw: float
+    subtropics_change_uniform: float
+
+
+def wet_get_wetter(state: ClimateState, delta_T: float = 6.0, RH: float = RH_DEFAULT,
+                   slope: float = R_ATM_SLOPE) -> WetGetWetter:
+    """Build the :class:`WetGetWetter` trade for a climate warmed ``delta_T`` (K) above its present ``T̄``.
+
+    Pairs the rung-0 *uniform* C–C field (:func:`planet.precip.precip_field`) with the contrast-split
+    :func:`wet_get_wetter_precip_field` at the warmed global-mean temperature, and reports the headline
+    changes vs the present field: the **ITCZ peak wettens** under both, but only the wet-get-wetter field
+    **dries the subtropical trough** (the uniform field wettens it — the rung-0 flaw). A **pure
+    diagnostic** (``replace`` makes a warmed copy; ``state`` and the climate are untouched). The
+    subtropical trough latitude is found from the prescribed pattern shape (T-independent).
+    """
+    warm = replace(state, global_mean_T=state.global_mean_T + float(delta_T))
+    phi = state.latitude_deg()
+    present = precip.precip_field(state)
+    uniform = precip.precip_field(warm)
+    wgw = wet_get_wetter_precip_field(warm, RH=RH, slope=slope)
+
+    # The subtropical trough: the local precip minimum equatorward of the storm-track band (the deserts),
+    # read off the prescribed pattern shape (T-independent). The polar floor is excluded (φ < midlat band).
+    band = (phi > 8.0) & (phi < precip.MIDLAT_CENTER_DEG)
+    sub_idx = int(np.flatnonzero(band)[np.argmin(precip.precip_pattern(phi[band]))])
+    itcz_idx = int(np.argmin(np.abs(phi)))                          # the ITCZ peak (equatormost latitude)
+    return WetGetWetter(
+        phi=phi, precip_present=present, precip_uniform=uniform, precip_wgw=wgw, delta_T=float(delta_T),
+        subtropics_lat=float(phi[sub_idx]),
+        itcz_change_wgw=float(wgw[itcz_idx] - present[itcz_idx]),
+        subtropics_change_wgw=float(wgw[sub_idx] - present[sub_idx]),
+        subtropics_change_uniform=float(uniform[sub_idx] - present[sub_idx]),
+    )
 
 
 # --------------------------------------------------------------------------- #

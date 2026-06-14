@@ -134,6 +134,101 @@ def test_energy_factor_floored_nonnegative_in_deep_cooling():
 
 
 # --------------------------------------------------------------------------- #
+# WET-GET-WETTER (the §12 rung-1 slice) — honesty class = a better *prescribed* parameterization, NOT
+# derived. STRUCTURAL (tight): the mean-zero anomaly split + the reduction to BOTH existing fields when
+# the rates coincide + unity-at-reference. PLUMBING (by-construction): ⟨P⟩ scales at the energy rate
+# (it *follows* from the mean-zero split — the rate is the prescription, not a finding). BENCHMARK
+# (loose, qualitative-direction): the wet bands wetten while the deserts dry — the rung-0 uniform C–C
+# gets the deserts backwards. The split direction and the two rates are calibrated/cited, not validated.
+# --------------------------------------------------------------------------- #
+def test_anomaly_split_generalizes_both_existing_fields_when_rates_coincide():
+    # The split ⟨P⟩·M + (P−⟨P⟩)·W collapses to uniform scaling P·factor when M == W, so it reproduces
+    # BOTH rung-0 (factor = C–C) and the energy-constrained field (factor = energy) — the structural
+    # anchor that confirms it is the generalization of energy_constrained_precip_field (~1e-12 reassoc).
+    st = replace(present_day_climate(EBMParams()), global_mean_T=22.0)   # off-reference: factors ≠ 1
+    pattern = precip.precip_pattern(st.latitude_deg())
+    cc = precip.clausius_clapeyron_factor(st.global_mean_T)
+    en = moist.energy_constrained_factor(st.global_mean_T)
+    assert np.allclose(moist._amplify_contrast(pattern, cc, cc), precip.precip_field(st))
+    assert np.allclose(moist._amplify_contrast(pattern, en, en),
+                       moist.energy_constrained_precip_field(st))
+    # the split (mean = energy, anomaly = C–C) is genuinely different from either uniform field
+    assert not np.allclose(moist.wet_get_wetter_precip_field(st), precip.precip_field(st))
+
+
+def test_anomaly_is_mean_zero_so_the_global_mean_scales_at_the_energy_rate(climate):
+    # The structurally-exact leg: pattern − ⟨pattern⟩ has zero area mean on the equal-area (uniform-Δx
+    # sin φ) grid to machine precision. ⟨P_wgw⟩ = ⟨P⟩·energy_factor then FOLLOWS (plumbing, not a
+    # finding) — checked in the unclamped (modest-warming) regime where the P ≥ 0 floor does not bite.
+    pattern = precip.precip_pattern(climate.latitude_deg())
+    assert abs(float(np.mean(pattern - np.mean(pattern)))) < 1e-9
+    warm = replace(climate, global_mean_T=climate.global_mean_T + 4.0)   # unclamped (no dry cell < 0)
+    wgw = moist.wet_get_wetter_precip_field(warm)
+    assert np.all(wgw > 0.0)                                             # floor inactive at this warming
+    pbar = float(np.mean(precip.precip_pattern(warm.latitude_deg())))
+    assert float(np.mean(wgw)) == pytest.approx(
+        pbar * moist.energy_constrained_factor(warm.global_mean_T), rel=1e-12)
+
+
+def test_reduces_to_rung0_pattern_at_the_reference_temperature():
+    # Both amplitudes = 1 at the present reference ⟹ P = pattern (the by-construction reduction; the
+    # opt-in is invisible at present, like energy_constrained_precip_field / precip.py).
+    st = replace(present_day_climate(EBMParams()), global_mean_T=precip.PRECIP_REF_TEMP_C)
+    assert np.allclose(moist.wet_get_wetter_precip_field(st), precip.precip_field(st))
+
+
+def test_wet_get_wetter_dries_the_deserts_where_rung0_wettens_them(climate):
+    # THE headline (loose, qualitative): under warming the ITCZ wettens AND the subtropical desert dries
+    # — whereas the rung-0 *uniform* C–C wettens the desert too (the flaw this slice fixes). ΔT chosen so
+    # the absolute drying unambiguously bites (the advisor's magnitude caveat — at tiny ΔT the desert may
+    # still wetten, just slower than rung-0).
+    w = moist.wet_get_wetter(climate, delta_T=6.0)
+    assert w.itcz_change_wgw > 0.0                       # wet-get-wetter: the ITCZ peak intensifies
+    assert w.subtropics_change_wgw < 0.0                 # dry-get-drier: the desert dries (absolute)
+    assert w.subtropics_change_uniform > 0.0             # the rung-0 flaw: uniform C–C wettens the desert
+    assert 20.0 < w.subtropics_lat < 35.0               # the trough sits in the canonical subtropics
+    # the desert ends up drier under wet-get-wetter than under the rung-0 uniform field, by construction
+    sub = int(np.argmin(np.abs(w.phi - w.subtropics_lat)))
+    assert w.precip_wgw[sub] < w.precip_uniform[sub]
+
+
+def test_high_latitudes_dry_the_named_overreach_edge(climate):
+    # Named overreach (sibling of test_subtropical_evaporative_belt_is_not_reproduced): the contrast
+    # split dries EVERY below-mean latitude — including the poles, which sit far below ⟨P⟩, so they dry
+    # *harder* than the deserts. But observed high-latitude P INCREASES under warming (a dynamic
+    # poleward-transport effect, rung 3+) — so "wet-get-wetter, dry-get-drier" is a tropical/subtropical
+    # idealization that is WRONG at the poles. Pinned as the known-wrong edge, not papered over.
+    phi = climate.latitude_deg()
+    warm = replace(climate, global_mean_T=climate.global_mean_T + 6.0)
+    present = precip.precip_field(climate)
+    wgw = moist.wet_get_wetter_precip_field(warm)
+    pole = int(np.argmax(phi))
+    assert wgw[pole] < present[pole]                            # the model dries the pole (the overreach)
+    assert precip.precip_field(warm)[pole] > present[pole]      # rung-0 uniform C–C wettens it (real-er)
+    # the pole dries at least as hard as the subtropical desert — the overreach is not a small residual
+    sub = int(np.argmin(np.where((phi > 8.0) & (phi < precip.MIDLAT_CENTER_DEG),
+                                 precip.precip_pattern(phi), np.inf)))
+    assert (present[pole] - wgw[pole]) >= (present[sub] - wgw[sub])
+
+
+def test_wet_get_wetter_floors_at_zero_in_deep_warming_named_edge(climate):
+    # Named edge: the linearized anomaly amplification drives the dry minima below 0 under strong warming
+    # (the linearization breaks) — clamped to total aridity, so P ≥ 0 stays physical (Whittaker needs it).
+    warm = replace(climate, global_mean_T=climate.global_mean_T + 12.0)
+    wgw = moist.wet_get_wetter_precip_field(warm)
+    assert np.all(wgw >= 0.0)
+    assert float(wgw.min()) == 0.0                       # some latitude reaches total aridity
+
+
+def test_wet_get_wetter_is_a_pure_diagnostic(climate):
+    # the builder does not mutate the climate; its "present" leg is exactly the rung-0 field (the baseline)
+    before = climate.global_mean_T
+    w = moist.wet_get_wetter(climate)
+    assert climate.global_mean_T == before
+    assert np.array_equal(w.precip_present, precip.precip_field(climate))
+
+
+# --------------------------------------------------------------------------- #
 # TRANSPORT D — the consistent path for a non-default-D world (the §9.1 size knob / two_way_pass).
 # ClimateState carries no D, so the diagnostic defaults to rung-0 D; the optional param threads the
 # climate's own D so moisture diffuses with the coefficient its temperature did.
@@ -326,3 +421,17 @@ def test_demo_reproduces_the_hadley_fix_headline():
     assert abs(r.net_full) < 1e-9                               # water conserved (a budget, not a band)
     assert 0.04 < r.itcz_rate < 0.09                            # emergent ~C–C rate ("rich-get-richer")
     assert r.itcz_rate > r.energy_rate                          # faster than the global-mean rate
+
+
+@pytest.mark.slow
+def test_demo_reproduces_the_wet_get_wetter_headline():
+    # Guards the committed figure (planet-wet-get-wetter.png): a fresh clone reproduces the headline —
+    # the ITCZ wettens while the desert DRIES (where the rung-0 uniform C–C wettens it), and the
+    # global mean still scales at the slow energy rate (the conserving leg).
+    from planet import demo_wet_get_wetter as demo
+    w = demo.compute()
+    assert w.itcz_change_wgw > 0.0                              # wet-get-wetter (the wet band intensifies)
+    assert w.subtropics_change_wgw < 0.0                       # dry-get-drier (the desert dries, absolute)
+    assert w.subtropics_change_uniform > 0.0                   # the rung-0 flaw: uniform C–C wettens it
+    assert 20.0 < w.subtropics_lat < 35.0                      # the trough is the canonical subtropics
+    assert np.all(w.precip_wgw >= 0.0)                         # physical at the demo warming (floor inactive)
