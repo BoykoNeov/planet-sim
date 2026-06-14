@@ -584,7 +584,19 @@ def _field_caption(view: PlanetView, active: str) -> str:
     circulation overlay is painted (the coupler map). These globes carry no formula, so this is pure
     relabel-don't-append (the eddy-globe exemplar's formula-gloss rule simply has nothing to restore here).
     """
-    parts = ["<b>How to read it.</b> " + _FIELD_GLOSS.get(active, f"Colour is the <b>{active}</b> field.")]
+    gloss = _FIELD_GLOSS.get(active, f"Colour is the <b>{active}</b> field.")
+    # Honest-by-DEFAULT for a serialized flow view (§R1): its VECTOR_OVERLAY layer carries its own
+    # `honesty` string (the coverage/provenance seam). The zonal-mean "one climate per circle of latitude"
+    # + "emergent jet" clauses below are FALSE for a longitudinally-structured field, so a flow view's
+    # caption is built from its honesty — *without* the caller having to remember `render(caption=...)`,
+    # in the one project that polices exactly this band-vs-globe overclaim. The coupler's circulation_layer
+    # carries no `honesty`, so its emergent-jet caption (below) is unchanged.
+    flow = next((ly for ly in view.ordered()
+                 if ly.kind is LayerKind.VECTOR_OVERLAY and ly.style.get("honesty")), None)
+    if flow is not None:
+        return _wrap_html(f"<b>How to read it.</b> {gloss} The arrows trace the <b>(u, v) flow</b>. "
+                          + str(flow.style["honesty"]), width=104)
+    parts = ["<b>How to read it.</b> " + gloss]
     parts.append("This globe is <b>zonal-mean</b>, so it paints <b>latitude bands, not east-west "
                  "geography</b> — every point on a circle of latitude shares one climate (continents and "
                  "oceans arrive at a later rung).")
@@ -609,11 +621,11 @@ def render(view: PlanetView, active: str = "biome", caption: str | None = None):
     renderer is **generic over** :class:`LayerKind` — it dispatches, it does not special-case a phase —
     so registering a new scalar or annotation layer needs no edit here (ADR 0004 #1).
 
-    ``caption`` overrides the bottom caption. It defaults to :func:`_field_caption`, whose
-    zonal-mean-bands honesty edge is correct for the biome-map family but **wrong** for a
-    longitudinally-structured field (the serialized vector flow fields, §R1): such a caller passes its
-    own honest caption (e.g. the field's coverage/honesty text). The geometry renderer is unchanged —
-    only the prose the view cannot self-describe is made pluggable.
+    ``caption`` **overrides** the bottom caption (default :func:`_field_caption`). The default is already
+    honest-by-construction per view family — the zonal-mean bands edge for the biome family, and a
+    flow view's own ``honesty`` string for a serialized vector field (§R1, so a bare ``render()`` of a
+    loaded flow field cannot silently publish the band-vs-globe overclaim) — so ``caption`` is for
+    nicer prose, not a load-bearing honesty requirement. The geometry renderer is unchanged.
 
     ``VECTOR_OVERLAY`` layers are painted as flow arrows (:func:`_vector_overlay_trace` — Plotly cones on
     the sphere-tangent plane) — the Phase-4 machinery the seam deferred through Phases 1–3. Requires the

@@ -206,6 +206,30 @@ def test_both_producers_render_through_one_generic_renderer():
         assert kinds[fs.VECTOR_LAYER] is pm.LayerKind.VECTOR_OVERLAY
 
 
+def test_bare_render_caption_of_a_flow_view_is_honest_by_default():
+    # The honesty-by-DEFAULT guard: a flow view's VECTOR_OVERLAY carries `honesty`, so _field_caption uses
+    # it WITHOUT the caller remembering caption= — a bare render() cannot silently publish the zonal-mean
+    # band-vs-globe lie. (The single words below are token-safe against the caption's <br> word-wrapping.)
+    view = fs.vector_view_from_flow_field(_band_flow_field(), provenance=PROV_EDDY)
+    cap = pm._field_caption(view, fs.SPEED_LAYER).lower()
+    assert "band" in cap and "reverses" in cap                    # the field's OWN honesty string
+    assert "continents" not in cap                                # the zonal-mean clause is gone
+    assert "emergent" not in cap                                  # the "emergent jet" clause is gone
+
+
+def test_field_caption_without_honesty_keeps_the_zonal_mean_jet_clause():
+    # The discriminator + coupler regression guard: a VECTOR_OVERLAY with NO `honesty` in its style (the
+    # zonal-mean circulation_layer) keeps the emergent-jet + zonal-mean caption unchanged.
+    grid = pm.Grid(np.linspace(-90.0, 90.0, 9), np.linspace(-180.0, 180.0, 5))
+    view = pm.PlanetView(grid, (
+        pm.Layer("speed", pm.LayerKind.SCALAR_FIELD, np.ones((9, 5)), "m/s", {}, z_order=0),
+        pm.Layer("circulation", pm.LayerKind.VECTOR_OVERLAY,
+                 np.stack([np.ones((9, 5)), np.zeros((9, 5))]), "m/s", {"colorscale": "RdBu_r"}, z_order=2),
+    ))
+    cap = pm._field_caption(view, "speed").lower()
+    assert "emergent" in cap and "zonal-mean" in cap
+
+
 def test_saved_html_carries_the_honest_caption_not_the_zonal_mean_one(tmp_path):
     pytest.importorskip("plotly")
     view = fs.vector_view_from_flow_field(fs.synthetic_flow_field(), provenance=PROV_SYN)

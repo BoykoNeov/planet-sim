@@ -163,9 +163,11 @@ def vector_view_from_flow_field(field: FlowField, *, provenance: str,
               style=vec_style, z_order=2),
     ]
     if scalar is not None:
-        layers.insert(1, Layer(SCALAR_LAYER, LayerKind.SCALAR_FIELD, scalar,
-                               str(field.scalar_label or "scalar"),
-                               style={"colorscale": "RdBu_r"}, z_order=1))
+        # `scalar_label` ("θ (°C)") is a display label, not a unit — it rides in the colorbar title; the
+        # unit slot stays honest (FlowField carries no separate unit string, §7 is unit-obsessive).
+        layers.insert(1, Layer(SCALAR_LAYER, LayerKind.SCALAR_FIELD, scalar, "",
+                               style={"colorscale": "RdBu_r",
+                                      "colorbar_title": str(field.scalar_label or "scalar")}, z_order=1))
     return PlanetView(grid=grid, layers=tuple(layers))
 
 

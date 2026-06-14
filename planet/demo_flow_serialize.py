@@ -69,34 +69,31 @@ def main() -> None:
 
     # --- producer 1: a synthetic GLOBAL field (the committed globe; needs no sim) ------------------ #
     synthetic = fs.synthetic_flow_field()
-    syn_spec = _round_trip(synthetic, PROV_SYNTHETIC, "flow-synthetic")
+    syn_spec = _round_trip(synthetic, PROV_SYNTHETIC, "flow-synthetic")   # asserts the round-trip (loud)
     print(f"  synthetic global : is_global=True   round-trip load(save)==spec  ✓   "
           f"({len(syn_spec.layers)} layers)")
 
     # --- producer 2: the model's REAL emergent eddy band (runs the short sim) ---------------------- #
-    try:
-        from . import demo_eddy_life
-        from .flow_globe import flow_field_from_eddy
-        eddy = demo_eddy_life.compute(nx=NX, ny=NY, n_frames=N_FRAMES).eddy
-        eddy_field = flow_field_from_eddy(eddy)
-        eddy_spec = _round_trip(eddy_field, PROV_EDDY, "flow-eddy")
-        cov = eddy_spec.view().layer(fs.VECTOR_LAYER).style["coverage"]
-        print(f"  real eddy band   : is_global={cov['is_global']}  round-trip load(save)==spec  ✓   "
-              f"(NH sector {cov['lat_min']:.0f}–{cov['lat_max']:.0f}° lat, zeros elsewhere)")
-    except Exception as exc:                          # the eddy leg is the optional, sim-bearing one
-        eddy_field = eddy_spec = None
-        print(f"  real eddy band   : skipped ({type(exc).__name__}: {exc})")
+    # Unguarded on purpose: _round_trip ASSERTS load(save)==spec, and a real round-trip regression must
+    # surface, not be swallowed as "skipped" — the eddy sim runs on core (no optional dep to guard).
+    from . import demo_eddy_life
+    from .flow_globe import flow_field_from_eddy
+    eddy_field = flow_field_from_eddy(demo_eddy_life.compute(nx=NX, ny=NY, n_frames=N_FRAMES).eddy)
+    eddy_spec = _round_trip(eddy_field, PROV_EDDY, "flow-eddy")
+    cov = eddy_spec.view().layer(fs.VECTOR_LAYER).style["coverage"]
+    print(f"  real eddy band   : is_global={cov['is_global']}  round-trip load(save)==spec  ✓   "
+          f"(NH sector {cov['lat_min']:.0f}–{cov['lat_max']:.0f}° lat, zeros elsewhere)")
 
     print("\n  → both producers serialize into the SAME schema and round-trip identically;")
     print("    coverage-extent (is_global) is only exercised because one producer is non-global.\n")
 
     # --- render both through the ONE generic renderer (cones); commit the synthetic globe ---------- #
+    # Only the render needs Plotly ([webviz]); the round-trip proof above already ran on bare core.
     try:
         saved = _render_globe(syn_spec, synthetic, DOCS_FIGURE)
         print(f"Synthetic-global globe saved → {saved.relative_to(_REPO_ROOT)}")
-        if eddy_spec is not None:
-            eddy_html = _render_globe(eddy_spec, eddy_field, OUTPUTS / "planet-flow-eddy.html")
-            print(f"Real eddy-band globe saved   → {eddy_html.relative_to(_REPO_ROOT)} (gitignored)")
+        eddy_html = _render_globe(eddy_spec, eddy_field, OUTPUTS / "planet-flow-eddy.html")
+        print(f"Real eddy-band globe saved   → {eddy_html.relative_to(_REPO_ROOT)} (gitignored)")
     except ImportError:
         print("(plotly not installed — install the webviz extra to render the globes: "
               "pip install -e .[webviz])")
