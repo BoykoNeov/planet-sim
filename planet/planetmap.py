@@ -426,14 +426,33 @@ def _hovertext(grid: Grid, layer: Layer) -> np.ndarray:
     return np.vectorize(fmt)(LAT, LON, val)
 
 
+_ARROW_LEN = 0.13                # cone length on the unit sphere — direction only (magnitude is the surface)
+_ARROW_LIFT = 1.04               # base radius: lift cones clear of the r=1 surface so they are not occluded
+
+
 def _vector_overlay_trace(go, grid: Grid, layer: Layer):
     """A Plotly ``Cone`` trace painting a ``VECTOR_OVERLAY`` velocity field as flow arrows on the globe.
 
     ``layer.data`` is the stacked ``(2, n_lat, n_lon)`` horizontal velocity ``[u, v]`` (m/s). At each
     (sub-sampled) cell the eastward/northward components are rotated onto the **sphere-tangent** 3-D
     directions (east ``ê_λ``, north ``ê_φ``) and drawn as a cone (arrowhead) just above the surface, so
-    a band of eastward cones at mid-latitudes *is* the emergent westerly jet. Cones are coloured by
-    wind speed. This is the machinery the ``VECTOR_OVERLAY`` seam deferred to Phase 4 (ADR 0004 #1)."""
+    a band of eastward cones at mid-latitudes *is* the emergent westerly jet. The cone is a **direction**
+    glyph — each vector is normalized to a fixed visible length (:data:`_ARROW_LEN`), since the magnitude
+    is already the speed surface beneath it (or, for the coupler jet, the layer label). This is the
+    machinery the ``VECTOR_OVERLAY`` seam deferred to Phase 4 (ADR 0004 #1).
+
+    Two non-obvious choices, both fixing the *global*-field failure mode (a band-only jet never hit them,
+    so they surfaced only when a full-globe producer — the §R1 interchange — first drove this path):
+
+    * **The poles are skipped** (``|cos φ| ≈ 0``). On a grid that *reaches* ±90° every longitude collapses
+      onto one xyz point, so successive cone anchors there are **coincident**. Plotly sizes cones by
+      ``norm × factor × sizeref`` with ``factor`` = the *minimum* distance between successive anchors
+      (over the velocity) — one coincident pair drives ``factor → 0`` and **every cone in the trace
+      vanishes**. Dropping the degenerate polar rows keeps that factor non-degenerate.
+    * **``sizemode="raw"``** (not the default ``"scaled"``): the cone length is the *actual* vector
+      length, so with vectors normalized to :data:`_ARROW_LEN` each arrow is a fixed, predictable size on
+      the unit sphere — independent of the wind range and of that internal ``factor`` entirely.
+    """
     u_field, v_field = np.asarray(layer.data[0], dtype=float), np.asarray(layer.data[1], dtype=float)
     lat = np.radians(grid.lat)
     lon = np.radians(grid.lon)
@@ -441,23 +460,29 @@ def _vector_overlay_trace(go, grid: Grid, layer: Layer):
     sj = max(1, lat.size // 16)
     si = max(1, lon.size // 12)
     xs, ys, zs, us, vs, ws = [], [], [], [], [], []
-    umax = float(np.max(np.abs(u_field))) or 1.0
+    speedmax = float(np.max(np.hypot(u_field, v_field))) or 1.0
     for j in range(0, lat.size, sj):
+        if abs(np.cos(lat[j])) < 1e-3:            # a degenerate polar row (all longitudes coincide) — skip
+            continue
         for i in range(0, lon.size, si):
             u, v = u_field[j, i], v_field[j, i]
-            if abs(u) + abs(v) < 0.05 * umax:
+            speed = float(np.hypot(u, v))
+            if speed < 0.05 * speedmax:
                 continue
             la, lo = lat[j], lon[i]
             east = np.array([-np.sin(lo), np.cos(lo), 0.0])
             north = np.array([-np.sin(la) * np.cos(lo), -np.sin(la) * np.sin(lo), np.cos(la)])
-            pos = 1.02 * np.array([np.cos(la) * np.cos(lo), np.cos(la) * np.sin(lo), np.sin(la)])
-            vec = u * east + v * north
+            pos = _ARROW_LIFT * np.array([np.cos(la) * np.cos(lo), np.cos(la) * np.sin(lo), np.sin(la)])
+            vec = (u * east + v * north) / speed * _ARROW_LEN     # unit direction, fixed visible length
             xs.append(pos[0]); ys.append(pos[1]); zs.append(pos[2])
             us.append(vec[0]); vs.append(vec[1]); ws.append(vec[2])
+    # a single-colour scale so the arrows honour `arrow_color` (cones default to colouring by norm, which
+    # is meaningless now that every arrow is unit-length); showscale off — the surface owns the colorbar.
+    color = layer.style.get("arrow_color", "#1a1a1a")
     return go.Cone(
         x=xs, y=ys, z=zs, u=us, v=vs, w=ws,
-        colorscale=layer.style.get("colorscale", "RdBu_r"), showscale=False,
-        sizemode="scaled", sizeref=0.8, anchor="tail",
+        colorscale=[[0.0, color], [1.0, color]], showscale=False,
+        sizemode="raw", sizeref=1.0, anchor="tail",
         name=layer.style.get("label", layer.name), hoverinfo="name",
     )
 

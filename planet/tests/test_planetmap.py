@@ -324,6 +324,30 @@ def test_render_paints_the_circulation_vector_overlay():
     assert "Cone" in kinds                            # the Phase-4 circulation overlay (now painted)
 
 
+def test_vector_overlay_global_field_has_no_collapsed_pole_cones():
+    # Regression (§R1): a full-globe flow that REACHES the poles must still paint visible arrows. On a
+    # grid spanning ±90° every longitude collapses onto one xyz point at the pole, so coincident cone
+    # anchors there drove Plotly's internal size factor to 0 and EVERY cone vanished — a band-only jet
+    # never hit this, so it surfaced only when a global producer (the interchange) first drove this path.
+    go = pytest.importorskip("plotly.graph_objects")
+    lat = np.linspace(-90.0, 90.0, 37)                       # reaches the poles — the degenerate case
+    lon = np.linspace(-180.0, 180.0, 73)
+    LON, LAT = np.meshgrid(np.radians(lon), np.radians(lat))
+    u = 20.0 * np.cos(2 * LAT)
+    v = 6.0 * np.cos(LAT) * np.sin(3 * LON)                  # genuine meridional flow (v exercised too)
+    layer = pm.Layer("circulation", pm.LayerKind.VECTOR_OVERLAY, np.stack([u, v]), "m/s",
+                     style={"arrow_color": "#1a1a1a"})
+    trace = pm._vector_overlay_trace(go, pm.Grid(lat=lat, lon=lon), layer)
+    pos = np.column_stack([np.asarray(trace.x), np.asarray(trace.y), np.asarray(trace.z)])
+    assert pos.shape[0] > 0                                  # cones were produced
+    assert not (np.hypot(pos[:, 0], pos[:, 1]) < 1e-3).any()  # no anchor on the pole axis (x=y=0)
+    steps = np.linalg.norm(np.diff(pos, axis=0), axis=1)
+    assert steps.min() > 1e-6                                # no coincident successive anchors → factor ≠ 0
+    vec = np.column_stack([np.asarray(trace.u), np.asarray(trace.v), np.asarray(trace.w)])
+    assert np.allclose(np.linalg.norm(vec, axis=1), pm._ARROW_LEN)   # fixed-length direction glyphs
+    assert trace.sizemode == "raw"                           # actual length, immune to the size factor
+
+
 def test_render_unknown_active_layer_raises_keyerror():
     pytest.importorskip("plotly.graph_objects")
     with pytest.raises(KeyError):
