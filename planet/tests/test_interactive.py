@@ -7,7 +7,7 @@ Two tiers, like the rest of the repo:
   few model runs), so they run in the always-on lane.
 * **slow** — the committed ``docs/interactive/index.html`` equals a fresh full-grid generation, so a
   change to the model or the page that isn't re-banked fails the gate. Marked ``slow`` because it
-  reruns the whole knob grid (tens of seconds).
+  reruns the whole (S0 × CO2 × tilt) knob grid (a few thousand model solves, minutes).
 """
 from __future__ import annotations
 
@@ -18,25 +18,31 @@ import re
 import pytest
 
 from planet import interactive
+from planet.obliquity import OBLIQUITY_EARTH
 
-# The slow golden regenerates 408 EBM solves and compares the page byte-for-byte. That is safe as a
-# *local* drift guard (it runs on the machine that banked the page), but fragile cross-platform: a
-# last-bit LAPACK difference on the Linux CI runner — especially one that flips a digit in a 60-char
-# biome string near a Whittaker threshold — would fail the comparison for a non-bug. So, exactly like
-# the notebook smoke-test, it is skipped in CI; the fast structural tests below cover correctness
-# there. The local full gate still runs it. (REMOVE if the page is ever generated deterministically
-# cross-platform, e.g. from a committed grid artifact rather than a live re-solve.)
+# The slow golden regenerates the whole (S0 × CO2 × tilt) grid of EBM solves and compares the page
+# byte-for-byte. That is safe as a *local* drift guard (it runs on the machine that banked the page),
+# but fragile cross-platform: a last-bit LAPACK difference on the Linux CI runner — especially one
+# that flips a digit in a biome string near a Whittaker threshold — would fail the comparison for a
+# non-bug. So, exactly like the notebook smoke-test, it is skipped in CI; the fast structural tests
+# below cover correctness there. The local full gate still runs it. (REMOVE if the page is ever
+# generated deterministically cross-platform, e.g. from a committed grid artifact rather than a live
+# re-solve.)
 _SKIP_IN_CI = os.environ.get("CI", "").lower() in {"true", "1"}
 
-# A tiny grid whose (0,0) cell is the exact Earth detent (S0=1365, CO2=0) → the baseline message.
-_SMALL = dict(s0_values=[1365.0, 1375.0], co2_values=[0.0, 2.0])
+# A tiny grid whose (0,0,0) cell is the exact Earth detent (S0=1365, CO2=0, tilt=23.44°) → the
+# baseline message. The obliquity axis must carry the exact OBLIQUITY_EARTH float as its first value
+# (not a typed 23.44) so the obliquity factor is exactly 1 there and s₂ is bit-identical to the model.
+_SMALL = dict(s0_values=[1365.0, 1375.0], co2_values=[0.0, 2.0],
+              obliquity_values=[OBLIQUITY_EARTH, 45.0])
 
 
 def test_compute_grid_shape():
     grid = interactive.compute_grid(**_SMALL)
-    assert len(grid["cells"]) == 4                         # 2 × 2
+    assert len(grid["cells"]) == 8                         # 2 × 2 × 2
     assert grid["axes"]["s0"]["values"] == [1365.0, 1375.0]
     assert grid["axes"]["co2"]["default_index"] == 0
+    assert grid["axes"]["obl"]["default_index"] == 0       # OBLIQUITY_EARTH is the first tilt value
     assert len(grid["lat"]) == len(grid["cells"][0]["temp"]) == len(grid["cells"][0]["biome"])
     assert set(grid["palette"]) == set(grid["names"])      # a colour for every named biome
     cell = grid["cells"][0]
@@ -45,9 +51,24 @@ def test_compute_grid_shape():
 
 def test_earth_detent_is_the_baseline():
     grid = interactive.compute_grid(**_SMALL)
-    earth = grid["cells"][0]                                # (s0=1365, co2=0)
+    earth = grid["cells"][0]                                # (s0=1365, co2=0, tilt=Earth)
     assert "baseline" in earth["headline"].lower()
     assert 13.0 < earth["Tbar"] < 16.0
+
+
+def test_obliquity_axis_moves_the_climate():
+    """A flatter sky (less tilt) starves the poles → more ice and a cooler planet than Earth's tilt.
+
+    Holds the Sun and greenhouse at present-day and walks only the tilt, so the (S0, CO2) detent is
+    fixed and the response is the obliquity knob alone — the s₂(ε) gradient steepening at low tilt.
+    """
+    grid = interactive.compute_grid(s0_values=[1365.0], co2_values=[0.0],
+                                    obliquity_values=[0.0, OBLIQUITY_EARTH])
+    flat, earth = grid["cells"][0], grid["cells"][1]       # tilt = 0°, then Earth's 23.44°
+    assert flat["ice"] < earth["ice"]                      # an untilted world has more polar ice
+    assert flat["Tbar"] < earth["Tbar"]                    # and runs colder (stronger ice-albedo)
+    assert "tilt" in flat["paragraph"].lower()             # the prose names the obliquity knob
+    assert "baseline" in earth["headline"].lower()         # Earth's tilt at the detent stays baseline
 
 
 def test_page_is_self_contained_and_deterministic():
@@ -79,8 +100,9 @@ def test_committed_page_is_well_formed():
 @pytest.mark.slow
 @pytest.mark.skipif(
     _SKIP_IN_CI,
-    reason="byte-exact over 408 live EBM solves — fragile cross-platform (LAPACK last-bit near a "
-    "Whittaker biome threshold); a local-only drift guard. Fast structural tests cover CI.",
+    reason="byte-exact over the full (S0 × CO2 × tilt) grid of live EBM solves — fragile cross-platform "
+    "(LAPACK last-bit near a Whittaker biome threshold); a local-only drift guard. Fast structural "
+    "tests cover CI.",
 )
 def test_committed_page_is_up_to_date():
     """docs/interactive/index.html must equal a fresh full-grid build (re-run `python -m planet.interactive`)."""

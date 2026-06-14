@@ -2325,16 +2325,26 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
 
 ### 12.3 Visualization & interactivity
 
-- **Rung-C GPU advection** · CPU `BufferGeometry` → GPU ping-pong *within* WebGL (renderer-only; the data
-  contract is unchanged). Trigger = particle counts that drop below ~30 fps at GCM resolution. **[named
-  upgrade — seam shifted down]** → [[planet-viz-animation-rungs]].
+- [x] ~~**Rung-C GPU advection**~~ **BUILT 2026-06-13** (`planet/flow_globe.py`) — the named seam shipped
+  **ahead of** its <~30 fps trigger (user-requested): advection now runs entirely on the GPU by default
+  (RGBA32F state texture, off-screen `UPDATE_FS` ping-pong, `DRAW_VS` reads positions from the state tex),
+  the CPU `BufferGeometry` loop demoted to a runtime fallback (WebGL can't run in CI → feature-detect +
+  GLSL compile-validate + console diagnostics, so a GPU failure degrades to a working globe). Renderer-only:
+  `FlowField`/`_build_data`/disclaimer/carve-out all unchanged. Full build record in §9.5; 7th structural
+  test pins both pipelines. **[shipped — seam closed]** → [[planet-viz-animation-rungs]].
 - **§9.4 toolkit promotion (rule-of-three)** · promote the shared viz helpers to a toolkit once a third
   consumer appears; not yet triggered. **[named, not triggered]** → §9.4.
 - **Live notebook widgets** · §2 snowball (live hysteresis / two stable states), §4 winds, §5 jet.
   Advisor flag: time the continuation/coupler sims first → `continuous_update=False` or precompute before
   promising "live". **[deferred]** → [[interactive-what-if]].
-- **Browser what-if 3rd axis (obliquity)** · the 2-knob precomputed grid is structured so a tilt axis is a
-  trivial add. **[deferred — ~free]** → [[interactive-what-if]].
+- [x] ~~**Browser what-if 3rd axis (obliquity)**~~ **BUILT 2026-06-14** (`planet/interactive.py`) — the
+  precomputed grid gained a third axis: a tilt slider over 0…45° (9 values, capped at
+  `OBLIQUITY_FAITHFUL_MAX`, the exact `OBLIQUITY_EARTH` float included so the detent stays bit-for-bit),
+  wired through `obliquity_params` → `EBMParams.s2` and narrated by the *existing* `explain.py` `obliquity_deg`
+  rules (no prose work — it already handled the knob). As predicted it touched only the data axis: S0/CO2
+  untouched (S0 keeps the snowball cliff + detent), `_LAT_STRIDE` 3→6 (free, 30 lats indistinguishable on a
+  300px canvas) keeps the page ~4 MB (≈ the eddy-globe precedent). `cells[(i·nCo2 + j)·nObl + k]`; cells
+  ≈3.7 k, the slow byte-golden stays CI-skipped. **[shipped — ~free, as scoped]** → [[interactive-what-if]].
 
 ### 12.4 Pedagogy (the notebook)
 

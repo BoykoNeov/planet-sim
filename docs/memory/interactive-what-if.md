@@ -17,10 +17,10 @@ the real user front door.
   *computed* deltas (never overclaims). Two depths: `oneline` causal chain + `paragraph` mechanism.
   `Knobs`/`Diagnostics`/`diagnose()`/`explain()`. Used live in the notebook AND baked into the
   browser page → can't drift.
-- `planet/interactive.py` → `docs/interactive/index.html` — no-install browser what-if (2 knobs:
-  Sun S0 × Greenhouse CO2). Self-contained: data **inlined** (file:// blocks fetch), vanilla canvas
-  (latitude-banded planet disk + T(lat) curve), no CDN. `python -m planet interactive`; hero card on
-  the landing page. Wired in `__main__`/`site.py`/README.
+- `planet/interactive.py` → `docs/interactive/index.html` — no-install browser what-if (originally 2 knobs:
+  Sun S0 × Greenhouse CO2; **3rd axis obliquity/tilt BUILT 2026-06-14**, see below). Self-contained: data
+  **inlined** (file:// blocks fetch), vanilla canvas (latitude-banded planet disk + T(lat) curve), no CDN.
+  `python -m planet interactive`; hero card on the landing page. Wired in `__main__`/`site.py`/README.
 - Notebook: §3 + §7 what-ifs render `explain_panel()` (live on every drag) in place of terse prints;
   `KNOB_STYLE` (gold non-white handle + `description_width:"initial"` so labels stop truncating) on
   §1/§3/§7 sliders; **all code cells `source_hidden`** (collapsed by default). Re-banked via a clean
@@ -32,8 +32,25 @@ the real user front door.
   on S0=1365, CO2=0. Snowball cliff lives between S0≈1245→1265 (drag freezes the planet).
 - Hysteresis can't be a lookup → browser **names** the path-dependence and defers the live two-branch
   demo to the notebook §2 (use `present_day_climate(ic_equator, ic_pole)` for warm/cold starts).
-- Explanations baked in Python (no JS climate rules) → no drift. 2-knob v1 is structured so a 3rd
+- Explanations baked in Python (no JS climate rules) → no drift. 2-knob v1 was structured so a 3rd
   axis (tilt) is a trivial add; D/star/size stay in the notebook bench.
+
+**3rd axis — obliquity/tilt — BUILT 2026-06-14** (was the "[deferred — ~free]" §12.3 item; built it +
+reconciled the *stale* §12.3 "Rung-C GPU advection" line in the same pass — GPU ping-pong had already
+shipped 2026-06-13, the backlog read pending). The trivial-add prediction **held**: only the data axis
+moved. A tilt slider over **0…45°, 9 values, capped at `OBLIQUITY_FAITHFUL_MAX`** (reuse the constant so
+it can't drift from the plots.py faithful-band shade), **including the exact `OBLIQUITY_EARTH` float** so
+the obliquity factor is exactly 1 there → `s2` bit-identical → the (1365, 0, 23.44°) cell stays the
+baseline. Wired `obliquity_params(obl, EBMParams(...))` → `EBMParams.s2`; narrated by the **existing**
+`explain.py` `obliquity_deg` rules (it already carried the knob → **zero prose work**, confirmed before
+building). Advisor's load-bearing call = **axis SHAPE, not size, is the constraint**: S0 has the snowball
+cliff + Earth detent → **left S0/CO2 untouched**; obliquity is smooth/cliff-free → coarse 9 is plenty.
+Size held ~4 MB (≈ the eddy-globe precedent) via **`_LAT_STRIDE` 3→6** (free — 30 lats indistinguishable on
+a 300px canvas), *not* axis-coarsening (regression risk) or prose-dedup (complexity, exact-number prose has
+few true dupes). JS decode `cells[(i·nCo2 + j)·nObl + k]` must track the `for s0: for co2: for obl` loop
+order. Grid ≈3.7 k solves (~10 min regen); slow byte-golden stays CI-skipped; +1 fast test
+(`test_obliquity_axis_moves_the_climate`: flat 0° world → more ice + colder than Earth's tilt; prose names
+the knob). D/star/size still notebook-only.
 - The slow byte-exact golden (`test_committed_page_is_up_to_date`) is **CI-gated** (`_SKIP_IN_CI`)
   like the notebook test — 408 live EBM solves compared byte-for-byte is fragile cross-platform
   (LAPACK last-bit near a Whittaker threshold flips a biome-string digit). Fast structural tests

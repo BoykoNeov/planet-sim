@@ -1,9 +1,9 @@
 """Generate ``docs/interactive/index.html`` — the **no-install** browser what-if.
 
-The user-facing front door for *experimentation*: drag two knobs (the Sun's brightness and the
-greenhouse strength) and watch the planet's climate, its biome bands, and a plain-language
-*what changed + why* explanation update **instantly** — no Jupyter, no Python, no install. It
-opens straight off disk and serves from GitHub Pages the same way the existing globes do.
+The user-facing front door for *experimentation*: drag three knobs (the Sun's brightness, the
+greenhouse strength, and the axial tilt) and watch the planet's climate, its biome bands, and a
+plain-language *what changed + why* explanation update **instantly** — no Jupyter, no Python, no
+install. It opens straight off disk and serves from GitHub Pages the same way the existing globes do.
 
 How it stays honest (the repo's whole character):
 
@@ -37,16 +37,25 @@ from planet.biomes import BIOME_COLORS, BIOME_NAMES, Biome
 from planet.catalog import _REPO_ROOT
 from planet.demo_biomes import compute
 from planet.explain import Knobs, diagnose, explain
+from planet.obliquity import OBLIQUITY_EARTH, OBLIQUITY_FAITHFUL_MAX, obliquity_params
 
 APP_PATH = _REPO_ROOT / "docs" / "interactive" / "index.html"
 
-# --- the grid (the two browser knobs) --------------------------------------------------------- #
+# --- the grid (the three browser knobs) ------------------------------------------------------- #
 # S0 spans dim→bright and lands an exact Earth detent on 1365 (1365 = 1235 + 13·10); the low end
 # crosses the Snowball cliff (~1250) so dragging the Sun can freeze the planet. CO2 warming is a
 # cut in the OLR offset A (demo_biomes' convention), 0→16 W/m² (present-day → ice-free hothouse).
+# Obliquity (axial tilt) is the third axis: an untilted 0° world (s₂ = −5/8, the steepest insolation
+# gradient, coldest poles) up to the single-P₂ knob's faithful cap (OBLIQUITY_FAITHFUL_MAX = 45°,
+# beyond which the dropped s₄ grows — the obliquity.py "scope edge"). Unlike S0 it is smooth and
+# cliff-free, so a coarse 9-value axis captures the whole trend (it triples the grid, not 24×). The
+# exact OBLIQUITY_EARTH float is included so Earth's tilt recovers the model bit-for-bit (the
+# obliquity factor is exactly 1 there → s₂ unchanged → the (1365, 0, 23.44°) cell is the baseline).
 S0_VALUES = [1235.0 + 10.0 * i for i in range(24)]        # 1235 … 1465, 24 steps, includes 1365
 CO2_VALUES = [float(i) for i in range(0, 17)]             # 0 … 16 W/m², 17 steps, includes 0
-_LAT_STRIDE = 3                                           # 180 model latitudes → 60 (equator→pole)
+OBLIQUITY_VALUES = sorted(                                # 9 steps, 0 … 45°, includes Earth's 23.44°
+    {0.0, 6.0, 12.0, 18.0, OBLIQUITY_EARTH, 30.0, 35.0, 40.0, OBLIQUITY_FAITHFUL_MAX})
+_LAT_STRIDE = 6                                           # 180 model latitudes → 30 (equator→pole)
 
 
 @dataclass(frozen=True)
@@ -65,9 +74,22 @@ class Cell:
     paragraph: str
 
 
+def _axis_default_index(values: list[float], target: float) -> int:
+    """The slider's home index — the exact ``target`` if present, else the nearest value."""
+    if target in values:
+        return values.index(target)
+    return min(range(len(values)), key=lambda i: abs(values[i] - target))
+
+
 def compute_grid(s0_values: list[float] = S0_VALUES,
-                 co2_values: list[float] = CO2_VALUES) -> dict:
-    """Run the validated model over the (S0 × CO2) grid → a JSON-ready dict (the slow step)."""
+                 co2_values: list[float] = CO2_VALUES,
+                 obliquity_values: list[float] = OBLIQUITY_VALUES) -> dict:
+    """Run the validated model over the (S0 × CO2 × tilt) grid → a JSON-ready dict (the slow step).
+
+    The cell list is flattened in this exact nesting order — ``s0`` outermost, ``co2``, then
+    ``obliquity`` innermost — so the page decodes it as ``cells[(i·nCo2 + j)·nObl + k]``; the loop
+    order and that JS index math must move together.
+    """
     base_result = compute(EBMParams())
     base_diag = diagnose(base_result)
     lat_half = [round(float(v), 2) for v in base_result.state.latitude_deg()[::_LAT_STRIDE]]
@@ -75,31 +97,34 @@ def compute_grid(s0_values: list[float] = S0_VALUES,
     cells: list[dict] = []
     for s0 in s0_values:
         for co2 in co2_values:
-            params = EBMParams(S0=s0, A=A_OLR - co2)
-            result = compute(params)
-            diag = diagnose(result)
-            ex = explain(Knobs(S0=s0, A=A_OLR - co2), base_diag, diag)
-            codes = result.codes[::_LAT_STRIDE]
-            temp = result.state.T[::_LAT_STRIDE]
-            cells.append(Cell(
-                Tbar=round(diag.global_mean_T, 2),
-                ice=round(diag.ice_line_lat, 1),
-                rainforest=round(diag.rainforest_pct, 1),
-                tundra=round(diag.tundra_pct, 1),
-                desert=round(diag.desert_pct, 1),
-                biome="".join(str(int(c)) for c in codes),
-                temp=[round(float(t), 1) for t in temp],
-                headline=ex.headline, oneline=ex.oneline, paragraph=ex.paragraph,
-            ).__dict__)
+            for obl in obliquity_values:
+                params = obliquity_params(obl, EBMParams(S0=s0, A=A_OLR - co2))
+                result = compute(params)
+                diag = diagnose(result)
+                ex = explain(Knobs(S0=s0, A=A_OLR - co2, obliquity_deg=obl), base_diag, diag)
+                codes = result.codes[::_LAT_STRIDE]
+                temp = result.state.T[::_LAT_STRIDE]
+                cells.append(Cell(
+                    Tbar=round(diag.global_mean_T, 2),
+                    ice=round(diag.ice_line_lat, 1),
+                    rainforest=round(diag.rainforest_pct, 1),
+                    tundra=round(diag.tundra_pct, 1),
+                    desert=round(diag.desert_pct, 1),
+                    biome="".join(str(int(c)) for c in codes),
+                    temp=[round(float(t), 1) for t in temp],
+                    headline=ex.headline, oneline=ex.oneline, paragraph=ex.paragraph,
+                ).__dict__)
 
     return {
         "axes": {
             "s0": {"label": "Sun — stellar flux S₀", "unit": "W/m²",
                    "values": [round(v, 0) for v in s0_values],
-                   "default_index": s0_values.index(S0_EARTH) if S0_EARTH in s0_values
-                   else min(range(len(s0_values)), key=lambda i: abs(s0_values[i] - S0_EARTH))},
+                   "default_index": _axis_default_index(s0_values, S0_EARTH)},
             "co2": {"label": "Greenhouse — added CO₂", "unit": "W/m²",
                     "values": [round(v, 0) for v in co2_values], "default_index": 0},
+            "obl": {"label": "Tilt — axial obliquity", "unit": "°",
+                    "values": [round(v, 0) for v in obliquity_values],
+                    "default_index": _axis_default_index(obliquity_values, OBLIQUITY_EARTH)},
         },
         "lat": lat_half,
         "palette": {str(int(b)): BIOME_COLORS[b] for b in Biome},
@@ -122,8 +147,8 @@ header { padding: 2.2rem 1.5rem 1rem; text-align: center;
 header h1 { margin: 0; font-size: 2rem; letter-spacing: -.02em; }
 header p { max-width: 44rem; margin: .5rem auto 0; color: #aeb7cc; }
 main { max-width: 60rem; margin: 0 auto; padding: 1rem 1.2rem 4rem; }
-.controls { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.6rem;
-            background: #131a30; border: 1px solid #232c49; border-radius: 12px;
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+            gap: 1rem 1.6rem; background: #131a30; border: 1px solid #232c49; border-radius: 12px;
             padding: 1.1rem 1.3rem; margin-bottom: 1.2rem; }
 .knob label { display: block; font-weight: 600; margin-bottom: .35rem; }
 .knob .val { color: #8ab4ff; font-variant-numeric: tabular-nums; }
@@ -137,6 +162,8 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
    background: #ffd166; border: 2px solid #0b1020; box-shadow: 0 0 0 3px #ffd16655; cursor: pointer; }
 .knob.greenhouse input[type=range]::-webkit-slider-thumb { background: #7ee0a0; box-shadow: 0 0 0 3px #7ee0a055; }
 .knob.greenhouse input[type=range]::-moz-range-thumb { background: #7ee0a0; box-shadow: 0 0 0 3px #7ee0a055; }
+.knob.tilt input[type=range]::-webkit-slider-thumb { background: #b69cff; box-shadow: 0 0 0 3px #b69cff55; }
+.knob.tilt input[type=range]::-moz-range-thumb { background: #b69cff; box-shadow: 0 0 0 3px #b69cff55; }
 .stage { display: flex; flex-wrap: wrap; gap: 1.2rem; }
 .viz { background: #0c1226; border: 1px solid #232c49; border-radius: 12px; padding: 1rem;
        display: flex; gap: 1rem; flex: 1 1 22rem; justify-content: center; }
@@ -161,9 +188,9 @@ footer { color: #8b95ad; font-size: .88rem; margin-top: 2rem; border-top: 1px so
 _BODY = """\
 <header>
   <h1>Build a climate — turn a knob, watch a world</h1>
-  <p>Brighten or dim the Sun and add greenhouse gas. The planet's temperature, its polar ice, and
-  its bands of life respond instantly — and the panel tells you <em>what changed and why</em>.
-  Every number is the real energy-balance model; this page just looks it up.</p>
+  <p>Brighten or dim the Sun, add greenhouse gas, or tilt the axis. The planet's temperature, its
+  polar ice, and its bands of life respond instantly — and the panel tells you <em>what changed and
+  why</em>. Every number is the real energy-balance model; this page just looks it up.</p>
 </header>
 <main>
   <div class="controls">
@@ -176,6 +203,11 @@ _BODY = """\
       <label>🏭 <span id="co2-label"></span>: <span class="val" id="co2-val"></span></label>
       <input type="range" id="co2" />
       <div class="hint">More greenhouse gas traps outgoing heat — a warmer world.</div>
+    </div>
+    <div class="knob tilt">
+      <label>🌍 <span id="obl-label"></span>: <span class="val" id="obl-val"></span></label>
+      <input type="range" id="obl" />
+      <div class="hint">Earth tilts 23°. More tilt spreads the year's sunlight toward the poles.</div>
     </div>
   </div>
 
@@ -212,15 +244,18 @@ _BODY = """\
 # Plain JS (no f-string: braces are JS). DATA is concatenated in ahead of this block.
 _APP_JS = r"""
 const D = window.PLANET_DATA;
-const nS0 = D.axes.s0.values.length, nCo2 = D.axes.co2.values.length;
-const cell = (i, j) => D.cells[i * nCo2 + j];
+const nS0 = D.axes.s0.values.length, nCo2 = D.axes.co2.values.length, nObl = D.axes.obl.values.length;
+// cells are flattened s0-outermost, co2, then obliquity innermost (compute_grid's loop order)
+const cell = (i, j, k) => D.cells[(i * nCo2 + j) * nObl + k];
 
 const $ = id => document.getElementById(id);
-const s0El = $("s0"), co2El = $("co2");
+const s0El = $("s0"), co2El = $("co2"), oblEl = $("obl");
 s0El.min = 0; s0El.max = nS0 - 1; s0El.step = 1; s0El.value = D.axes.s0.default_index;
 co2El.min = 0; co2El.max = nCo2 - 1; co2El.step = 1; co2El.value = D.axes.co2.default_index;
+oblEl.min = 0; oblEl.max = nObl - 1; oblEl.step = 1; oblEl.value = D.axes.obl.default_index;
 $("s0-label").textContent = D.axes.s0.label;
 $("co2-label").textContent = D.axes.co2.label;
+$("obl-label").textContent = D.axes.obl.label;
 
 // legend (all biomes, in the equator→pole order they appear)
 $("legend").innerHTML = Object.keys(D.names).map(k =>
@@ -298,9 +333,10 @@ function drawCurve(c) {
 }
 
 function render() {
-  const i = +s0El.value, j = +co2El.value, c = cell(i, j);
+  const i = +s0El.value, j = +co2El.value, k = +oblEl.value, c = cell(i, j, k);
   $("s0-val").textContent = D.axes.s0.values[i] + " " + D.axes.s0.unit;
   $("co2-val").textContent = "+" + D.axes.co2.values[j] + " " + D.axes.co2.unit;
+  $("obl-val").textContent = D.axes.obl.values[k] + D.axes.obl.unit;
   $("headline").textContent = c.headline;
   $("oneline").textContent = c.oneline;
   $("paragraph").textContent = c.paragraph;
@@ -312,6 +348,7 @@ function render() {
 }
 s0El.addEventListener("input", render);
 co2El.addEventListener("input", render);
+oblEl.addEventListener("input", render);
 render();
 """
 

@@ -97,8 +97,8 @@ def _header() -> str:
 def _interactive_hero() -> str:
     """The headline call-to-action: the no-install browser what-if (docs/interactive/index.html)."""
     return ('<section>\n  <h2>Turn a knob, build a climate</h2>\n'
-            '  <p class="sub">No install, no notebook — drag the Sun and the greenhouse and watch the '
-            'planet respond, with a plain-language explanation of <em>what changed and why</em>. '
+            '  <p class="sub">No install, no notebook — drag the Sun, the greenhouse, and the axial tilt '
+            'and watch the planet respond, with a plain-language explanation of <em>what changed and why</em>. '
             'Every number is the real model.</p>\n'
             '  <a class="globe" href="interactive/index.html" '
             'style="display:block;max-width:42rem;text-decoration:none">\n'

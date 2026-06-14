@@ -43,15 +43,15 @@ straight to one?
 ```powershell
 python -m planet snowball     # run one demo (prints its validation table + banks a figure)
 python -m planet list         # print the full catalogue of demos
-python -m planet interactive  # drag two knobs in your browser — a live what-if + plain-language "why"
+python -m planet interactive  # drag three knobs in your browser — a live what-if + plain-language "why"
 python -m planet notebook     # open the teaching notebook in JupyterLab (opens your browser for you)
 python -m planet globes       # just open a saved interactive globe — no compute
 python -m planet site         # build & open the landing page — a clickable gallery of everything
 ```
 
 **Turn a knob, build a climate — no install.** `python -m planet interactive` opens
-[`docs/interactive/index.html`](docs/interactive/index.html): drag the Sun and the greenhouse and the
-planet's temperature, polar ice, and bands of life respond instantly, with a plain-language
+[`docs/interactive/index.html`](docs/interactive/index.html): drag the Sun, the greenhouse, and the axial
+tilt and the planet's temperature, polar ice, and bands of life respond instantly, with a plain-language
 explanation of *what changed and why* (`planet/explain.py`). It's a lookup over a precomputed grid of
 the real `planet.demo_biomes.compute` runs — instant, deterministic, and **self-contained** (the data
 is inlined, so it opens straight off disk and serves from GitHub Pages alike). Want continuous knobs,
