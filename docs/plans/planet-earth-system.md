@@ -1314,11 +1314,24 @@ backbone** (recorded below).
   machine precision for *any* `D` (the diffusion conserves `∫T dx`, so transport cannot change the mean).
   **Moisture REDISTRIBUTES that fixed `⟨δT⟩` poleward.** Asserted **tight** (conservation). The PA factor
   is **reported two ways (name the metric, advisor):** the **single-endpoint** ratio `δT(pole)/δT(equator)`
-  ≈ **1.5** (Earth, RH 0.8 — the *most generous*, and the polar cell sits on the harmonic-face bias the
-  bias largely cancels in a δT *difference*), and the **area-band** ratio `mean(δT|φ≥60°)/mean(δT|φ≤30°)`
-  ≈ **1.4** (less generous) — both honest, both pass a loose `1.3–1.7` band. **Direction banked** (PA>1
-  robustly), **magnitude loose** (endpoint 1.43→1.50 across RH 0.6→0.8; the observed ~2–3× also needs the
-  ice-albedo + lapse-rate feedbacks held out of scope).
+  ≈ **2.05** (Earth, RH 0.8 — the *most generous*, polar cell on the harmonic-face bias), and the
+  **area-band** ratio `mean(δT|φ≥60°)/mean(δT|φ≤30°)` ≈ **1.80** (less generous) — both honest. **Direction
+  banked** (PA>1 robustly), **magnitude loose** (the observed ~2–3× also needs the ice-albedo + lapse-rate
+  feedbacks held out of scope; and ~2.05 is the model's *converged* number, not a *validated* one — the
+  formulation sets it).
+- **THE dt-FREE RE-BANK (2026-06-14, a splitting-error finding).** The headline was originally banked as
+  endpoint **≈1.5** / band **≈1.4** — those were a **first-order operator-splitting artifact**, not the
+  physical answer. The PA had been read off the Strang relaxation at the default `n_tau=0.5`, whose **shape**
+  carries an **O(Δt) splitting bias** (backward-Euler transport split against the exact radiation half-step;
+  the global *mean* stays exact — `pa_dry≡1.0` exactly, the clean control), and that bias *suppresses* the
+  amplification. Recomputing **dt-free** lifts it to **endpoint ≈2.05 / band ≈1.80** (Richardson dt→0 and a
+  direct solve agree to 3 digits). The fix: `moist_steady_direct` — a **Picard iteration on the
+  frozen-`D_eff` linear solve `(L_T−B·I)T=A−S(1−α)`**, the *nonlinear generalisation of
+  `ebm.steady_linear`* (exactly as rung-4 went Newton), **no time-stepping ⟹ no splitting bias**, ~20
+  iterations / ~10 ms. The relaxation `moist_equilibrium` is kept (bit-for-bit rung-0 reduction +
+  animations); the **headline magnitude is the direct solve's**. *Direction was never in doubt* — only the
+  magnitude moved, and it moved the same way the under-converged number always under-reported. Spike +
+  findings: `outputs/rung25_splitting_dt_spike.py`, `outputs/rung25_picard_prototype.py` (gitignored).
 - **THE ATTRIBUTION NULL (advisor — the backbone).** The moist model differs from dry in *two* ways (a
   recalibrated `D`-shape AND the T-dependent `D_eff`); which causes PA? **Freeze `D_eff` at its present
   profile and warm → PA = 1.0 *exactly*** (uniform `δT=ΔA/B` solves the perturbation for *any* frozen
@@ -1326,7 +1339,7 @@ backbone** (recorded below).
   PA=1.0000, spread ~3e-10, via the genuine array-`D` `EnergyBalanceModel`).
 - **The recalibration = the named wall (the double-count).** Rung-0's `D=0.555` is an *effective*
   diffusivity already absorbing latent transport; explicit MSE diffusion would double-count it, so
-  `recalibrate_sensible_D` re-derives a **smaller sensible `D_s≈0.30`** matching the dry present-day
+  `recalibrate_sensible_D` re-derives a **smaller sensible `D_s≈0.28`** matching the dry present-day
   **equator-pole contrast** (`⟨T⟩` is automatically equal — energy balance fixes it from `A,B,ᾱ`
   independent of `D` — so contrast is the natural single scalar). **The TRADE (not a win):** a *single
   scalar* can't reproduce all of dry `T(x)` — same mean+contrast but a **higher-moment shape residual**
@@ -1342,12 +1355,14 @@ backbone** (recorded below).
   `test_subtropical_evaporative_belt_is_not_reproduced` did **not** flip (a different deliverable).
 - **Triad.** *Tight* — exact analytic `dq_sat/dT` (vs finite-diff + ~7 %/K log-slope); `D_eff`-inside
   conservation; pinned `⟨δT⟩=ΔA/B`; the frozen-`D_eff` PA=1 null. *Real-but-loose (unlock)* — the PA
-  itself (endpoint ratio ~1.5 / area-band ~1.4, direction banked / magnitude loose). *Plumbing* — RH=0 ∧
-  `D_s=0.555` ⟹ the genuine `EnergyBalanceModel` rung-0 solve **bit-for-bit**. *Named choices* —
-  recalibration to present contrast (`D_s<0.555`) + its target-invariance + the **named PA metric**
-  (endpoint vs area-band, the advisor's "don't let the most-generous number read as *the* number"). Tests:
-  `planet/tests/test_moist_ebm.py` (12, all **fast**, incl. a `.converged` guard); full planet gate
-  **261 passed, 1 skip**. No engine edit; `uses` unchanged.
+  itself (dt-free endpoint ratio ~2.05 / area-band ~1.80, direction banked / magnitude loose). *Plumbing* —
+  RH=0 ∧ `D_s=0.555` ⟹ the genuine `EnergyBalanceModel` rung-0 solve **bit-for-bit** for the relaxation,
+  and to **machine precision** for the dt-free `moist_steady_direct` → `steady_linear`. A test also pins the
+  splitting artifact (the `n_tau=0.5` relaxation reads ~1.5, climbing toward the dt-free value as `n_tau→0`,
+  the mean exact throughout). *Named choices* — recalibration to present contrast (`D_s<0.555`) + its
+  target-invariance + the **named PA metric** (endpoint vs area-band, the advisor's "don't let the
+  most-generous number read as *the* number"). Tests: `planet/tests/test_moist_ebm.py` (14, all **fast**,
+  incl. a `.converged` guard); full gate **443 passed, 1 skip**. No engine edit; `uses` unchanged.
 
 **Rung 2.x — BUILT (the full-sphere EBM + the energetic ITCZ; `planet/sphere_ebm.py`, 2026-06-14).** The
 chosen slice of the user's "ITCZ/Hadley + moist precip pattern" deferral. Rung-0's EBM is **hemisphere-only**
@@ -1819,7 +1834,7 @@ text, local PDF); the logarithmic-CO₂ contrast → **Myhre+ 1998**.
   (:func:`local_radiative_slope`) collapses to ~1.0 at the warm equator (water-vapour feedback) and rises to
   ~2.4 by the cold pole — so under a uniform forcing warming **concentrates in the tropics** (endpoint
   ``δT(pole)/δT(equator)≈0.68``, band 0.73), the **mirror image** of rung-2.5's moisture-*transport* polar
-  amplification (~1.4–1.5). **The SIGN was measured, not assumed** (the advisor's discriminator: smallest
+  amplification (dt-free ~1.8–2.05). **The SIGN was measured, not assumed** (the advisor's discriminator: smallest
   ``B_loc`` warms most; WV pulls ``B_loc`` *down* at the equator, the Planck ``4σT³`` pulls it *up* — WV wins
   decisively). A clean "two mechanisms pull opposite ways" pair with rung 2.5: the WV *radiative* feedback
   alone favours the tropics; *transport* (+ lapse-rate + ice, out of scope) make Earth's poles amplify.
@@ -2076,7 +2091,7 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
 - [ ] **Tighten the ITCZ-migration sensitivity** · *deliverable:* re-derive `D` in `sphere_ebm.py` ·
   *anchor:* the closed-form `δ/AHT` lands within ~factor-1 of observed (currently ~2× high, rides the
   calibrated `D`) · *cost:* one re-derive. **[named refinement]** → [[planet-rung2x-itcz]].
-- [ ] **Recalibrate `D_s≈0.30` (rung 2.5)** · *deliverable:* a smaller sensible-heat `D` in `moist_ebm.py` ·
+- [ ] **Recalibrate `D_s≈0.28` (rung 2.5)** · *deliverable:* a smaller sensible-heat `D` in `moist_ebm.py` ·
   *anchor:* the MSE-diffusing EBM matches the dry present contrast with no latent double-count,
   target-invariant <5% · *cost:* single-scalar re-derive. **[named upgrade]** →
   [[planet-rung25-mse-diffusion]].

@@ -69,7 +69,7 @@ untouched). Spike-first (`outputs/rung4_radiative_ebm_spike.py`, gitignored) + a
 headline: the OLR slope is **not one number** — its *local* value `B_loc(Ts)=dOLR/dTs` collapses to ~1.0 at
 the warm equator (water-vapour feedback) and rises to ~2.4 by the cold pole, so under a uniform forcing
 warming **concentrates in the tropics** (endpoint `δT(pole)/δT(equator)≈0.68`, band 0.73) — the **mirror** of
-rung-2.5's moisture-*transport* polar amplification (~1.4). **The SIGN was measured, not assumed** (advisor's
+rung-2.5's moisture-*transport* polar amplification (dt-free ~1.8–2.05). **The SIGN was measured, not assumed** (advisor's
 discriminator: smallest `B_loc` warms most; WV pulls it *down* at the equator, Planck `4σT³` pulls it *up* —
 WV wins). Clean "two mechanisms pull opposite ways" pair with rung 2.5.
 

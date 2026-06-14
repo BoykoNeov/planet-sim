@@ -79,7 +79,7 @@ def print_summary(r: RadiativeEBMResult) -> None:
     print(f"  amplification δT(pole)/δT(equator): gray {ta.amp_gray:.2f}  (TROPICAL, < 1)  "
           f"vs uniform-B null {ta.amp_null:.2f}")
     print(f"  band ratio mean(≥60°)/mean(≤30°)  : gray {ta.amp_gray_band:.2f}")
-    print(f"  => the mirror of rung-2.5's polar amplification (~1.4): WV radiative feedback favours the "
+    print(f"  => the mirror of rung-2.5's polar amplification (dt-free ~1.8–2.05): WV radiative feedback favours the "
           f"tropics.\n")
 
 

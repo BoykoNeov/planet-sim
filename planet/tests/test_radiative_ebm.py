@@ -171,7 +171,7 @@ def test_global_mean_warming_is_not_pinned_jensen(ta):
 
 def test_present_climate_is_a_jensen_warm_shift_of_rung0(ta, params):
     # The emergent present-day structure at the SAME D, vs rung-0's dt-free reference (steady_linear, NOT the
-    # relaxation default, which carries an O(Δt²) contrast error). The contrast is essentially unchanged (the
+    # relaxation default, whose shape carries an O(Δt) contrast error). The contrast is essentially unchanged (the
     # loading-matched mean slope ≈ 2), but the mean is lifted by Jensen (concave OLR) — a near-uniform warm
     # shift. Direction banked, magnitude loose.
     absorbed = constant_albedo_absorbed(params)

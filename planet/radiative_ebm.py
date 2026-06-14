@@ -27,7 +27,7 @@ the climlab-matched loading ``B_loc`` runs ~**1.1 at a 30 °C equator** up to ~*
 and back to ~**1.8 at a −30 °C pole**, so the *equator* has the smallest local damping. Under a uniform
 forcing the warming concentrates there — **tropical amplification** (endpoint ``δT(pole)/δT(equator) ≈ 0.7``,
 :class:`TropicalAmplification`), the **mirror image** of rung-2.5's moisture-*transport* polar amplification
-(:mod:`planet.moist_ebm`, ~1.4–1.5). The two rungs make a clean "two mechanisms pull opposite ways" pair:
+(:mod:`planet.moist_ebm`, dt-free ~1.8–2.05). The two rungs make a clean "two mechanisms pull opposite ways" pair:
 the water-vapour *radiative* feedback alone favours the tropics, while it is *transport* (and the
 lapse-rate and ice feedbacks held out of scope) that make Earth's poles amplify.
 
@@ -42,10 +42,14 @@ The "mirror" is real *at Earth's loading*; it is not a symmetry of equally-robus
 Why a Newton solve, not the Strang relaxation spine (a numerical finding)
 ------------------------------------------------------------------------
 Rung-0 and rung-2.5 reach equilibrium by **Strang operator splitting**, whose radiation half-step is the
-*analytically exact* solution of the linear ``−B·T`` relaxation — so their steady state is **dt-free**.
-With a **nonlinear** ``OLR(Ts)`` that exactness is lost: a frozen-slope linearised half-step leaves an
-operator-splitting error that **does not vanish at equilibrium** (the spike found the relaxed steady state
-drifting with the step size, ``⟨T⟩ ≈ 18.9 → 18.0`` as ``n_τ → 0``, converging onto the Newton answer), and
+*analytically exact* solution of the linear ``−B·T`` relaxation. That makes the relaxed steady state's
+**global mean** dt-free (exact), but **not its shape**: split against a *backward-Euler* transport step the
+*shape* carries an **O(Δt)** splitting bias — which is exactly why both rungs read their headline off a
+**direct** solve (:meth:`planet.ebm.EnergyBalanceModel.steady_linear`, and rung-2.5's Picard
+:func:`planet.moist_ebm.moist_steady_direct`), never the relaxation. With a **nonlinear** ``OLR(Ts)`` even
+that mean-exactness is lost: a frozen-slope linearised half-step leaves an operator-splitting error that
+**does not vanish at equilibrium** — not even in the mean (the spike found the relaxed steady state drifting
+with the step size, ``⟨T⟩ ≈ 18.9 → 18.0`` as ``n_τ → 0``, converging onto the Newton answer), and
 near the warm-equator runaway edge (next paragraph) the local half-step goes outright unstable. So the
 radiative EBM is solved by **coupled Newton iteration** on the steady residual
 
@@ -93,7 +97,7 @@ Validation triad (plan §3) — what is asserted tight vs loose
   rung-0): ``OLR`` is concave, so by Jensen the planet must run warmer on average to emit the same mean.
   *(Part of the ~0.68 magnitude is runaway-proximity — the warmed equator reaches ~39 °C where ``B_loc`` ≈
   0.5, still positive/stable but close to the local runaway. Compared throughout to rung-0's dt-free*
-  ``steady_linear`` *reference, not its relaxation default, which itself carries an O(Δt²) splitting error.)*
+  ``steady_linear`` *reference, not its relaxation default, whose shape carries an O(Δt) splitting error.)*
 
 Named scope edges
 -----------------

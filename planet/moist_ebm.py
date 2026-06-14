@@ -50,13 +50,25 @@ hot path is untouched), the ~one radiation helper duplicated being the correct p
 ``(D_s/C)(1−x²)`` match the dry model's once-built harmonic cells; ``face="exact"`` would pre-distort
 them and silently break it.
 
+**The headline magnitude, however, comes from the dt-FREE solve** (:func:`moist_steady_direct`), not the
+relaxation. The same frozen-``D_eff`` coefficient, dropped into a **direct linear steady solve** ``(L_T −
+B·I)T = A − S(1−α)`` and Picard-iterated, converges with **no time-stepping** — so with **no
+operator-splitting error**. This is the spine's reuse of :meth:`planet.ebm.EnergyBalanceModel.steady_linear`
+(the nonlinear generalisation of it, exactly as rung-4's :mod:`planet.radiative_ebm` is its Newton
+generalisation). It matters because the Strang relaxation's steady state carries an **O(Δt) shape bias**
+(the backward-Euler transport split against the exact radiation half-step): the global mean stays exact,
+but the *shape* — and hence the polar-amplification *ratio* — drifts with the step, the default
+``n_tau = 0.5`` suppressing the endpoint factor to ≈ 1.5 against the dt-free ≈ 2.05. The relaxation is kept
+for the bit-for-bit rung-0 reduction and for animations (it has the transient); the magnitude is the
+direct solve's.
+
 The recalibration — re-derive D_s so we do not double-count latent transport (the wall)
 ---------------------------------------------------------------------------------------
 Rung-0's ``D = 0.555`` is an **effective** diffusivity calibrated to the observed present-day gradient;
 it *already* contains the real atmosphere's latent transport lumped into one number. Diffusing latent
 heat **explicitly** on top of that would double-count it, so the moist EBM re-derives a **smaller
 sensible** ``D_s`` (:func:`recalibrate_sensible_D`) such that the moist present-day climate reproduces
-the dry present-day **equator-to-pole contrast** (≈ 0.30 vs 0.555 for Earth + RH 0.8). The global mean
+the dry present-day **equator-to-pole contrast** (≈ 0.28 vs 0.555 for Earth + RH 0.8). The global mean
 ``⟨T⟩`` is *automatically* equal in both (energy balance fixes it from ``A, B, ᾱ`` independent of ``D``),
 so the contrast is the natural single recalibration scalar.
 
@@ -82,14 +94,21 @@ Validation triad (plan §3) — re-classed for honesty
   recalibrated ``D``-shape.
 * **Real-but-loose physics (the unlock).** The **polar amplification** itself: the poles warm more than
   the tropics, emergent from moisture transport alone. The **direction** (PA > 1, robustly across RH) is
-  banked; the **magnitude** is loose — and the *metric matters*, so it is reported two ways: the
-  **single-endpoint** ratio ``δT(pole)/δT(equator)`` ≈ **1.5** (Earth, RH 0.8 — the most generous, and
-  the polar cell sits on the harmonic-face bias), and the **area-band** ratio
-  ``mean(δT|φ≥60°)/mean(δT|φ≤30°)`` ≈ **1.4**. Both pass a loose ``1.3–1.7`` band; "~1.5" names the
-  endpoint ratio specifically. The observed ~2–3× also needs ice-albedo + lapse-rate feedbacks held out
-  of scope here.
-* **Plumbing (by construction).** RH = 0 **and** ``D_s = D_TRANSPORT`` reduce the moist relaxation to
-  the dry rung-0 solve **bit-for-bit** (``β ≡ 0`` ⟹ the per-step operator is the dry one, every step).
+  banked; the **magnitude** is loose — and the *metric matters*, so it is reported two ways from the
+  **dt-free** :func:`moist_steady_direct` climate: the **single-endpoint** ratio ``δT(pole)/δT(equator)``
+  ≈ **2.05** (Earth, RH 0.8 — the most generous, and the polar cell sits on the harmonic-face bias), and
+  the **area-band** ratio ``mean(δT|φ≥60°)/mean(δT|φ≤30°)`` ≈ **1.80**; "~2.0" names the endpoint ratio
+  specifically. *This is the model's **converged** number, not a **validated** one*: the magnitude is set
+  by the formulation (the inside-divergence MSE diffusion, the contrast recalibration), so whether
+  moisture transport alone "should" give ≈1.5 or ≈2.0 is a property of the model — and the observed ~2–3×
+  additionally needs the ice-albedo + lapse-rate feedbacks held out of scope here.
+  **(Earlier banked as ≈1.5 / ≈1.4 — that was the Strang relaxation's O(Δt) shape bias at the default
+  ``n_tau = 0.5``, which suppresses the amplification; the dt-free direct solve removes it. The
+  *direction* was never in doubt — and the relaxation's global mean was exact throughout.)**
+* **Plumbing (by construction).** RH = 0 **and** ``D_s = D_TRANSPORT`` reduce **both** paths to the dry
+  rung-0 solve **bit-for-bit** (``β ≡ 0`` ⟹ the per-step operator is the dry one): the relaxation
+  (:func:`moist_equilibrium`) to :meth:`planet.ebm.EnergyBalanceModel.equilibrate`, and the dt-free direct
+  solve (:func:`moist_steady_direct`) to :meth:`planet.ebm.EnergyBalanceModel.steady_linear`.
 
 Named scope edges
 -----------------
@@ -120,6 +139,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 import numpy as np
+from scipy.linalg import solve_banded
 from scipy.optimize import brentq
 
 from engines.diffusion import Diffusion1D, Neumann, uniform_grid
@@ -215,6 +235,13 @@ def moist_equilibrium(params: EBMParams, D_s: float, absorbed_fn,
     ``∂/∂x[(1−x²)·D_eff(T)·∂T/∂x]`` (rebuilt from the current ``T`` — ``D_eff`` inside the divergence),
     and a second radiation half-step. Self-contained — it does **not** touch :mod:`planet.ebm`.
 
+    **Carries an O(Δt) shape bias — not the headline path.** The exact radiation half-step is split
+    against a *backward-Euler* transport step, so the converged steady state's **shape** carries a
+    first-order operator-splitting error (the global mean stays exact): at the default ``n_tau = 0.5`` the
+    bias *suppresses* the emergent polar amplification (endpoint ≈ 1.5 vs the dt-free ≈ 2.05), shrinking as
+    ``n_tau → 0``. Use this path for the bit-for-bit rung-0 reduction and for animations (it produces the
+    intermediate transient); use the **dt-free** :func:`moist_steady_direct` for the headline magnitude.
+
     Parameters
     ----------
     params : EBMParams
@@ -269,10 +296,89 @@ def moist_equilibrium(params: EBMParams, D_s: float, absorbed_fn,
     )
 
 
-def _dry_equilibrium(params: EBMParams, D: float, absorbed_fn, T_init=None,
-                     A: Optional[float] = None, **kw) -> ClimateState:
-    """The constant-albedo dry reference at scalar transport ``D`` — :func:`moist_equilibrium` with RH=0."""
-    return moist_equilibrium(params, D, absorbed_fn, RH=0.0, T_init=T_init, A=A, **kw)
+# --------------------------------------------------------------------------- #
+# The dt-FREE moist steady solve — Picard on the frozen-D_eff linear solve (the headline path).
+#
+# The moist steady state is nonlinear *only* through D_eff(T), so freezing D_eff and solving the linear
+# (L_T[D_eff] − B·I)T = A − S(1−α) in one tridiagonal solve, then re-freezing and repeating, converges
+# (Picard) onto the true nonlinear steady state with **no time-stepping** — hence **no operator-splitting
+# dt bias**. This is the nonlinear generalisation of :meth:`planet.ebm.EnergyBalanceModel.steady_linear`
+# (exactly as rung-4's :mod:`planet.radiative_ebm` is its Newton generalisation), and it is the path the
+# headline :func:`polar_amplification` uses. The Strang relaxation :func:`moist_equilibrium` is kept as the
+# general/animatable path, but its steady state carries an **O(Δt) shape bias** (the backward-Euler
+# transport substep, split against the exact radiation half-step): at the default ``n_tau = 0.5`` that bias
+# *suppresses* the emergent polar amplification (endpoint ratio ≈ 1.5 vs the dt-free ≈ 2.05), the global
+# mean staying exact throughout. The linear assembly below mirrors ``steady_linear``'s (harmonic faces) and
+# is pinned **bit-for-bit** against it by the RH = 0 reduction test.
+# --------------------------------------------------------------------------- #
+def _steady_tridiag_solve(x: np.ndarray, dx: np.ndarray, dxc: np.ndarray,
+                          Dcoef: np.ndarray, B: float, rhs: np.ndarray) -> np.ndarray:
+    """One direct linear steady solve ``(L_T − B·I)T = rhs`` with cell coefficient ``Dcoef = D_eff·(1−x²)``.
+
+    Assembles the conservative transport operator ``L_T = d/dx[D_eff(1−x²) d/dx]`` with **harmonic-mean
+    faces** (the engine's idiom), subtracts the radiative damping ``B``, and solves the tridiagonal system
+    in one banded solve. Identical in form to :meth:`planet.ebm.EnergyBalanceModel.steady_linear` — pinned
+    bit-for-bit by the RH = 0 reduction (constant ``D_eff`` ⟹ the dry linear EBM).
+    """
+    Dface = 2.0 * Dcoef[:-1] * Dcoef[1:] / (Dcoef[:-1] + Dcoef[1:])      # harmonic-mean interior faces
+    Tt = Dface / dxc                                                     # interior-face transmissibilities
+    n = x.size
+    sub = np.zeros(n); diag = np.zeros(n); sup = np.zeros(n)
+    sup[:-1] += Tt / dx[:-1]; diag[:-1] += -Tt / dx[:-1]
+    sub[1:] += Tt / dx[1:];   diag[1:] += -Tt / dx[1:]
+    diag = diag - B                                                      # (L_T − B·I): diagonally dominant
+    ab = np.zeros((3, n))
+    ab[0, 1:] = sup[:-1]; ab[1, :] = diag; ab[2, :-1] = sub[1:]
+    return solve_banded((1, 1), ab, rhs)
+
+
+def moist_steady_direct(params: EBMParams, D_s: float, absorbed_fn,
+                        RH: float = moist.RH_DEFAULT, A: Optional[float] = None, T_init=None,
+                        tol: float = 1e-11, max_iter: int = 500) -> ClimateState:
+    """The **dt-free** moist steady climate by Picard iteration on the frozen-``D_eff`` linear solve.
+
+    Each Picard step freezes ``D_eff(T_k) = D_s·(1 + β(T_k))``, assembles ``(L_T[D_eff] − B·I)`` with
+    ``D_eff`` **inside** the conservative divergence, and solves ``(L_T − B·I)T_{k+1} = A − S(1−α)`` in one
+    tridiagonal solve — repeating until ``max|T_{k+1} − T_k| < tol``. Because there is **no time-stepping**,
+    there is **no operator-splitting error**: the fixed point is the true nonlinear steady state (= the
+    ``Δt → 0`` limit of :func:`moist_equilibrium`), reached in ~20 iterations. This is the
+    **headline path** — :func:`polar_amplification` uses it. The nonlinear generalisation of
+    :meth:`planet.ebm.EnergyBalanceModel.steady_linear`; valid only for a **constant-albedo** (ice-OFF)
+    absorbed field (raises otherwise), exactly as ``steady_linear`` does. ``RH = 0`` ⟹ constant ``D_eff``
+    ⟹ one effective solve ⟹ the dry linear EBM, bit-for-bit ``steady_linear`` (the plumbing reduction).
+    """
+    grid = uniform_grid(1.0, params.n_cells)
+    x = grid.centers
+    dx = grid.widths
+    dxc = np.diff(grid.centers)
+    B = params.B
+    A_olr = params.A if A is None else float(A)
+    a_cold = absorbed_fn(x, np.full(x.shape, -100.0))
+    a_warm = absorbed_fn(x, np.full(x.shape, 100.0))
+    if not np.allclose(a_cold, a_warm):
+        raise ValueError("moist_steady_direct requires a state-independent (constant-albedo) absorbed "
+                         "field; the ice feedback must go through moist_equilibrium (the relaxation)")
+    absorbed = np.asarray(a_cold, dtype=float)
+    rhs = A_olr - absorbed
+    if T_init is None:
+        T_init = 30.0 + (-30.0 - 30.0) * x                            # warm equator → cold pole (Earth-like)
+    T = np.array(np.broadcast_to(np.asarray(T_init, dtype=float), x.shape), dtype=float)
+    converged, it = False, 0
+    for it in range(1, max_iter + 1):
+        Dcoef = effective_diffusivity(T, D_s, RH) * (1.0 - x ** 2)     # D_eff(T) inside the divergence
+        T_new = _steady_tridiag_solve(x, dx, dxc, Dcoef, B, rhs)
+        if np.max(np.abs(T_new - T)) < tol:
+            T = T_new
+            converged = True
+            break
+        T = T_new
+    Tbar = float(np.mean(T))                                          # L = 1 ⟹ area mean (∫₀¹ T dx)
+    return ClimateState(
+        x=x, T=T, global_mean_T=Tbar,
+        ice_line_lat=ice_line_latitude(x, T, params.T_freeze),
+        net_toa=float(np.mean(absorbed_fn(x, T)) - A_olr - B * Tbar),
+        converged=converged, iterations=it,
+    )
 
 
 def equator_pole_contrast(state: ClimateState) -> float:
@@ -302,17 +408,17 @@ def recalibrate_sensible_D(params: Optional[EBMParams] = None, RH: float = moist
     already lumped into rung-0's effective ``D = 0.555`` (the named wall). Roots ``f(D_s) = (moist target)
     − (dry target)`` by bisection, both climates run with **constant albedo** at the present ``A``. The
     ``target`` is the equator-to-pole ``"contrast"`` (default; ``"T2"`` matches the P₂ amplitude — the
-    factor is invariant to the choice). For Earth defaults + RH 0.8 this gives ``D_s ≈ 0.30`` (< 0.555,
+    factor is invariant to the choice). For Earth defaults + RH 0.8 this gives ``D_s ≈ 0.28`` (< 0.555,
     because the moisture-amplified ``D_eff`` transports more, so less dry ``D`` is needed to match).
     """
     if params is None:
         params = EBMParams()
     measure = {"contrast": equator_pole_contrast, "T2": P2_amplitude}[target]
     absorbed = constant_albedo_absorbed(params)
-    dry_target = measure(_dry_equilibrium(params, params.D, absorbed))
+    dry_target = measure(moist_steady_direct(params, params.D, absorbed, RH=0.0))   # dt-free dry reference
 
     def gap(D_s: float) -> float:
-        return measure(moist_equilibrium(params, D_s, absorbed, RH=RH)) - dry_target
+        return measure(moist_steady_direct(params, D_s, absorbed, RH=RH)) - dry_target
 
     return float(brentq(gap, D_lo, D_hi, xtol=1e-4))
 
@@ -339,16 +445,17 @@ class PolarAmplification:
     """Emergent polar amplification: dry-vs-moist warming under a uniform OLR forcing ``ΔA`` (°C).
 
     ``phi`` latitudes (deg); ``D_s`` the recalibrated sensible diffusivity; ``RH``/``dA`` the closure
-    and forcing. ``*_present``/``*_warm`` are the equilibrium climates before/after the forcing for the
-    ``dry`` (constant ``D``) and ``moist`` (``D_eff(T)``) models; ``delta_T_dry``/``delta_T_moist`` the
-    warming profiles. ``mean_delta_T`` is the **pinned** global-mean warming ``ΔA/B`` (both models share
-    it to machine precision — the conservation anchor). The polar amplification is reported **two ways**
-    (name the metric): ``pa_moist`` / ``pa_dry`` are the **single-endpoint** ratios ``δT(pole)/δT(equator)``
-    (the headline ~1.5 for moist; ≈ 1 the dry null), and ``pa_moist_band`` / ``pa_dry_band`` are the
-    **area-band** ratios ``mean(δT|φ≥60°)/mean(δT|φ≤30°)`` (the less-generous, less-bias-exposed
-    companion, ~1.4 for moist) — both honest "polar amplification"; the band average is carried so the
-    most-generous endpoint number is not mistaken for *the* number. ``polar_excess`` is the moist pole
-    warming **minus** the pinned mean (the redistributed excess). Plain arrays.
+    and forcing. ``*_present``/``*_warm`` are the **dt-free** (:func:`moist_steady_direct`) equilibrium
+    climates before/after the forcing for the ``dry`` (constant ``D``) and ``moist`` (``D_eff(T)``)
+    models; ``delta_T_dry``/``delta_T_moist`` the warming profiles. ``mean_delta_T`` is the **pinned**
+    global-mean warming ``ΔA/B`` (both models share it to machine precision — the conservation anchor).
+    The polar amplification is reported **two ways** (name the metric): ``pa_moist`` / ``pa_dry`` are the
+    **single-endpoint** ratios ``δT(pole)/δT(equator)`` (the headline ~2.05 for moist; ≈ 1 the dry null),
+    and ``pa_moist_band`` / ``pa_dry_band`` are the **area-band** ratios ``mean(δT|φ≥60°)/mean(δT|φ≤30°)``
+    (the less-generous, less-bias-exposed companion, ~1.80 for moist) — both honest "polar amplification";
+    the band average is carried so the most-generous endpoint number is not mistaken for *the* number.
+    ``polar_excess`` is the moist pole warming **minus** the pinned mean (the redistributed excess). Plain
+    arrays.
     """
 
     phi: np.ndarray
@@ -374,11 +481,12 @@ def polar_amplification(params: Optional[EBMParams] = None, RH: float = moist.RH
     """Warm dry and moist EBMs by a uniform ``ΔA`` and measure the emergent polar amplification.
 
     The rung-2.5 headline. Builds the constant-albedo present-day climate for the **dry** EBM
-    (``D = params.D``) and the **moist** EBM (``D_eff(T)`` at the recalibrated ``D_s``), warms both by a
-    uniform OLR reduction ``A → A − ΔA`` (the CO₂ proxy), and returns the :class:`PolarAmplification`.
-    The dry model warms **exactly uniformly** (``δT = ΔA/B`` — transport of a uniform field is zero), so
-    its ``pa_dry ≈ 1`` is the clean null; the moist model **redistributes** that same pinned ``⟨δT⟩``
-    poleward (``pa_moist`` ~ 1.5 for Earth defaults). ``D_s`` defaults to
+    (``D = params.D``) and the **moist** EBM (``D_eff(T)`` at the recalibrated ``D_s``) — all four climates
+    by the **dt-free** :func:`moist_steady_direct` (no operator-splitting bias) — warms both by a uniform
+    OLR reduction ``A → A − ΔA`` (the CO₂ proxy), and returns the :class:`PolarAmplification`. The dry
+    model warms **exactly uniformly** (``δT = ΔA/B`` — transport of a uniform field is zero), so its
+    ``pa_dry ≈ 1`` is the clean null; the moist model **redistributes** that same pinned ``⟨δT⟩``
+    poleward (``pa_moist`` ~ 2.05 for Earth defaults). ``D_s`` defaults to
     :func:`recalibrate_sensible_D` (so the moist present climate matches the dry contrast); pass a value
     to skip the recalibration.
     """
@@ -389,10 +497,10 @@ def polar_amplification(params: Optional[EBMParams] = None, RH: float = moist.RH
     absorbed = constant_albedo_absorbed(params)
     A_warm = params.A - float(dA)
 
-    dry_present = _dry_equilibrium(params, params.D, absorbed)
-    dry_warm = _dry_equilibrium(params, params.D, absorbed, T_init=dry_present.T, A=A_warm)
-    moist_present = moist_equilibrium(params, D_s, absorbed, RH=RH)
-    moist_warm = moist_equilibrium(params, D_s, absorbed, RH=RH, T_init=moist_present.T, A=A_warm)
+    dry_present = moist_steady_direct(params, params.D, absorbed, RH=0.0)
+    dry_warm = moist_steady_direct(params, params.D, absorbed, RH=0.0, T_init=dry_present.T, A=A_warm)
+    moist_present = moist_steady_direct(params, D_s, absorbed, RH=RH)
+    moist_warm = moist_steady_direct(params, D_s, absorbed, RH=RH, T_init=moist_present.T, A=A_warm)
 
     dTd = dry_warm.T - dry_present.T
     dTm = moist_warm.T - moist_present.T

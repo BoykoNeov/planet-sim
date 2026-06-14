@@ -7,10 +7,13 @@ Re-classed for honesty (plan §10 / the module docstring):
   ``∫T dx``); the global-mean warming is **pinned** ``⟨δT⟩ = ΔA/B`` to machine precision; and the
   **frozen-D_eff null** warms *exactly uniformly* (PA = 1) — proving the emergent PA is the
   ``dD_eff/dT`` feedback, not the recalibrated ``D``-shape.
-* **real-but-loose (the unlock)** — the **polar amplification**: the moist EBM warms the poles ~1.4–1.5×
-  the tropics while the dry EBM warms uniformly; direction banked, magnitude loose (RH-dependent).
-* **plumbing (by construction)** — RH = 0 **and** ``D_s = D_TRANSPORT`` reduce the moist relaxation to
-  the genuine ``EnergyBalanceModel`` rung-0 solve **bit-for-bit**.
+* **real-but-loose (the unlock)** — the **polar amplification**: the dt-free moist EBM warms the poles
+  ~1.8–2.05× the tropics while the dry EBM warms uniformly; direction banked, magnitude loose
+  (RH-dependent). The headline is the **dt-free** ``moist_steady_direct``; the Strang relaxation carries an
+  O(Δt) shape bias that suppresses it to ~1.5 at the default step (one test pins that).
+* **plumbing (by construction)** — RH = 0 **and** ``D_s = D_TRANSPORT`` reduce **both** paths to the
+  genuine ``EnergyBalanceModel`` rung-0 solve **bit-for-bit**: the relaxation to ``equilibrate``, the
+  dt-free direct solve to ``steady_linear``.
 * **named modeling choices** — the recalibration matches the present contrast (``D_s < 0.555``), and the
   PA factor is **invariant** to that target (contrast vs the P₂ amplitude).
 """
@@ -115,6 +118,20 @@ def test_RH0_default_D_reduces_to_rung0_engine_bit_for_bit(params):
     assert np.array_equal(mine.T, ref.T)
 
 
+def test_direct_solve_RH0_reduces_to_steady_linear_to_machine_precision(params):
+    # The DT-FREE companion reduction: at RH=0 (constant D_eff = D_s) the Picard direct solve IS the dry
+    # LINEAR EBM, so it must reproduce EnergyBalanceModel.steady_linear — the headline path's plumbing
+    # anchor, pinning the lean tridiagonal assembly to the engine's. (To machine precision, not bit-for-bit:
+    # the engine forms the cell coefficient as (D/C)(1−x²)·C, a different float order than D·(1−x²).)
+    absorbed = me.constant_albedo_absorbed(params)
+    eng = EnergyBalanceModel(A=params.A, B=params.B, D=D_TRANSPORT, T_freeze=params.T_freeze,
+                             water_depth=params.water_depth, n_cells=params.n_cells, face="harmonic")
+    ref = eng.steady_linear(absorbed)
+    mine = me.moist_steady_direct(params, D_TRANSPORT, absorbed, RH=0.0)
+    assert np.allclose(mine.T, ref.T, rtol=0.0, atol=1e-9)
+    assert mine.converged
+
+
 # --------------------------------------------------------------------------- #
 # REAL-BUT-LOOSE (the unlock) — emergent polar amplification; the dry model is the uniform null.
 # --------------------------------------------------------------------------- #
@@ -131,14 +148,53 @@ def test_moist_polar_amplifies_while_dry_warms_uniformly(params, pa):
 
 
 def test_polar_amplification_factor_in_loose_band_both_metrics(pa):
-    # Loose benchmark (Earth defaults, RH 0.8). NAME THE METRIC: the single-endpoint ratio (the headline
-    # ~1.5, the most generous, polar cell on the harmonic-face bias) and the area-band ratio
-    # mean(>=60°)/mean(<=30°) (~1.4, less generous) are BOTH honest polar amplification — assert both in
-    # the loose band, with endpoint ≥ band (the endpoint reads the warmest/coldest extremes).
-    assert 1.3 < pa.pa_moist < 1.7                             # endpoint ratio ~1.5
-    assert 1.25 < pa.pa_moist_band < 1.6                       # area-band ratio ~1.4
+    # Loose benchmark (Earth defaults, RH 0.8), read off the DT-FREE direct-solve climates. NAME THE
+    # METRIC: the single-endpoint ratio (the headline ~2.05, the most generous, polar cell on the
+    # harmonic-face bias) and the area-band ratio mean(>=60°)/mean(<=30°) (~1.80, less generous) are BOTH
+    # honest polar amplification — assert both in the loose band, with endpoint ≥ band (the endpoint reads
+    # the warmest/coldest extremes). (Earlier these were ~1.5 / ~1.4 — the n_tau=0.5 Strang relaxation's
+    # O(Δt) shape bias; test_relaxation_underestimates_dt_free_PA pins that artifact.)
+    assert 1.9 < pa.pa_moist < 2.2                            # endpoint ratio ~2.05 (dt-free)
+    assert 1.7 < pa.pa_moist_band < 1.9                       # area-band ratio ~1.80 (dt-free)
     assert pa.pa_moist >= pa.pa_moist_band                     # endpoint is the more generous metric
     assert pa.pa_dry_band == pytest.approx(1.0, abs=1e-3)      # dry null both ways (band metric too)
+
+
+def test_relaxation_underestimates_dt_free_PA_and_converges_to_it(params):
+    # THE SPLITTING-ARTIFACT PIN. The headline PA is the dt-FREE direct solve (~2.05 endpoint). The Strang
+    # relaxation carries an O(Δt) SHAPE bias (backward-Euler transport split against the exact radiation
+    # half-step) that SUPPRESSES the amplification: at the default n_tau=0.5 it reads ~1.5, and it climbs
+    # toward the direct value as n_tau shrinks. The global mean stays exact at every step — only the shape,
+    # hence the RATIO, is biased. Pins the finding (and the direction of the bias) so it cannot silently
+    # regress to the old under-converged headline.
+    absorbed = me.constant_albedo_absorbed(params)
+    RH = moist.RH_DEFAULT
+    D_s = me.recalibrate_sensible_D(params, RH)                # the dt-free recalibrated D_s (~0.28)
+    A_warm = params.A - 10.0
+
+    def endpoint_pa(present, warm):
+        dT = warm.T - present.T
+        return dT[-1] / dT[0], float(np.mean(dT))
+
+    dp = me.moist_steady_direct(params, D_s, absorbed, RH=RH)
+    dw = me.moist_steady_direct(params, D_s, absorbed, RH=RH, A=A_warm, T_init=dp.T)
+    pa_direct, mean_direct = endpoint_pa(dp, dw)
+
+    cp = me.moist_equilibrium(params, D_s, absorbed, RH=RH, n_tau=0.5)
+    cw = me.moist_equilibrium(params, D_s, absorbed, RH=RH, A=A_warm, T_init=cp.T, n_tau=0.5)
+    pa_coarse, mean_coarse = endpoint_pa(cp, cw)
+
+    fp = me.moist_equilibrium(params, D_s, absorbed, RH=RH, n_tau=0.1, tol=1e-11, max_iter=200000)
+    fw = me.moist_equilibrium(params, D_s, absorbed, RH=RH, A=A_warm, T_init=fp.T, n_tau=0.1,
+                              tol=1e-11, max_iter=200000)
+    pa_fine, _ = endpoint_pa(fp, fw)
+
+    assert pa_direct > 1.9                                     # dt-free headline ~2.05
+    assert pa_coarse < 1.65                                    # the n_tau=0.5 artifact ~1.5 (suppressed)
+    assert pa_coarse < pa_fine < pa_direct                    # shrinking dt climbs toward the dt-free value
+    # the global-mean warming is the pinned ΔA/B at BOTH steps — only the SHAPE drifts with dt
+    assert mean_coarse == pytest.approx(mean_direct, abs=1e-6)
+    assert mean_direct == pytest.approx(10.0 / params.B, abs=1e-9)
 
 
 def test_pa_direction_is_robust_grows_with_RH(params):
@@ -165,7 +221,7 @@ def test_recalibrated_Ds_is_below_the_dry_default(pa):
     # D_s < rung-0's 0.555: because the moisture-amplified D_eff transports MORE heat, less dry D is
     # needed to match the same present contrast (the explicit-latent-transport correction = the wall).
     assert pa.D_s < D_TRANSPORT
-    assert 0.2 < pa.D_s < 0.45                                 # ≈ 0.30 for Earth + RH 0.8
+    assert 0.2 < pa.D_s < 0.45                                 # ≈ 0.28 for Earth + RH 0.8 (dt-free)
 
 
 def test_pa_is_invariant_to_the_recalibration_target(params):

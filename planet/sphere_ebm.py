@@ -64,9 +64,11 @@ realistic, **not** "the EBM predicts the observed ITCZ migration."
 The operator-splitting gotcha (spike-caught)
 --------------------------------------------
 The EFE and its sensitivity must be read off a **converged** temperature profile. The default Strang-split
-relaxation at ``n_tau = 0.5`` (``ebm.py``'s default step) carries an O(Δt²) **steady-state splitting
-error** that *steepens* the equatorial curvature (so ``ebm.py`` anchors its own North check with
-``method="direct"``, never the relaxation). :meth:`steady_linear` (the dt-free solve) is splitting-free
+relaxation at ``n_tau = 0.5`` (``ebm.py``'s default step) carries an **O(Δt) steady-state splitting error
+in the shape** (first-order — the backward-Euler transport substep, split against the exact radiation
+half-step; the global *mean* stays exact) that *steepens* the equatorial curvature (so ``ebm.py`` anchors
+its own North check with ``method="direct"``, never the relaxation). :meth:`steady_linear` (the dt-free
+solve) is splitting-free
 and is the path the tight sensitivity uses; the ice (nonlinear) climate is converged with a small
 ``n_tau``. A naive ``n_tau = 0.5`` reading inflates the curvature and spuriously *lowers* ``|deg/PW|``
 toward ``−3.8`` — a numerical artifact, not the physical number.
@@ -196,7 +198,8 @@ class SphereEBM:
         ``Q`` is an optional steady energy source (W m⁻²; the imposed interhemispheric flux). **Note the
         splitting-error gotcha (module docstring):** the EFE/sensitivity wants a *converged* profile — use a
         **small ``n_tau``** here (or :meth:`steady_linear` in the constant-albedo case); the default
-        ``n_tau = 0.5`` carries an O(Δt²) curvature-steepening error.
+        ``n_tau = 0.5`` carries an O(Δt) curvature-steepening (shape) error — first-order, from the
+        backward-Euler transport split against the exact radiation half-step (the mean stays exact).
         """
         T = np.full(self.x.shape, float(T_init)) if np.isscalar(T_init) else np.array(T_init, float)
         Qarr = np.zeros_like(self.x) if Q is None else np.asarray(Q, dtype=float)

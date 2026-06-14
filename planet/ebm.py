@@ -90,7 +90,9 @@ Validation triad (plan §3) — what is asserted tight vs loose
   ``d/dx[(1−x²) dP₂/dx] = −6 P₂`` (Legendre's equation) makes the transport diagonal in
   the P₂ mode — reproduced by the FV engine at **~2nd order** in Δx (the contract's
   convergence invariant). This validates that transport + linear radiation are assembled
-  correctly, in the no-feedback limit where the splitting is exact.
+  correctly — read off the dt-free :meth:`steady_linear` solve (the Strang relaxation's *shape*
+  carries an O(Δt) splitting bias; only its global *mean* is exact, so the direct solve is the
+  no-feedback reference).
 * **Conservation (tight).** At equilibrium the **global energy balance**
   ``⟨S(1−α)⟩ = A + B·⟨T⟩`` (absorbed solar = OLR, area-mean ``⟨·⟩ = ∫₀¹·dx``) holds to
   machine precision; the diffusive transport conserves ``∫T dx`` structurally (the engine's
@@ -200,8 +202,9 @@ def two_mode_solution(x: np.ndarray | float, S0: float = S0_EARTH, albedo: float
 
     The transport spreads the equator-to-pole contrast: larger ``D`` (more efficient
     transport) shrinks ``|T₂|`` (a flatter planet). This is the **headline analytic check** —
-    the FV engine must reproduce it at ~2nd order in Δx (the spatial half of the tight leg);
-    valid only in the no-feedback limit where the splitting is exact.
+    the FV engine must reproduce it at ~2nd order in Δx (the spatial half of the tight leg),
+    read off the dt-free :meth:`steady_linear` solve (constant-albedo only; the Strang relaxation's
+    *shape* carries an O(Δt) splitting bias, so it is not the reference here).
     """
     T0 = equilibrium_temperature_0d(S0, albedo, A, B)
     T2 = (S0 / 4.0) * (1.0 - albedo) * s2 / (6.0 * D + B)
