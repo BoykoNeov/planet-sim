@@ -253,6 +253,31 @@ def test_log_law_coefficient_predicts_the_right_order(band):
     assert abs(analytic_per_doubling - column_per_doubling) / column_per_doubling < 0.4
 
 
+def test_band_path_reduces_to_gray_end_to_end():
+    """REDUCTION (end-to-end): the full ``band_olr`` path — not just the kernel — collapses to gray.
+
+    A full-spectrum band (uniform ``k`` = the column's CO₂ optical depth, the ``(p/p_s)`` shape, on a
+    pure-CO₂ ``wv_fraction=0`` column so its τ is exactly that shape) drives the actual per-bin
+    assembly; summed over the whole Planck spectrum it reproduces :meth:`GrayRadiationColumn.
+    outgoing_longwave` to the Planck-grid truncation (~0.1%). Exercises the per-bin Planck weighting
+    that the machine-precision *kernel* test and the Myhre-band magnitude test only constrain indirectly.
+    """
+    col = rad.GrayRadiationColumn(total_tau=2.0, wv_fraction=0.0)     # τ is a pure (p/p_s) CO₂ shape
+    full = rad.SpectralCO2Band(column=col, band_centre_cm=2000.0, half_width_cm=1999.0,
+                               band_centre_tau=col.total_tau, uniform=True, n_bins=2000)
+    for co2 in (1.0, 2.0):
+        gray = col.outgoing_longwave(rad.PRESENT_SURFACE_T, co2_factor=co2, water_vapour=False)
+        band_full = full.band_olr(rad.PRESENT_SURFACE_T, co2_factor=co2)
+        assert band_full == pytest.approx(gray, rel=3e-3)            # ~Planck-grid truncation
+
+
+def test_spectral_forcing_is_resolution_converged():
+    """The per-doubling forcing is stable across band resolution (the 'converged ≠ validated' reflex)."""
+    vals = [rad.SpectralCO2Band(n_bins=n).forcing_per_doubling((1, 2)).item() for n in (150, 300, 600)]
+    assert abs(vals[1] - vals[0]) / vals[1] < 0.01
+    assert abs(vals[2] - vals[1]) / vals[1] < 0.01
+
+
 # --------------------------------------------------------------------------- #
 # PLUMBING / REDUCTION — the emergent OLR reduces to rung-0's A + B·T near present.
 # --------------------------------------------------------------------------- #

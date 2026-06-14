@@ -141,8 +141,8 @@ global mean); spectral-band log law; clouds. Demo `planet/demo_lapse_rate.py` �
 ---
 
 **Rung-4 spectral-band log law BUILT 2026-06-14** (`planet/radiation.py`: `SpectralCO2Band` +
-`planck_flux_per_wavenumber` + `_transmission_emission` + module band/Myhre constants; 7 fast + 1 slow
-tests in `test_radiation.py`, full planet gate green 395 pass/1 skip). The §12 within-rung slice that fixes
+`planck_flux_per_wavenumber` + `_transmission_emission` + module band/Myhre constants; 9 fast + 1 slow
+tests in `test_radiation.py`, full planet gate green). The §12 within-rung slice that fixes
 the rung-4-core CO₂-forcing edge: gray's band-independent absorption SATURATES (per-doubling `ΔF`
 48→53→41→25→20, decreasing — adding CO₂ pushes the WHOLE Planck spectrum to the cold upper atmosphere), but
 the observed law is LOGARITHMIC (Myhre 5.35·ln(C/C₀) ≈ 3.7 W/m² *per doubling, constant*). **Separate
@@ -162,8 +162,10 @@ exp wing's `τ=1` level spreads a CONSTANT spectral width `2l·d(lnC)` per doubl
 **independent anchor = REDUCTION-TO-GRAY** — `_transmission_emission` (written independently of
 `GrayRadiationColumn._olr_from`) with the gray whole-spectrum `σT⁴` source reproduces `_olr_from` to
 MACHINE PRECISION (`rel<1e-12`, residual = float mul-order ULP — exactly what two independent
-implementations agreeing looks like); + a UNIFORM-`k` band (no wings) SATURATES like gray (the wing is the
-ingredient); + `π∫B_ν dν=σT⁴` pins the spectral Planck. (2) **the unlock (loose) = constant per-doubling in
+implementations agreeing looks like); + an END-TO-END check (the full `band_olr` path, full-spectrum
+uniform-`k` band on a `wv_fraction=0` column, reproduces `outgoing_longwave` to ~0.1% = Planck-grid
+truncation — advisor's belt-and-suspenders, exercises the per-bin weighting directly); + a UNIFORM-`k` band
+(no wings) SATURATES like gray (the wing is the ingredient); + `π∫B_ν dν=σT⁴` pins the spectral Planck. (2) **the unlock (loose) = constant per-doubling in
 the Myhre band** (2–6 W/m²) vs gray's 20–53 — but the **MAGNITUDE IS THE WALL** (advisor #4): rides the
 wing scale `l`, band-centre τ, half-width — calibrated to ORDER, and "CO₂ wings ≈ exponential" is itself an
 empirical input; the **FUNCTIONAL FORM (logarithmic) is the win**, NOT the ~3.7 coefficient (the column
