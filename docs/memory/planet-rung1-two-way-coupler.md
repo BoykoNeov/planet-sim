@@ -18,8 +18,24 @@ back-reaction on `h,u,v` → dry dynamics bit-for-bit unchanged, the re-seal). `
 machine-exact — the anchor) + `tracer_variance` (`∫½hθ²`, bounded) diagnostics; `test_tracer.py`.
 **Honesty correction vs the plan table:** variance is **bounded** (enstrophy honesty class — round-off
 smooth, cascades only under filamentation), **NOT "dt-convergent"** (measured: dt-halving sat at
-round-off ~1e-14). Scheme is **not monotone** (no flux limiter → Gibbs over/undershoot on sharp fronts
-= the named scope edge; TVD/WENO is the unbuilt upgrade).
+round-off ~1e-14). Scheme is **not monotone** by default (no flux limiter → Gibbs over/undershoot on sharp fronts
+= the named scope edge). **TVD limiter BUILT 2026-06-14** (the §12.2 within-rung slice;
+`engines/fluid/shallowwater.py`, opt-in `tracer_limiter=` ∈ {minmod, vanleer, mc, superbee}, default-off
+→ centered byte-for-bit; `test_tracer_limiter.py`, full-repo gate 432 fast): `θ_face=θ_up+½ψ(r)(θ_down−θ_up)`
+with **ψ≡1 = the existing centered average** (unlimited = the ψ≡1 special case); anchor met = a uniform-flow
+step develops **no new extrema** under all 4 limiters (rigorous 1-D TVD, h frozen by an exact steady state)
+while `∫hθ` stays machine-exact. Honest edge (advisor): strict TVD is **1-D only** — 2-D dimension-split
+limiting (Goodman–LeVeque) gives no maximum principle, so the 2-D test asserts only *reduced* overshoot vs
+centered (limiter is dissipative ⇒ variance one-sided-decreases); Sweby `0≤ψ≤min(2,2r)` + raise on unknown
+name (ψ≡2 is bounded yet non-monotone). WENO not needed — TVD meets the anchor at a fraction of the code.
+**Advisor done-check caught a real sign bug** in the `U<0`/`V<0` smoothness ratio (`θ−θ_plus` not `θ_plus−θ`;
+pinned by the linear-ramp `r=+1` criterion both directions) that the `+x`-only anchor missed — but its
+signature is **direction-asymmetric OVER-DIFFUSION** (neg-flow peak 0.83 vs 0.96), **not** overshoot (a
+step stays monotone under the bug too), so the regression is a **reflection-symmetry** test (peak retention
+bit-identical for ±x/±y on the correct scheme) + the ±-parametrized monotone step. Lesson: a limiter sign
+error can surface as asymmetric *accuracy* loss rather than overshoot (boundedness-preservation here was
+observed, not guaranteed — at an extremum the buggy ψ>0 *can* inject one), so **test direction symmetry, not
+just over/undershoot**.
 
 **THE de-risking finding (step-0 probe, advisor-driven; `outputs/rung1_stability_probe.py`, gitignored):**
 a passive tracer on a *steady zonal* jet (v̄≈0) transports ZERO meridional heat — real transport needs

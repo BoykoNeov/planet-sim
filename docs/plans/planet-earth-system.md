@@ -2109,9 +2109,28 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
 
 **Rung 1 — two-way coupler (complete).**
 *Buildable slices:*
-- [ ] **TVD/WENO flux limiter** · *deliverable:* a limiter in the `engines/fluid` SSP-RK3 advection step ·
-  *anchor:* a monotonicity test (no new extrema on a step IC) green **and** the existing conservation +
-  variance-bound tests stay green · *cost:* one limiter, no new anchor. **[named upgrade]** →
+- [x] ~~**TVD/WENO flux limiter**~~ **BUILT 2026-06-14** (`engines/fluid/shallowwater.py`,
+  `tracer_limiter=` ∈ {minmod, vanleer, mc, superbee}; `test_tracer_limiter.py`, 10 tests; full-repo gate
+  **432 fast**). A **TVD** flux limiter (van Leer default) on the passive-tracer face value, written as
+  `θ_face = θ_up + ½·ψ(r)·(θ_down − θ_up)` — and **ψ≡1 IS the existing centered average**, so the unlimited
+  path is literally the ψ≡1 special case. **Opt-in, default-off → centered scheme byte-for-bit** (the
+  `None` branch is the original expression verbatim, not routed through the ψ form — float-reorder would
+  break `array_equal`; advisor #1). **Anchor met:** a uniform x-flow advecting a step develops **no new
+  extrema** (θ∈[IC] to 1e-9, positive) under all four limiters where centered overshoots — *rigorous 1-D
+  TVD* (grid-aligned flow, h frozen by an exact steady state); `∫hθ` stays machine-exact (conservative
+  flux form untouched); variance/passivity seals stay green. **Honest edge (advisor #3, sharper than my
+  draft):** strict TVD is 1-D — in 2-D the dimension-split limiting (Goodman–LeVeque) gives no maximum
+  principle, so the 2-D test asserts only that the limiter *reduces* the overshoot vs centered (+ it is
+  dissipative ⇒ variance one-sided-decreases; gentle van Leer clips smooth extrema only mildly). Sweby
+  region `0≤ψ≤min(2,2r)` + **raise on unknown limiter name** (advisor #4: ψ≡2 is bounded yet non-monotone).
+  No reuse ripple (`LayeredShallowWater`/`baroclinic_qg` have their own `_rhs`; kwarg last). WENO not
+  needed — TVD meets the anchor at a fraction of the code. **The advisor done-check then caught a real
+  sign error** in the `U<0`/`V<0` upwind smoothness ratio (must be `θ−θ_plus`, not `θ_plus−θ` — pinned by
+  the linear-ramp `r=+1` criterion in both flow directions); the `+x`-only anchor missed it. Its empirical
+  signature is **direction-asymmetric over-diffusion** (negative-flow peak 0.83 vs 0.96), **not** the
+  predicted overshoot — a pure step stays monotone under the buggy limiter too (no interior extremum to
+  over-amplify) — so the regression is a **reflection-symmetry** test (peak retention is *bit-identical*
+  for ±x/±y on the correct scheme) plus the ±x/±y-parametrized monotone step. **[named upgrade — BUILT]** →
   [[planet-rung1-two-way-coupler]].
 - [ ] **Wet-get-wetter precip shape/amplitude** · *deliverable:* `q`-scaled amplitude in
   `planet/circ_precip.py` (the band-centre←jet *position* seam is already banked) · *anchor:* amplitude

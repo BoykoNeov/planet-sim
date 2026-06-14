@@ -61,7 +61,8 @@ stacked-field shape is the GCM-climb seam: **N vertical layers** is a leading-ax
 extension, and an **advected tracer** is one more field — both contract *extensions*
 that do not change the per-step array boundary. The **advected tracer is built** (rung 1):
 a ``tracer`` set on :class:`SWState` is advected in flux form by :meth:`step` as a strictly
-**passive** scalar (no feedback on the dynamics). **N vertical layers** remain a named,
+**passive** scalar (no feedback on the dynamics), either with the default centered flux or — opt-in
+via ``tracer_limiter`` — a **TVD-limited** (monotone) flux. **N vertical layers** remain a named,
 unbuilt extension (rung 3 — baroclinic).
 
 Units & sign convention
@@ -188,6 +189,41 @@ def _ym(a: np.ndarray) -> np.ndarray:   # value at j-1 (south)
 
 
 # --------------------------------------------------------------------------- #
+# TVD flux limiters (opt-in, passive-tracer advection only — rung 1 upgrade)
+# --------------------------------------------------------------------------- #
+# Each ψ(r) maps the upwind smoothness ratio r to a blend weight on the second-
+# order (centered) part of the face value: θ_face = θ_up + ½·ψ(r)·(θ_down − θ_up).
+# ψ≡0 is pure first-order upwind; ψ≡1 is the unlimited centered average (the
+# engine's default tracer scheme). All four limiters below live in the Sweby TVD
+# region 0 ≤ ψ ≤ min(2, 2r) and vanish for r ≤ 0 (an extremum), which is exactly
+# what makes the limited mixing-ratio stay bounded by its two neighbours ⇒ the
+# updated cell value is a convex combination ⇒ no new extrema (1-D monotone).
+def _minmod(r: np.ndarray) -> np.ndarray:
+    return np.maximum(0.0, np.minimum(1.0, r))
+
+
+def _vanleer(r: np.ndarray) -> np.ndarray:
+    ar = np.abs(r)
+    return (r + ar) / (1.0 + ar)
+
+
+def _mc(r: np.ndarray) -> np.ndarray:                          # monotonized central
+    return np.maximum(0.0, np.minimum(np.minimum(2.0 * r, 0.5 * (1.0 + r)), 2.0))
+
+
+def _superbee(r: np.ndarray) -> np.ndarray:
+    return np.maximum(0.0, np.maximum(np.minimum(2.0 * r, 1.0), np.minimum(r, 2.0)))
+
+
+_TRACER_LIMITERS = {
+    "minmod": _minmod,
+    "vanleer": _vanleer,
+    "mc": _mc,
+    "superbee": _superbee,
+}
+
+
+# --------------------------------------------------------------------------- #
 # Solver
 # --------------------------------------------------------------------------- #
 class ShallowWater:
@@ -211,6 +247,15 @@ class ShallowWater:
         Reference latitude for ``f = f₀ + β(y − y_ref)``; defaults to the domain center.
     bottom : ndarray, optional
         Bottom topography ``h_b`` at cell centers (m); ``None`` is a flat bottom.
+    tracer_limiter : str, optional
+        Selects a **TVD flux limiter** for the passive-tracer advection (rung-1
+        upgrade). ``None`` (default) keeps the unlimited **centered** flux — the
+        original scheme, byte-for-byte — which is second-order but **over/undershoots**
+        sharp tracer fronts (Gibbs ripples). One of ``"minmod"``, ``"vanleer"``,
+        ``"mc"``, ``"superbee"`` makes the tracer **monotone** (no new extrema) along
+        grid-aligned flow, at the cost of first-order clipping at smooth extrema; the
+        conservative flux form is untouched, so ``∫hθ`` stays machine-exact either way.
+        Affects **only** the tracer — the dry ``(h, u, v)`` dynamics are byte-identical.
     """
 
     def __init__(
@@ -222,11 +267,19 @@ class ShallowWater:
         beta: float = 0.0,
         y_ref: Optional[float] = None,
         bottom: Optional[np.ndarray] = None,
+        tracer_limiter: Optional[str] = None,
     ) -> None:
         if g <= 0.0:
             raise ValueError(f"g must be positive, got {g}")
         if mean_depth <= 0.0:
             raise ValueError(f"mean_depth H must be positive, got {mean_depth}")
+        if tracer_limiter is not None and tracer_limiter not in _TRACER_LIMITERS:
+            raise ValueError(
+                f"unknown tracer_limiter {tracer_limiter!r}; "
+                f"choose from {sorted(_TRACER_LIMITERS)} or None (unlimited centered)"
+            )
+        self.tracer_limiter = tracer_limiter
+        self._limiter = None if tracer_limiter is None else _TRACER_LIMITERS[tracer_limiter]
         self.grid = grid
         self.g = float(g)
         self.H = float(mean_depth)
@@ -338,8 +391,10 @@ class ShallowWater:
         scheme holds it to a small, **bounded** drift — the honesty class of :meth:`potential_enstrophy`
         (a near-invariant), **not** machine-exact like :meth:`mass`/:meth:`tracer_mass` and **not**
         dt-convergent like :meth:`energy` (smooth fields drift at round-off; strongly filamented runs
-        cascade variance toward the grid). It is **not** monotone — no flux limiter, so sharp gradients
-        over/undershoot (no boundedness of θ is claimed). Raises if no tracer is set.
+        cascade variance toward the grid). With the **default** unlimited centered scheme it is **not**
+        monotone — sharp gradients over/undershoot (no boundedness of θ is claimed); constructing the
+        solver with a ``tracer_limiter`` makes the advection monotone (no new extrema) and dissipative
+        (variance then only decreases). Raises if no tracer is set.
         """
         if state.tracer is None:
             raise ValueError("state carries no tracer (state.tracer is None)")
@@ -397,15 +452,51 @@ class ShallowWater:
 
         # Passive tracer (rung 1): flux-form advection of the tracer mass m = h·θ,
         # ∂m/∂t = −∇·(θ·hu), REUSING the mass fluxes U, V already assembled above. The face
-        # tracer is the centered 2-point average (matching the centered scheme). This
-        # telescopes on the periodic domain ⇒ ∫m conserved to machine precision (like mass),
-        # and is *consistent*: for a uniform θ it reduces to θ·dh, so a constant tracer is
-        # preserved (no spurious source). It does NOT feed back on (h, u, v) — strictly passive.
+        # tracer mixing-ratio is the centered 2-point average (matching the centered scheme),
+        # OR — opt-in — a TVD-limited value (``tracer_limiter``). Either way the scheme stays in
+        # conservative flux form, so it telescopes on the periodic domain ⇒ ∫m conserved to
+        # machine precision (like mass), and is *consistent*: for a uniform θ both face values
+        # reduce to θ, so the tendency is θ·dh and a constant tracer is preserved (no spurious
+        # source). It does NOT feed back on (h, u, v) — strictly passive.
         theta = m / h
-        Fx = U * 0.5 * (theta + _xm(theta))       # tracer flux at u-faces
-        Fy = V * 0.5 * (theta + _ym(theta))       # tracer flux at v-faces
+        if self._limiter is None:
+            Fx = U * 0.5 * (theta + _xm(theta))   # tracer flux at u-faces (centered, unlimited)
+            Fy = V * 0.5 * (theta + _ym(theta))   # tracer flux at v-faces
+        else:
+            Fx = U * self._limited_face(theta, U, _xm, _xp)   # TVD-limited u-face value
+            Fy = V * self._limited_face(theta, V, _ym, _yp)   # TVD-limited v-face value
         dm = -((_xp(Fx) - Fx) / dx + (_yp(Fy) - Fy) / dy)
         return dh, du, dv, dm
+
+    def _limited_face(self, theta, flux, shift_m, shift_p) -> np.ndarray:
+        """TVD-limited tracer mixing-ratio at the velocity faces along one axis.
+
+        The face indexed like its mass flux ``flux`` sits between the cell (``theta``) and its
+        ``shift_m`` neighbour (the *minus* side: west for ``_xm``, south for ``_ym``). Upwind is
+        chosen by ``sign(flux)``; the limited value is ``θ_up + ½·ψ(r)·(θ_down − θ_up)`` with
+        ``r`` the upwind smoothness ratio. For any Sweby-region ψ this stays bounded in
+        ``[θ_up, θ_down]`` ⇒ a monotone (no-new-extrema) reconstruction along the flow. Multiply
+        the return by the face mass flux to get the conservative tracer flux.
+
+        The ``r`` division is taken only where the across-face gradient is nonzero (flat across a
+        face ⇒ ``θ_down = θ_up`` and the blend term vanishes anyway), so it is NaN/warning-free and
+        a uniform tracer is preserved exactly.
+        """
+        th = theta
+        th_m = shift_m(th)                        # neighbour on the minus side of the face
+        th_p = shift_p(th)                         # neighbour on the plus side
+        th_mm = shift_m(th_m)                      # one further to the minus side
+        pos = flux > 0.0                           # flow from the minus side toward the cell
+        up = np.where(pos, th_m, th)
+        down = np.where(pos, th, th_m)
+        # gradient one cell upwind of the face, in the flow direction (sign matters per branch):
+        #   flux>0 → upwind cell is the minus-neighbour, next-upwind one further minus: θ_m − θ_mm
+        #   flux<0 → upwind cell is THIS cell, next-upwind the plus-neighbour:          θ − θ_p
+        num = np.where(pos, th_m - th_mm, th - th_p)
+        den = down - up                            # gradient across the face (downwind − upwind)
+        nonzero = den != 0.0
+        r = np.where(nonzero, num / np.where(nonzero, den, 1.0), 0.0)
+        return up + 0.5 * self._limiter(r) * den
 
     # -- time stepping (SSP-RK3) -------------------------------------------- #
     def step(self, state: SWState, dt: float) -> SWState:
