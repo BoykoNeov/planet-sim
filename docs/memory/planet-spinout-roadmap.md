@@ -39,13 +39,30 @@ atmosphere↔ocean = project boundary, all the same line.
   NetCDF Julia), `import(export(s))==s` round-trip-identity = the real test.
 
 **planet-sim rungs (finish in THIS repo; stays ATMOSPHERE-ONLY, never ships an ocean visual):**
-- **R1 = materialize+serialize the viz contract — THIS is what the spinoff binds on, NOT Rung C.** Serialize
-  the today-computed-then-viewed `vector_overlay` jet into the §9.3 schema (vector-field layer, both
-  encodings, round-trip test extended). Decisive move: **add a synthetic global-coverage 2nd producer** and
-  read BOTH the real eddy band AND the synthetic field through the **already-built Rung B renderer**
-  (`eddy_globe.py`) → proves **producer-agnosticism** = the exact property ClimaOcean later relies on.
-- **R2 = §9.4 toolkit promotion** (rule-of-three now met: frame side-channel + flow-globe + serialization
-  have a 3rd consumer). Natural co-rung.
+- **R1 = materialize+serialize the viz contract — THIS is what the spinoff binds on, NOT Rung C. BUILT
+  2026-06-14** (`planet/flow_serialize.py` + `demo_flow_serialize.py` + `test_flow_serialize.py`; committed
+  globe `docs/figures/planet-flow-serialize.html`). A `FlowField` → a `VECTOR_OVERLAY` `Layer` in a
+  `PlanetView`/`PlanetSpec` (**reuse the schema, ADR 0004 #3 "one structure not two"** → `planet_spec.save/load`
+  unchanged); coverage-extent+provenance+radius+honesty ride the JSON-safe `style` **cast native** (win32
+  numpy-int json landmine, breaks the `==`). **Proof = round-trip identity on BOTH producers** (real eddy band
+  `is_global=False` + synthetic global `is_global=True`). **Two advisor-settled design forks:** (a) renderer =
+  **`planetmap.render` (generic cones), NOT `eddy_globe.py`** — the plan's "Rung B renderer" was a STALE ref
+  (`eddy_globe` consumes an eddy OBJECT, not a field); `render` gained a backward-compat `caption=` + a
+  **honest-by-DEFAULT caption** (a flow view's `VECTOR_OVERLAY.style["honesty"]` replaces the zonal-mean/
+  emergent-jet clauses — coupler `circulation_layer` has no honesty so it's unchanged); common scalar = speed
+  `|(u,v)|`. (b) **band embedded on a FULL-GLOBE grid, zeros outside its coverage box** — NH-sector-only, NOT
+  `circulation_layer`'s mirror+wrap, NOT a patch grid (whose `_polecapped` would smear); honest-by-construction
+  + IS the ECCO target shape ("grid you serialize = grid you render"). **`frames` = named DEFERRED** increment
+  (orthogonal to producer-agnosticism; single saturated snapshot for R1). Gate full fast lane + slow live-eddy
+  round-trip + site drift guards green.
+- **R2 = §9.4 toolkit promotion — BUILT (as DOCUMENTATION) 2026-06-14.** R1 gave the SERIALIZATION machinery its
+  3rd consumer (export + two-world diff + vector interchange), meeting rule-of-three — but it's ALREADY a clean
+  shared module, so the promotion is **document it, NOT extract** (§9.4 post-split note + §11.2). **The
+  globe-geometry HELPERS stay 2-consumer** (`_sphere_xyz`: planetmap→eddy_globe; `_band_geometry`/`_earth_radius`:
+  eddy_globe→flow_globe — R1 added a serialization consumer, NOT a geometry one) → extracting them now = the
+  pre-emption §9.4 forbids (named+held). Other half: refreshed the **stale cross-repo `viz/` / ARCHITECTURE.md §6
+  refs** (dead since the 2026-06-10 monorepo split). The advisor pre-flagged "R2 has no high-value standalone
+  form" — the bundle's engineering value WAS R1.
 - **R-parallel = Rung C** (three.js/WebGL particle showcase) **OFF the critical path** — proves
   *renderer*-agnosticism (a DIFFERENT axis from R1's *producer*-agnosticism); spinoff does NOT wait on it.
 - **R3 = bank planet-sim** (atmosphere-only capstone; seam documented+tested). Start the new repo only AFTER
