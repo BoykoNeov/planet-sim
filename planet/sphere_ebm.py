@@ -32,7 +32,9 @@ that identification and named so the rung is not over-read:
   is simply the latitude of the **temperature maximum** (``∂T/∂x = 0``). Calling it "the ITCZ" is an
   *identification* by appeal to external moist theory, not an emergent rain belt. Wiring it into the
   prescribed precipitation band (:func:`itcz_informed_precip`) **relocates** that band to the
-  energetically-warmest latitude; it does **not** make rainfall emergent. (The *moisture-convergence* sign
+  energetically-warmest latitude; it does **not** make rainfall emergent. (The emergent-budget version —
+  rain that *falls out of* a conserving ``P − E`` budget and co-locates with the EFE, not a painted band —
+  is :mod:`planet.sphere_moist`.) (The *moisture-convergence* sign
   in the deep tropics is a separate fix — the eddy-only :func:`planet.moist.moisture_convergence` stays
   backwards there by default; the opt-in :func:`planet.moist.hadley_moisture_convergence` adds the mean
   Hadley cell that flips it. This rung is about ITCZ *position*, that one about the deep-tropical *sign*.)
@@ -352,7 +354,9 @@ def itcz_informed_precip(climate: SphereClimate) -> np.ndarray:
     to the symmetric rung-0 field **bit-for-bit when ``φ_EFE = 0``** (the plumbing reduction). **Honest
     scope (module docstring):** this *relocates a prescribed band* to the energetically-warmest latitude in
     a **dry** model — it is **not** emergent rainfall, and the rung-0 :mod:`planet.precip` stays the default
-    everywhere else (opt-in, like :mod:`planet.circ_precip`).
+    everywhere else (opt-in, like :mod:`planet.circ_precip`). For rain that *emerges* from a conserving
+    ``P − E`` budget (and co-locates with the EFE rather than being painted there), see
+    :func:`planet.sphere_moist.sphere_moisture_budget`.
     """
     return precip.precipitation(climate.latitude_deg(), climate.global_mean_T,
                                 itcz_center_deg=climate.phi_efe)

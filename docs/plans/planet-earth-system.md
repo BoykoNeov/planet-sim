@@ -1481,6 +1481,59 @@ opt-in/independent-diff discipline of `energy_constrained_precip_field` / `circ_
   updated; `precip.py` untouched. Sources extend [[moist-ebm-source]] (Held & Soden 2006 rich-get-richer;
   the diffusive-moist-EBM + mean-circulation moisture budget — Hartmann GPC; Hwang & Frierson 2010).
 
+**Rung 2.x — Emergent ITCZ rain BUILT (the full-sphere moisture budget co-located with the EFE;
+`planet/sphere_moist.py`, 2026-06-14).** The "meatiest new finding" slice: rung 2.x's precip wire only
+**relocated a prescribed Gaussian band** to the EFE (a *dry* model painting a belt); this rung carries the
+rung-2 **column moisture budget** onto the full sphere so the ITCZ rain **emerges from a conserving `P−E`
+budget** whose convergence maximum **sits on the EFE** — *rained*, not *painted*. **A SIBLING** —
+`moist.py`/`sphere_ebm.py` UNTOUCHED (reuses `moist.specific_humidity`/`q_sat`/`HADLEY_STRENGTH`, re-derives
+the conservative operators on the doubled grid). Built **spike-first** (`outputs/rung2x_sphere_moist_spike.py`,
+gitignored) + **advisor-pressure-tested twice** — the second round **overturned the advisor's own predicted
+headline** (record it, it's load-bearing). The model = full-sphere eddy convergence `(D/c_p)·∂ₓ[(1−x²)∂ₓq]`
++ a **two-cell Hadley** circulation whose ascent is **anchored at the EFE** (`hadley_streamfunction`,
+asymmetric widths — descent edges pinned at ±30° ⟹ the physical cross-equatorial cell widens), both in
+**conservative face form** with two real polar Neumann-0 ends ⟹ `∫(P−E)=0` **machine-exact** for *any*
+asymmetric cell.
+- **Banked (tight/structural):** the **cross-model reduction** to the hemisphere `moist.moisture_budget` on
+  the NH at `φ_EFE=0` — **machine-exact** (eddy 0.0, full ~4e-11: a symmetric `q` zeroes the equatorial
+  face-flux, so the full-sphere stencil collapses to the hemisphere's equatorial-symmetry boundary);
+  `∫(P−E)=0` machine-exact (symmetric **and** displaced); symmetric climate ⟹ even `P−E` peaking at the
+  equator. The two-cell `Ψ` (0 at the EFE + at the ±edge descents, sign-flips across the EFE).
+- **The two real nuggets (advisor's final altitude):** (1) **co-location of the NET `P−E` on the EFE = a
+  FALSIFIABLE CHECK, not a given** — the down-gradient eddy term *exports* moisture from the warm EFE (the
+  rung-2 ITCZ trade), so the prescribed cell must **beat that export at the displaced latitude**; it does, by
+  a **~2.6× margin** (eddy ≈ −113 cm/yr vs Hadley ≈ +287 at the EFE) for the calibrated strength ⟹ the net
+  rain max lands on the EFE to **<1°** (checked, not assumed). (2) **The displaced-ITCZ peak intensification
+  is GEOMETRIC, NOT emergent `q` — a CLEAN NEGATIVE RESULT** (pinned so it is not silently re-read as a win):
+  the peak grows because the pinned-edge near cell **narrows**, not because the warm hemisphere is moister —
+  replacing `q(T)` with a hemispherically-symmetric `q` leaves the peak unchanged (180.8 ≈ 180.5 cm/yr), and
+  symmetric cell widths remove the intensification entirely. The only clean emergent-`q` signature is the
+  **~C–C warming response** (the Hadley-fix nugget, re-confirmed on the full sphere).
+- **THE ADVISOR OVERTURN (record it).** The advisor first predicted the headline = "the displaced ITCZ is
+  more intense because it sits in the warmer/moister hemisphere; magnitude tracks the interhemispheric
+  q-contrast = emergent." A decomposition spike **refuted it**: under the (constant-albedo) Q-flux the
+  q-contrast is tiny (~2–11 %), and **neither** the peak **nor** the wet-NH/dry-SH dipole tracks it — the
+  peak is geometric (above), the **dipole is displacement-driven** (present at full strength with a
+  *symmetric* `q`; its *direction*, toward the warm hemisphere, is by-construction). Surfaced as a
+  reconcile-call (the "don't silently switch on primary evidence" discipline); the advisor **conceded** and
+  re-pitched the altitude to: architectural win (budget-not-band) = the headline "what"; the two nuggets
+  above; **drop** any claim that `q` shapes the meridional asymmetry in either direction (the realq<symq
+  "damping" was confounded — symmetrizing also relocates the q-peak). The genuinely-new emergent content is
+  **modest** — largely 2.x's EFE displacement × the rung-2 Hadley convergence recombined into a conserving
+  budget.
+- **Named edges / walls (carried):** the cell is **prescribed** (`HADLEY_STRENGTH` the wall; the fully
+  emergent `Ψ∝H/GMS` cell = **rung 3+** — it double-counts the mean transport already lumped into the EBM's
+  `D` and needs a GMS closure); anchoring the ascent at the EFE is a **placement**, not a derivation (it is
+  what makes "rain co-locates with the EFE" true — by-construction); the asymmetry is **imposed** (Q-flux/
+  albedo); the **subtropical desert stays mislocated** (hyper-peaked C–C `q`, the rung-2 wall, unfixed);
+  `P−E` not a full `P` (no honest zonal `E` keeps `P≥0` — `moist.py`'s discipline). **Demo banked +
+  CI-guarded** (`planet/demo_sphere_moist.py` → `docs/figures/planet-sphere-moist.png`: rained-vs-painted +
+  the co-location margin + the conserving dipole/geometric-negative; the `slow`
+  `test_demo_reproduces_the_banked_headline` pins co-location + the margin + conservation + dipole signs +
+  geometric-not-q). Tests: `planet/tests/test_sphere_moist.py` (10 tight/loose/plumbing fast + 1 slow guard);
+  full gate **507 passed, 1 skip**. `moist.py`/`sphere_ebm.py` untouched (sphere_ebm breadcrumb added);
+  `precip.py` untouched. Extends [[planet-rung2x-itcz]], [[planet-rung2-hadley-fix]], [[moist-ebm-source]].
+
 **Rung 3 — SCOPED + spike-validated (vertical structure → baroclinic instability; 2026-06-12).** The
 biggest jump on the §5 staircase: the **first *structural* edit to a shared engine** since Phase 3 (so it
 triggers the full-repo gate + the import-drift guard, ADR 0003) and the **first compute wall**. A
@@ -2180,10 +2233,15 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
 
 **Rung 2 — moist dynamics (complete, incl. 2.5 / 2.x / Hadley fix).**
 *Buildable slices:*
-- [ ] **Emergent ITCZ rain** · *deliverable:* couple precip to the moisture budget in a `sphere_ebm.py`
-  sibling (today the band is *relocated*, not *rained*) · *anchor:* rain co-locates with the emergent
-  energy-flux-equator (not a prescribed band) and `∫(P−E)=0` stays machine-exact · *cost:* moisture
-  budget → precip seam. **[named upgrade]** → [[planet-rung2x-itcz]].
+- [x] ~~**Emergent ITCZ rain**~~ **BUILT 2026-06-14** (`planet/sphere_moist.py`) — the full-sphere moisture
+  budget (eddy + a two-cell Hadley cell anchored on the EFE), conservative `∫(P−E)=0` machine-exact, rain
+  *rained* not *painted*. **The advisor's predicted "q-contrast" headline was OVERTURNED** by a decomposition
+  spike: the displaced-ITCZ intensity is **geometric, not emergent `q`** (clean negative result), and the
+  wet/dry dipole is **displacement-driven** (direction by-construction). The two real nuggets: co-location of
+  the **net** `P−E` on the EFE is a **falsifiable check** (the prescribed cell beats the eddy export ~2.6×),
+  and the geometric-not-`q` negative. Genuinely-new emergent content is **modest** (2.x × Hadley recombined
+  into a conserving budget); the architectural win (budget-not-band) is the "what". **[named upgrade —
+  BUILT]** → [[planet-rung2x-itcz]].
 - [ ] **Tighten the ITCZ-migration sensitivity** · *deliverable:* re-derive `D` in `sphere_ebm.py` ·
   *anchor:* the closed-form `δ/AHT` lands within ~factor-1 of observed (currently ~2× high, rides the
   calibrated `D`) · *cost:* one re-derive. **[named refinement]** → [[planet-rung2x-itcz]].
