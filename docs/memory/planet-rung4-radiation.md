@@ -57,3 +57,47 @@ Pierrehumbert *PoPC* §4 / Goody & Yung (gray RE + two-stream closure); Trenbert
 (operating point); Myhre+ 1998 (the log law). Demo `planet/demo_radiation.py` → `docs/figures/planet-
 radiation.png` (3 panels: emergent OLR + slope-decomposition/WV-loading sweep + saturating forcing).
 [[moist-ebm-source]]; plan §10.
+
+---
+
+**Rung-4 completion — the per-latitude EBM wire BUILT 2026-06-14** (`planet/radiative_ebm.py`, 11 fast +
+2 demo tests; the natural completion, was *left-to-user-call*). Wires the emergent gray `OLR(Ts,τ)` into the
+EBM **per latitude** (real radiation drives the climate) — a **separate sibling alongside rung-0** (`ebm.py`
+untouched). Spike-first (`outputs/rung4_radiative_ebm_spike.py`, gitignored) + advisor-pressure-tested.
+
+**§12's scoping guess "radiative polar amplification" was OVERTURNED by the spike → it is TROPICAL.** The
+headline: the OLR slope is **not one number** — its *local* value `B_loc(Ts)=dOLR/dTs` collapses to ~1.0 at
+the warm equator (water-vapour feedback) and rises to ~2.4 by the cold pole, so under a uniform forcing
+warming **concentrates in the tropics** (endpoint `δT(pole)/δT(equator)≈0.68`, band 0.73) — the **mirror** of
+rung-2.5's moisture-*transport* polar amplification (~1.4). **The SIGN was measured, not assumed** (advisor's
+discriminator: smallest `B_loc` warms most; WV pulls it *down* at the equator, Planck `4σT³` pulls it *up* —
+WV wins). Clean "two mechanisms pull opposite ways" pair with rung 2.5.
+
+**Core = a coupled Newton steady solve** of `L_T·T + S(1−α) − OLR(T)=0` (Jacobian `L_T − diag(B_loc)`) — the
+**nonlinear generalisation of `ebm.steady_linear`'s direct mode**, reusing the engine-pinned transport
+tridiagonal. **NOT the Strang relaxation**, for two reasons found in the spike: (a) the half-step that is
+*exact* for rung-0's linear OLR carries an **O(Δt²) splitting error that does not vanish at equilibrium** once
+OLR is nonlinear (relaxed steady ⟨T⟩ drifts with the step → Newton; and **rung-0's own relax default has a
+sizeable contrast error**, 47.9 vs `steady_linear` 38.4 — so all rung-0 comparisons here use the *direct*
+reference); (b) it goes unstable at the warm-equator runaway. **Runaway finding:** the per-latitude wire
+**exposes the local Komabayashi–Ingersoll edge the global column hid** — at rung-4's *default* WV loading 0.5
+the equatorial column is *past* local runaway (`B_loc<0` for `Ts≳32°C`), so the wire runs at the
+**climlab-matched loading** (`climlab_matched_column`: WV fraction ≈ **0.348** giving global-mean `B=2`, where
+`B_loc>0` everywhere; Newton converges ~6 iters as transport stabilises the equator).
+
+**Advisor's Jensen catch (load-bearing): the global mean is NOT pinned at `ΔA/B`** (unlike rung 2.5) — OLR is
+concave so `⟨OLR(T)⟩≠OLR(⟨T⟩)` and the WV feedback **amplifies the mean too** (`⟨δT⟩=6.99 > ΔA/B_tan=5.94`);
+the moist-EBM "redistribution around a pinned mean" framing **does not transfer**. Present mean-state = a
+**Jensen warm shift** (~2°C above rung-0) with **contrast ≈ unchanged** (loading-matched mean slope ≈2) → the
+signal is in the *warming response*, not the present climate. **`D` NOT recalibrated** (§12 expected
+"recalibrate `D` as rung 2.5" as the cost; but the present contrast is already ≈ rung-0's, nothing to
+recalibrate *for*; `D` sets magnitude not sign). **Triad:** *tight* — linear `olr_fn` → `ebm.steady_linear`
+**bit-for-bit** (4.5e-13, all departure = OLR curvature) + **net-TOA=0 machine** at convergence; *discriminator
+(pure column)* — `B_loc` min at the warmest latitude + WV flips the Planck ordering; *unlock (loose)* —
+tropical amp **at the Earth loading**, **both sign AND magnitude ride the WV loading** (advisor's catch — the
+single-loading blind spot): a drier Planck-dominated planet is **POLAR** (`amp>1` below crossover ~0.15;
+`B_noWV` rises with Ts) — *unlike* rung-2.5's polar direction which IS RH-robust, so the "mirror" is not a
+symmetry of equally-robust mechanisms. Part of the 0.68 is **runaway-proximity** (warmed eq ~39°C, `B_loc≈0.5`,
+stable but near the hot edge). Null = the present *tangent* (uniform `B`, warms uniformly, `amp=1`). Demo `planet/demo_radiative_ebm.py` → `docs/figures/planet-radiative-ebm.png`.
+Remaining within-rung upgrades: spectral-band log law + moist-adiabatic lapse-rate feedback + clouds.
+[[planet-rung25-mse-diffusion]] [[moist-ebm-source]]; plan §10.

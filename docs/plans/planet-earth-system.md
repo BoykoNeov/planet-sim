@@ -1806,8 +1806,59 @@ text, local PDF); the logarithmic-CO₂ contrast → **Myhre+ 1998**.
   pins Te, the operating point, the decomposition bracket, the WV-loading recovery, and saturation, and the
   fast `test_the_decomposition_is_order_validated_against_soden_held` pins the Soden–Held orders). Tests:
   `planet/tests/test_radiation.py` (14 fast + 1 slow). No engine edit; `uses` unchanged. **Rung 4 core
-  COMPLETE** (the per-latitude EBM wire + the spectral-band log law + a moist-adiabatic lapse-rate feedback
-  = named within-rung upgrades).
+  COMPLETE** (the spectral-band log law + a moist-adiabatic lapse-rate feedback + clouds = named within-rung
+  upgrades; the per-latitude EBM wire is now BUILT, below).
+
+**Rung 4 completion — the per-latitude EBM wire BUILT** (2026-06-14, `planet/radiative_ebm.py`, 11 fast +
+  2 demo tests; the natural rung-4 completion, was *[left to user call]*). Wires the emergent gray
+  ``OLR(Ts,τ)`` into the EBM **per latitude** so *real radiation drives the climate* — a **separate sibling
+  alongside rung-0** (`ebm.py` untouched, the `moist_ebm`/`sphere_ebm`/`baroclinic_qg` discipline). Built
+  **spike-first** (`outputs/rung4_radiative_ebm_spike.py`, gitignored) + advisor-pressure-tested. **§12's
+  scoping guess was OVERTURNED by the spike: the amplification is TROPICAL, not "radiative polar."** The
+  headline = the OLR slope is **not one number**: its *local* value ``B_loc(Ts)=dOLR/dTs``
+  (:func:`local_radiative_slope`) collapses to ~1.0 at the warm equator (water-vapour feedback) and rises to
+  ~2.4 by the cold pole — so under a uniform forcing warming **concentrates in the tropics** (endpoint
+  ``δT(pole)/δT(equator)≈0.68``, band 0.73), the **mirror image** of rung-2.5's moisture-*transport* polar
+  amplification (~1.4–1.5). **The SIGN was measured, not assumed** (the advisor's discriminator: smallest
+  ``B_loc`` warms most; WV pulls ``B_loc`` *down* at the equator, the Planck ``4σT³`` pulls it *up* — WV wins
+  decisively). A clean "two mechanisms pull opposite ways" pair with rung 2.5: the WV *radiative* feedback
+  alone favours the tropics; *transport* (+ lapse-rate + ice, out of scope) make Earth's poles amplify.
+  **Numerical core = a coupled Newton steady solve** of ``L_T·T + S(1−α) − OLR(T)=0`` (Jacobian
+  ``L_T − diag(B_loc)``), the **nonlinear generalisation of ``ebm.steady_linear``'s direct mode** — reusing
+  the engine-pinned transport tridiagonal so transport cannot drift. **NOT the Strang relaxation** (two
+  findings forced this): (a) the relaxation half-step that is *analytically exact* for rung-0's linear OLR
+  carries an O(Δt²) **splitting error that does not vanish at equilibrium** once OLR is nonlinear (the relaxed
+  steady ⟨T⟩ drifts with the step, converging onto Newton; **rung-0's *own* relax default carries a sizeable
+  contrast error** — 47.9 vs ``steady_linear``'s dt-free 38.4 — so all rung-0 comparisons here use the direct
+  reference); (b) near the warm-equator runaway the local half-step goes unstable. **Runaway finding:** the
+  per-latitude wire **exposes the local Komabayashi–Ingersoll edge the global column hid** — at rung-4's
+  *default* WV loading 0.5 the equatorial column is *past* its local runaway (``B_loc<0`` for ``Ts≳32 °C``,
+  no stable local equilibrium), so the wire runs at the **climlab-matched loading**
+  (:func:`climlab_matched_column`: the WV fraction ≈ **0.348** giving global-mean ``B=2``, where ``B_loc>0``
+  everywhere and Newton converges in ~6 iters as transport stabilises the equator). **Triad:** *tight* — a
+  **linear ``olr_fn`` reproduces ``ebm.steady_linear`` bit-for-bit** (4.5e-13; whole gray departure
+  attributable to OLR **curvature** alone) + **net-TOA=0 machine-exact** at convergence (conservation);
+  *the discriminator (tight, pure column)* — ``B_loc`` minimised at the warmest latitude + the WV feedback
+  **flips the Planck ordering**; *unlock (real but loose)* — tropical amplification **at the Earth-calibrated
+  loading**, with **both the sign and the magnitude riding the WV loading** (the wall): a drier,
+  Planck-dominated planet is **polar** (``amp>1`` below a crossover loading ≈0.15; the bare ``B_noWV`` rises
+  with ``Ts`` so the dry equator damps most) — *unlike* rung-2.5's polar direction, which IS robust to its RH
+  wall, so the "mirror" holds at Earth's loading but is not a symmetry of equally-robust mechanisms (advisor's
+  catch — the single-loading blind spot, now pinned by a low-loading sign-flip test). Part of the ~0.68
+  magnitude is **runaway-proximity** (the warmed equator hits ~39 °C / ``B_loc≈0.5``, stable but near the
+  hot edge; a test asserts ``B_loc>0`` at the warmed state). **Advisor's Jensen catch (load-bearing): the global mean is NOT pinned at
+  ``ΔA/B``** — OLR is concave so ``⟨OLR(T)⟩≠OLR(⟨T⟩)`` and the WV feedback **amplifies the mean response too**
+  (``⟨δT⟩=6.99 > ΔA/B_tan=5.94``); the moist-EBM "redistribution around a pinned mean" framing **deliberately
+  does not transfer**. Present mean-state = a **Jensen warm shift** (gray ⟨T⟩ ~2 °C above rung-0) with
+  **contrast ≈ unchanged** (the loading-matched *average* slope ≈ 2), so the latitudinal signal lives in the
+  *warming response*, not the present climate. **``D`` NOT recalibrated** (§12 expected "recalibrate ``D`` as
+  rung 2.5 did" as the cost — but the present contrast is already ≈ rung-0's at this loading, so there is
+  nothing to recalibrate *for*; ``D`` sets the amplification magnitude not its sign). The clean **null** = the
+  present-day *tangent* (uniform ``B``), which warms exactly uniformly (``amp_null=1``), isolating the
+  nonlinearity. Demo banked + CI-guarded (`planet/demo_radiative_ebm.py` → `docs/figures/planet-radiative-ebm.png`:
+  the ``B_loc(φ)`` discriminator, the Jensen warm shift, the tropical-amplification warming). Scope edges
+  (each named): constant albedo / fixed lapse rate / clear-sky (the within-rung upgrades), uniform ``ΔA``
+  forcing not ``ΔS₀``. [[planet-rung4-radiation]]; extends [[moist-ebm-source]] [[ebm-radiation-source]].
 
 **Reference sources — pin at build (the `[[…-source]]` discipline, not carried from
 memory).** Phase 1 pinned `[[ebm-radiation-source]]` (`A, B, D, α, T_freeze` — Budyko
@@ -2057,12 +2108,12 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
 
 **Rung 4 — gray radiative transfer (complete).**
 *Buildable slices:*
-- [ ] **Per-latitude EBM wire** · *deliverable:* an opt-in sibling `RadiativeEBM` where gray `OLR(Ts,τ)`
-  drives each band → **emergent latitudinal radiative structure** (a crude radiative polar amplification,
-  distinct from the rung-2.5 *transport* one) · *anchor:* reduction to rung-0 at the climlab-matched
-  loading (global-mean `B=2`) + the emergent meridional profile · *cost:* re-opens the jointly-tuned
-  `(A,B,D)` calibration (recalibrate `D`, as rung 2.5 did). The natural rung-4 completion. **[left to user
-  call]** → [[planet-rung4-radiation]].
+- [x] ~~**Per-latitude EBM wire**~~ **BUILT 2026-06-14** (`planet/radiative_ebm.py`) — gray `OLR(Ts,τ)`
+  drives each band via a coupled Newton solve. §12's guess of "radiative polar amplification" was
+  **OVERTURNED → TROPICAL** amplification (the mirror of rung-2.5): `B_loc` smallest at the warm equator
+  (WV feedback beats Planck). `D` was **not** recalibrated (present contrast already ≈ rung-0's at the
+  climlab-matched loading); the global mean is **not** pinned (Jensen). → §10 rung-4 completion;
+  [[planet-rung4-radiation]].
 - [ ] **Spectral-band log law** · *deliverable:* replace gray's *saturating* concave `OLR(τ)` with
   band-resolved absorption · *anchor:* per-doubling `ΔF` becomes **constant** (the Myhre log law) at a
   realistic magnitude, vs gray's decreasing 48→…→20 W/m² · *cost:* band physics in the column.
