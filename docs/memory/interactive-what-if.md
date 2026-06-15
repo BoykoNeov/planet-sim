@@ -51,6 +51,31 @@ few true dupes). JS decode `cells[(i·nCo2 + j)·nObl + k]` must track the `for 
 order. Grid ≈3.7 k solves (~10 min regen); slow byte-golden stays CI-skipped; +1 fast test
 (`test_obliquity_axis_moves_the_climate`: flat 0° world → more ice + colder than Earth's tilt; prose names
 the knob). D/star/size still notebook-only.
+
+**4th axis — ocean fraction — BUILT 2026-06-15** (`3612377`; the user's "water knob" question, resolved to
+**option B = water that affects TEMPERATURE**, over option A = a biome-only precip-amplitude multiplier).
+**NOT a free reuse** like obliquity (which already had its `explain.py` clause): ocean needed a NEW cited
+`planet/ocean.py` param-derivation, a NEW `Knobs.ocean_fraction` field + cause/gradient clause + an honesty
+caveat. `ocean_params(w, base)` maps sea fraction → **two** EBM params it already accepts — `a0` (FIRM leg:
+wetter=darker=warmer, Donohoe&Battisti 2011, full-range planetary-albedo swing 0.07) and `D` (LOOSE/flagged
+leg: more ocean spreads heat poleward, Trenberth&Caron 2001, all-land −25%/all-ocean +10%); **commutes with
+`obliquity_params`** (disjoint: s2 vs a0/D). Earth's **0.71 = exact identity** → baseline bit-for-bit. **No
+`Knobs.D` double-count** (ocean drives D internally; the ocean clause narrates it). Honesty ceilings surfaced
+in prose + slider hint: heat-capacity/seasons INVISIBLE (equilibrium annual-mean), rain PATTERN fixed (precip
+= prescribed pattern × C–C, no ocean source) → a wetter world rains more *everywhere*, not somewhere new.
+[[ocean-albedo-transport-source]] pins the citations. **The obliquity "only the data axis moves" pattern did
+NOT fully hold**: ocean moves TEMPERATURE, so every ΔT/ice/biome/prose field refreshes per ocean value →
+**multiplicative on the page** (a biome-only knob would have shared the temperature fields, far cheaper). And
+the obliquity build's size lever was already spent: prose is **77% of the page and onelines/paragraphs are
+100% UNIQUE** (they embed exact ΔT/ice/%), so **string-interning is dead** and `_LAT_STRIDE` can't drop
+again. So the budget was bought elsewhere: **CO2 trimmed 17→9** (2 W/m², advisor: over-resolved at 1). Axis
+= **5 ocean steps {0, 35, 71, 85, 100}%**, including the exact `OCEAN_FRACTION_EARTH`. JS decode is now 4-D
+`cells[((i·nCo2+j)·nObl+k)·nOcean+l]` (track the `for s0: for co2: for obl: for ocean` order). **Size: 18.4
+MB** — my ~14 MB estimate **undershot by 30%** because ocean prose runs ~1890 vs ~1450 bytes/cell; user
+**confirmed keep-5 after I flagged it** (revealed preference = resolution over size, since they'd already
+picked the richest option). ~9.7 k solves (~regen minutes); slow byte-golden still CI-skipped; +`test_ocean.py`
++ ocean clauses in `test_explain.py` + `test_ocean_axis_moves_the_climate`. Browser eyeball owed →
+[[pending-interactive-hover-check]]. D/star/size still notebook-only.
 - The slow byte-exact golden (`test_committed_page_is_up_to_date`) is **CI-gated** (`_SKIP_IN_CI`)
   like the notebook test — 408 live EBM solves compared byte-for-byte is fragile cross-platform
   (LAPACK last-bit near a Whittaker threshold flips a biome-string digit). Fast structural tests

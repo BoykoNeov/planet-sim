@@ -43,6 +43,14 @@ What to verify when picked up (full numbered steps were given in session
    (scrollbar only on the longest cells).
 3. **Disk hover** — hovering the planet disk shows a tooltip naming the biome
    band + |lat|°, matching the band under the cursor; disappears off the globe.
+4. **Ocean knob (4th slider, built 2026-06-15 `3612377`)** — the blue 🌊 Ocean
+   slider (0…100%, default 71%) sits aligned in the knob row; dragging more-ocean
+   should warm the planet (ice line retreats, warm bands expand) and less-ocean cool
+   it, with the "why" prose naming "a wetter/drier world" + the heat-capacity/rain-
+   pattern caveat. Confirm the four-knob row stays aligned (it wraps to 2×2 below
+   ~52 rem — fine, each row still aligned) and that "Why" still holds still while
+   dragging ocean (the fixed-height one-liner). Page is now **18.4 MB** — first
+   off-disk load is heavier.
 
 **Disk band-latitude BUG found + fixed 2026-06-14 (`7fc976b`, pushed):** the
 user spotted boreal forest painted *poleward* of the ice-line ring (real cells:
