@@ -326,6 +326,54 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   **default**; circ-informed is **opt-in**. De-risked in two throwaway spikes first
   (`outputs/rung1_circprecip*`). Tests: fast reduction/migration/structure + one `slow` composition
   (`tests/test_circ_precip.py`). No engine edit; `uses` unchanged.
+- **Rung 2 (moist water cycle) — BUILT** (2026-06-11). `planet/moist.py` splits the single C–C precip
+  rate: the global **mean** is **energy-constrained** (~2.5 %/K, linear) while the wet−dry **anomaly**
+  sharpens at C–C ~7 %/K (Held & Soden 2006 "rich-get-richer"). **Structurally exact:** the mean-zero
+  anomaly split (so the area-mean really scales at the energy rate) + the reduction to rung 0 when the
+  two rates coincide; **opt-in**, `precip.py` stays the default. The emergent `P−E` budget reuses the
+  rung-1 κ→D bridge (`L` cancels — no new `D_q`), `∫(P−E)=0` machine-exact. **Pinned overreach:** the
+  split dries the *poles* (wrong sign — a tropical/subtropical idealization, not hidden). Showcased in
+  notebook §8.1. `tests/test_moist.py`.
+- **Rung 2.5 (MSE-diffusing moist EBM, where T responds) — BUILT** (2026-06-12; dt-free re-bank
+  2026-06-14). `planet/moist_ebm.py`: a moist-static-energy diffusivity `D_eff(T)=D_s·(1+β(T))` that
+  grows where it is warm. Headline = emergent **polar amplification ~2.05 (endpoint) / ~1.80 (band)**
+  from moisture transport **alone** — ice feedback OFF; the dry-EBM null warms *exactly uniformly*.
+  Read as **redistribution around a pinned `⟨δT⟩=ΔA/B`** (transport conserves ∫T): direction banked,
+  magnitude loose (rides the recalibrated `D_s≈0.30`). **Attribution exact:** freeze `D_eff` → PA = 1.
+  `moist_steady_direct` (Picard on the frozen-`D_eff` linear solve) is dt-free — the old ~1.5 was an
+  O(Δt) splitting artifact. Showcased in §8.2. `tests/test_moist_ebm.py`.
+- **Rung 2.x (full-sphere EBM + energetic ITCZ) — BUILT** (2026-06-14). `planet/sphere_ebm.py`: a
+  pole-to-pole `x∈[−1,1]` **sibling** (`ebm.py` untouched, hemisphere reduction 1e-9); the ITCZ = the
+  energy-flux-equator, migrating toward the warm hemisphere under an imposed asymmetry. The migration
+  **sensitivity is a closed-form consequence** of the calibrated `D` (observed *order*, ~2× high), not
+  an emergent prediction. Opt-in `itcz_center_deg` precip seam + the prescribed-Hadley `P−E` **sign**
+  fix in `moist.py` (eddy-only stays default — diffusion structurally can't converge moisture at a
+  max). `tests/test_sphere_ebm.py`.
+- **Rung 3 (baroclinic instability → eddy turbulence) — BUILT** (Phase A 2026-06-12, Phase B
+  2026-06-13). **Phase A = linear growth** (`engines/fluid/layered.py` + `stability.py`): the two-layer
+  SW dispersion rooted from first principles (zero-shear neutral to ~1e-20, recovers both Poincaré
+  modes); a sibling `LayeredShallowWater` engine, `nl=1` reduction byte-identical. **Phase B = the bet
+  won** (`planet/baroclinic_qg.py`, two-layer QG turbulence): the saturated baroclinic eddy thickness
+  flux is **down-gradient + irreversible (irr 0.96–1.0** vs rung-1 ~0.1) at an **order-unity
+  `κ/(v'L_d)=0.71–1.27`** (vs rung-1 ~1e-3) → rung-1's reduction-to-EBM **finally non-vacuous**. The
+  bet is won only by *showing turbulence* (inverse-cascade KE spectrum, peak below injection `k*`).
+  Tight leg: QG dispersion = analytic **Phillips** to 2e-15 + **Charney–Stern** `U_crit=β/F`. Banked
+  **dimensionless + qualitative** (dimensional `κ` is box/drag/resolution-dependent). The free-surface
+  SW route **outcropped** at saturation (`h→0` — the named wall that routed the build to QG). Showcased
+  in §8.3. `tests/test_baroclinic_qg.py` + `engines/fluid/tests/test_{layered,stability}.py`.
+- **Rung 4 (spectral radiation column) — BUILT**. `planet/radiation.py` + `radiative_ebm.py`: the §1
+  gray OLR offset `A` becomes a spectral column. **Headline = the logarithmic CO₂ law** — exponential
+  band wings turn the gray *saturating* forcing into the **Myhre** `5.35·ln(C/C₀)` ≈ 3.7 W/m²/doubling
+  (constant per doubling); flatten the wing and it saturates again (the wing is the whole ingredient).
+  Form banked, magnitude order-calibrated. Also an emergent moist-adiabat **lapse-rate feedback**
+  (**overturned** ~0.84 — it overshoots, named not banked). Reduces to the gray column. Showcased in
+  §8.4. `tests/test_radiation_lapse_rate.py`, `test_radiative_ebm.py`.
+- **Teaching surfaces re-synced to the rungs — BUILT** (2026-06-15). The notebook gained **§8 "Up the
+  staircase"** (four showcase sections — rungs 2 / 2.5 / 3 / 4 — that run the cheap demos live and embed
+  the banked figures), and its stale forward-looking prose was de-staled: §6 "what's next" now reports
+  the rungs as built, and §3's two "named gaps" (band migration, the energy-constrained rate) point at
+  the modules that closed them. The browser what-if (`docs/interactive/index.html`) header was updated
+  for the now-shipped ocean knob. This rung log extended through rung 4.
 
 ## Test runner (tiered gate, ADR 0003)
 

@@ -228,9 +228,10 @@ footer { color: #8b95ad; font-size: .88rem; margin-top: 2rem; border-top: 1px so
 _BODY = """\
 <header>
   <h1>Build a climate — turn a knob, watch a world</h1>
-  <p>Brighten or dim the Sun, add greenhouse gas, or tilt the axis. The planet's temperature, its
-  polar ice, and its bands of life respond instantly — and the panel tells you <em>what changed and
-  why</em>. Every number is the real energy-balance model; this page just looks it up.</p>
+  <p>Brighten or dim the Sun, add greenhouse gas, tilt the axis, or change how much of the world is
+  ocean. The planet's temperature, its polar ice, and its bands of life respond instantly — and the
+  panel tells you <em>what changed and why</em>. Every number is the real energy-balance model; this
+  page just looks it up.</p>
 </header>
 <main>
   <div class="controls">
