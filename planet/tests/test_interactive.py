@@ -7,7 +7,7 @@ Two tiers, like the rest of the repo:
   few model runs), so they run in the always-on lane.
 * **slow** — the committed ``docs/interactive/index.html`` equals a fresh full-grid generation, so a
   change to the model or the page that isn't re-banked fails the gate. Marked ``slow`` because it
-  reruns the whole (S0 × CO2 × tilt) knob grid (a few thousand model solves, minutes).
+  reruns the whole (S0 × CO2 × tilt × ocean) knob grid (~ten thousand model solves, minutes).
 """
 from __future__ import annotations
 
@@ -20,8 +20,9 @@ import pytest
 from planet import interactive
 from planet.biomes import Biome
 from planet.obliquity import OBLIQUITY_EARTH
+from planet.ocean import OCEAN_FRACTION_EARTH
 
-# The slow golden regenerates the whole (S0 × CO2 × tilt) grid of EBM solves and compares the page
+# The slow golden regenerates the whole (S0 × CO2 × tilt × ocean) grid of EBM solves and compares the page
 # byte-for-byte. That is safe as a *local* drift guard (it runs on the machine that banked the page),
 # but fragile cross-platform: a last-bit LAPACK difference on the Linux CI runner — especially one
 # that flips a digit in a biome string near a Whittaker threshold — would fail the comparison for a
@@ -31,19 +32,22 @@ from planet.obliquity import OBLIQUITY_EARTH
 # re-solve.)
 _SKIP_IN_CI = os.environ.get("CI", "").lower() in {"true", "1"}
 
-# A tiny grid whose (0,0,0) cell is the exact Earth detent (S0=1365, CO2=0, tilt=23.44°) → the
-# baseline message. The obliquity axis must carry the exact OBLIQUITY_EARTH float as its first value
-# (not a typed 23.44) so the obliquity factor is exactly 1 there and s₂ is bit-identical to the model.
+# A tiny grid whose (0,0,0,0) cell is the exact Earth detent (S0=1365, CO2=0, tilt=23.44°, ocean=0.71)
+# → the baseline message. The obliquity and ocean axes must carry the exact OBLIQUITY_EARTH and
+# OCEAN_FRACTION_EARTH floats as their first value (not a typed 23.44 / 0.71) so both knobs are exactly
+# the identity there and s₂/a0/D are bit-identical to the model.
 _SMALL = dict(s0_values=[1365.0, 1375.0], co2_values=[0.0, 2.0],
-              obliquity_values=[OBLIQUITY_EARTH, 45.0])
+              obliquity_values=[OBLIQUITY_EARTH, 45.0], ocean_values=[OCEAN_FRACTION_EARTH, 1.0])
 
 
 def test_compute_grid_shape():
     grid = interactive.compute_grid(**_SMALL)
-    assert len(grid["cells"]) == 8                         # 2 × 2 × 2
+    assert len(grid["cells"]) == 16                        # 2 × 2 × 2 × 2
     assert grid["axes"]["s0"]["values"] == [1365.0, 1375.0]
     assert grid["axes"]["co2"]["default_index"] == 0
     assert grid["axes"]["obl"]["default_index"] == 0       # OBLIQUITY_EARTH is the first tilt value
+    assert grid["axes"]["ocean"]["values"] == [71, 100]    # stored as whole-percent of surface
+    assert grid["axes"]["ocean"]["default_index"] == 0     # OCEAN_FRACTION_EARTH is the first value
     assert len(grid["lat"]) == len(grid["cells"][0]["temp"]) == len(grid["cells"][0]["biome"])
     assert set(grid["palette"]) == set(grid["names"])      # a colour for every named biome
     cell = grid["cells"][0]
@@ -64,12 +68,28 @@ def test_obliquity_axis_moves_the_climate():
     fixed and the response is the obliquity knob alone — the s₂(ε) gradient steepening at low tilt.
     """
     grid = interactive.compute_grid(s0_values=[1365.0], co2_values=[0.0],
-                                    obliquity_values=[0.0, OBLIQUITY_EARTH])
+                                    obliquity_values=[0.0, OBLIQUITY_EARTH],
+                                    ocean_values=[OCEAN_FRACTION_EARTH])   # pin ocean so only tilt moves
     flat, earth = grid["cells"][0], grid["cells"][1]       # tilt = 0°, then Earth's 23.44°
     assert flat["ice"] < earth["ice"]                      # an untilted world has more polar ice
     assert flat["Tbar"] < earth["Tbar"]                    # and runs colder (stronger ice-albedo)
     assert "tilt" in flat["paragraph"].lower()             # the prose names the obliquity knob
     assert "baseline" in earth["headline"].lower()         # Earth's tilt at the detent stays baseline
+
+
+def test_ocean_axis_moves_the_climate():
+    """More ocean darkens the surface → a warmer planet than a drier world at the same Sun/CO₂/tilt.
+
+    Holds the other three knobs at present-day and walks only the ocean fraction from a land world to
+    Earth's sea fraction, so the response is the ocean knob alone (lower a0 + a touch more transport).
+    """
+    grid = interactive.compute_grid(s0_values=[1365.0], co2_values=[0.0],
+                                    obliquity_values=[OBLIQUITY_EARTH],
+                                    ocean_values=[0.0, OCEAN_FRACTION_EARTH])
+    land, earth = grid["cells"][0], grid["cells"][1]       # 0% ocean, then Earth's 71%
+    assert land["Tbar"] < earth["Tbar"]                    # a drier, brighter world runs colder
+    assert "ocean" in land["paragraph"].lower()            # the prose names the ocean knob
+    assert "baseline" in earth["headline"].lower()         # Earth's sea fraction stays the baseline
 
 
 def test_page_is_self_contained_and_deterministic():
@@ -81,7 +101,7 @@ def test_page_is_self_contained_and_deterministic():
     assert "http://" not in html and "https://" not in html
     assert 'src="http' not in html
     assert '<canvas id="disk"' in html and '<canvas id="curve"' in html
-    assert all(f'id="{knob}"' in html for knob in ("s0", "co2", "obl"))   # all three knob sliders
+    assert all(f'id="{knob}"' in html for knob in ("s0", "co2", "obl", "ocean"))  # all four knob sliders
     assert 'id="tip"' in html and "mousemove" in html                     # the disk biome-hover read-out
 
 
@@ -98,7 +118,7 @@ def test_committed_page_is_well_formed():
     assert "window.PLANET_DATA = " in html
     assert "http://" not in html and "https://" not in html
     assert '<canvas id="disk"' in html
-    assert all(f'id="{knob}"' in html for knob in ("s0", "co2", "obl"))   # all three knob sliders
+    assert all(f'id="{knob}"' in html for knob in ("s0", "co2", "obl", "ocean"))  # all four knob sliders
     assert 'id="tip"' in html and "mousemove" in html                     # the disk biome-hover read-out
 
 
@@ -148,7 +168,8 @@ def test_disk_paints_no_forest_on_the_ice_cap(s0, co2, obl):
     warmer −5 °C isotherm, which is equatorward of the ring). This replays ``drawDisk``'s fixed
     nearest-latitude lookup over the disk's pixel rows and pins that physics on the screen.
     """
-    grid = interactive.compute_grid(s0_values=[s0], co2_values=[co2], obliquity_values=[obl])
+    grid = interactive.compute_grid(s0_values=[s0], co2_values=[co2], obliquity_values=[obl],
+                                    ocean_values=[OCEAN_FRACTION_EARTH])   # Earth sea fraction
     cell, lat, ice = grid["cells"][0], grid["lat"], grid["cells"][0]["ice"]
     assert 1 < ice < 89, "this cell must have a finite ice cap for the ring to be drawn"
     R = 144                                            # the shipped disk radius (canvas 300 → R≈144)
@@ -168,12 +189,12 @@ def test_disk_paints_no_forest_on_the_ice_cap(s0, co2, obl):
 @pytest.mark.slow
 @pytest.mark.skipif(
     _SKIP_IN_CI,
-    reason="byte-exact over the full (S0 × CO2 × tilt) grid of live EBM solves — fragile cross-platform "
+    reason="byte-exact over the full (S0 × CO2 × tilt × ocean) grid of live EBM solves — fragile cross-platform "
     "(LAPACK last-bit near a Whittaker biome threshold); a local-only drift guard. Fast structural "
     "tests cover CI.",
 )
 def test_committed_page_is_up_to_date():
-    """docs/interactive/index.html must equal a fresh full-grid build (re-run `python -m planet.interactive`)."""
+    """docs/interactive/index.html must equal a fresh full-grid build (re-run `python -m planet interactive`)."""
     expected = interactive.build_app_html(interactive.compute_grid())
     actual = interactive.APP_PATH.read_text(encoding="utf-8")
     assert actual == expected, "docs/interactive/index.html is stale — regenerate it and commit"

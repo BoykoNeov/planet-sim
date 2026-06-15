@@ -43,7 +43,7 @@ straight to one?
 ```powershell
 python -m planet snowball     # run one demo (prints its validation table + banks a figure)
 python -m planet list         # print the full catalogue of demos
-python -m planet interactive  # drag three knobs in your browser — a live what-if + plain-language "why"
+python -m planet interactive  # drag four knobs in your browser — a live what-if + plain-language "why"
 python -m planet notebook     # open the teaching notebook in JupyterLab (opens your browser for you)
 python -m planet globes       # just open a saved interactive globe — no compute
 python -m planet site         # build & open the landing page — a clickable gallery of everything

@@ -11,6 +11,7 @@ from planet.albedo import A_OLR, EBMParams, S0_EARTH
 from planet.demo_biomes import compute
 from planet.explain import Diagnostics, Knobs, diagnose, explain
 from planet.obliquity import OBLIQUITY_EARTH
+from planet.ocean import OCEAN_FRACTION_EARTH
 
 _BASE = diagnose(compute(EBMParams()))
 
@@ -112,6 +113,38 @@ def test_obliquity_cooling_note_absent_when_tilt_lowered():
     """A *smaller* tilt starves the poles (a steeper gradient) — not the redistribution-cooling case."""
     ex = explain(Knobs(obliquity_deg=6.0), _BASE_DIAG, _diag(35.0, 90.0))
     assert "redistributes" not in ex.paragraph.lower()
+
+
+def test_more_ocean_reads_as_a_darker_warmer_world():
+    """A wetter world: the cause names the darkening surface, the paragraph the poleward transport."""
+    ex = explain(Knobs(ocean_fraction=1.0), _BASE_DIAG, _diag(18.0, 75.0))
+    one = ex.oneline.lower()
+    assert "wetter world" in one and "darkens" in one
+    assert "warm" in one and "cool" not in one
+    assert "carries more heat poleward" in ex.paragraph.lower()   # the transport (gradient) channel
+
+
+def test_less_ocean_reads_as_a_brighter_cooler_world():
+    """A drier world: the surface brightens (reflects more) and the planet cools."""
+    ex = explain(Knobs(ocean_fraction=0.0), _BASE_DIAG, _diag(11.0, 65.0))
+    one = ex.oneline.lower()
+    assert "drier world" in one and "brightens" in one
+    assert "cool" in one and "warm" not in one
+
+
+def test_ocean_caveat_fires_when_ocean_moved():
+    """Moving the ocean knob surfaces the two honest ceilings (heat capacity + fixed rain pattern)."""
+    ex = explain(Knobs(ocean_fraction=1.0), _BASE_DIAG, _diag(18.0, 75.0))
+    para = ex.paragraph.lower()
+    assert "heat capacity" in para and "fixed latitude pattern" in para
+
+
+def test_ocean_caveat_absent_at_earth_fraction():
+    """Ocean at Earth's fraction (another knob did the warming) → no ocean clause or caveat."""
+    ex = explain(Knobs(ocean_fraction=OCEAN_FRACTION_EARTH, A=A_OLR - 8), _BASE_DIAG, _diag(20.0, 80.0))
+    text = (ex.oneline + " " + ex.paragraph).lower()
+    assert "wetter world" not in text and "drier world" not in text
+    assert "heat capacity" not in text
 
 
 def test_deterministic():

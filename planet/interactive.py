@@ -1,9 +1,10 @@
 """Generate ``docs/interactive/index.html`` — the **no-install** browser what-if.
 
-The user-facing front door for *experimentation*: drag three knobs (the Sun's brightness, the
-greenhouse strength, and the axial tilt) and watch the planet's climate, its biome bands, and a
-plain-language *what changed + why* explanation update **instantly** — no Jupyter, no Python, no
-install. It opens straight off disk and serves from GitHub Pages the same way the existing globes do.
+The user-facing front door for *experimentation*: drag four knobs (the Sun's brightness, the
+greenhouse strength, the axial tilt, and how much of the surface is ocean) and watch the planet's
+climate, its biome bands, and a plain-language *what changed + why* explanation update **instantly** —
+no Jupyter, no Python, no install. It opens straight off disk and serves from GitHub Pages the same
+way the existing globes do.
 
 How it stays honest (the repo's whole character):
 
@@ -38,23 +39,29 @@ from planet.catalog import _REPO_ROOT
 from planet.demo_biomes import compute
 from planet.explain import Knobs, diagnose, explain
 from planet.obliquity import OBLIQUITY_EARTH, OBLIQUITY_FAITHFUL_MAX, obliquity_params
+from planet.ocean import OCEAN_FRACTION_EARTH, ocean_params
 
 APP_PATH = _REPO_ROOT / "docs" / "interactive" / "index.html"
 
-# --- the grid (the three browser knobs) ------------------------------------------------------- #
+# --- the grid (the four browser knobs) -------------------------------------------------------- #
 # S0 spans dim→bright and lands an exact Earth detent on 1365 (1365 = 1235 + 13·10); the low end
-# crosses the Snowball cliff (~1250) so dragging the Sun can freeze the planet. CO2 warming is a
-# cut in the OLR offset A (demo_biomes' convention), 0→16 W/m² (present-day → ice-free hothouse).
-# Obliquity (axial tilt) is the third axis: an untilted 0° world (s₂ = −5/8, the steepest insolation
-# gradient, coldest poles) up to the single-P₂ knob's faithful cap (OBLIQUITY_FAITHFUL_MAX = 45°,
-# beyond which the dropped s₄ grows — the obliquity.py "scope edge"). Unlike S0 it is smooth and
-# cliff-free, so a coarse 9-value axis captures the whole trend (it triples the grid, not 24×). The
-# exact OBLIQUITY_EARTH float is included so Earth's tilt recovers the model bit-for-bit (the
-# obliquity factor is exactly 1 there → s₂ unchanged → the (1365, 0, 23.44°) cell is the baseline).
+# crosses the Snowball cliff (~1250) so dragging the Sun can freeze the planet. CO2 warming is a cut
+# in the OLR offset A (demo_biomes' convention), 0→16 W/m² in 2 W/m² steps (present-day → ice-free
+# hothouse) — coarsened from 1 W/m² so the fourth (ocean) axis fits the page budget without losing a
+# visible feature (the climate is smooth in A). Obliquity (axial tilt) is the third axis: an untilted
+# 0° world (s₂ = −5/8, the steepest insolation gradient, coldest poles) up to the single-P₂ knob's
+# faithful cap (OBLIQUITY_FAITHFUL_MAX = 45°, beyond which the dropped s₄ grows — the obliquity.py
+# "scope edge"); smooth and cliff-free, so 9 values capture it. Ocean fraction is the fourth axis: a
+# bone-dry land world (0%) → a water world (100%), darkening the surface and carrying more heat
+# poleward (planet.ocean); like obliquity it is smooth, so a coarse 5-value axis captures the trend.
+# The exact OBLIQUITY_EARTH and OCEAN_FRACTION_EARTH detents are included so Earth's tilt and sea
+# fraction recover the model bit-for-bit → the (1365, 0, 23.44°, 0.71) cell is the baseline.
 S0_VALUES = [1235.0 + 10.0 * i for i in range(24)]        # 1235 … 1465, 24 steps, includes 1365
-CO2_VALUES = [float(i) for i in range(0, 17)]             # 0 … 16 W/m², 17 steps, includes 0
+CO2_VALUES = [float(i) for i in range(0, 17, 2)]          # 0 … 16 W/m², 9 steps of 2, includes 0
 OBLIQUITY_VALUES = sorted(                                # 9 steps, 0 … 45°, includes Earth's 23.44°
     {0.0, 6.0, 12.0, 18.0, OBLIQUITY_EARTH, 30.0, 35.0, 40.0, OBLIQUITY_FAITHFUL_MAX})
+OCEAN_VALUES = sorted(                                    # 5 steps, 0 … 1, includes Earth's 0.71
+    {0.0, 0.35, OCEAN_FRACTION_EARTH, 0.85, 1.0})
 _LAT_STRIDE = 6                                           # 180 model latitudes → 30 (equator→pole)
 
 
@@ -83,12 +90,15 @@ def _axis_default_index(values: list[float], target: float) -> int:
 
 def compute_grid(s0_values: list[float] = S0_VALUES,
                  co2_values: list[float] = CO2_VALUES,
-                 obliquity_values: list[float] = OBLIQUITY_VALUES) -> dict:
-    """Run the validated model over the (S0 × CO2 × tilt) grid → a JSON-ready dict (the slow step).
+                 obliquity_values: list[float] = OBLIQUITY_VALUES,
+                 ocean_values: list[float] = OCEAN_VALUES) -> dict:
+    """Run the validated model over the (S0 × CO2 × tilt × ocean) grid → a JSON-ready dict (slow).
 
-    The cell list is flattened in this exact nesting order — ``s0`` outermost, ``co2``, then
-    ``obliquity`` innermost — so the page decodes it as ``cells[(i·nCo2 + j)·nObl + k]``; the loop
-    order and that JS index math must move together.
+    The cell list is flattened in this exact nesting order — ``s0`` outermost, ``co2``, ``obliquity``,
+    then ``ocean`` innermost — so the page decodes it as ``cells[((i·nCo2 + j)·nObl + k)·nOcean + l]``;
+    the loop order and that JS index math must move together. The obliquity and ocean knobs compose
+    onto the (S0, A) base params (the former replaces ``s2``, the latter ``a0``/``D`` — disjoint, so
+    they commute); at the Earth detents both are the identity, so the baseline cell is bit-for-bit.
     """
     base_result = compute(EBMParams())
     base_diag = diagnose(base_result)
@@ -98,22 +108,24 @@ def compute_grid(s0_values: list[float] = S0_VALUES,
     for s0 in s0_values:
         for co2 in co2_values:
             for obl in obliquity_values:
-                params = obliquity_params(obl, EBMParams(S0=s0, A=A_OLR - co2))
-                result = compute(params)
-                diag = diagnose(result)
-                ex = explain(Knobs(S0=s0, A=A_OLR - co2, obliquity_deg=obl), base_diag, diag)
-                codes = result.codes[::_LAT_STRIDE]
-                temp = result.state.T[::_LAT_STRIDE]
-                cells.append(Cell(
-                    Tbar=round(diag.global_mean_T, 2),
-                    ice=round(diag.ice_line_lat, 1),
-                    rainforest=round(diag.rainforest_pct, 1),
-                    tundra=round(diag.tundra_pct, 1),
-                    desert=round(diag.desert_pct, 1),
-                    biome="".join(str(int(c)) for c in codes),
-                    temp=[round(float(t), 1) for t in temp],
-                    headline=ex.headline, oneline=ex.oneline, paragraph=ex.paragraph,
-                ).__dict__)
+                for ocean in ocean_values:
+                    params = ocean_params(ocean, obliquity_params(obl, EBMParams(S0=s0, A=A_OLR - co2)))
+                    result = compute(params)
+                    diag = diagnose(result)
+                    ex = explain(Knobs(S0=s0, A=A_OLR - co2, obliquity_deg=obl, ocean_fraction=ocean),
+                                 base_diag, diag)
+                    codes = result.codes[::_LAT_STRIDE]
+                    temp = result.state.T[::_LAT_STRIDE]
+                    cells.append(Cell(
+                        Tbar=round(diag.global_mean_T, 2),
+                        ice=round(diag.ice_line_lat, 1),
+                        rainforest=round(diag.rainforest_pct, 1),
+                        tundra=round(diag.tundra_pct, 1),
+                        desert=round(diag.desert_pct, 1),
+                        biome="".join(str(int(c)) for c in codes),
+                        temp=[round(float(t), 1) for t in temp],
+                        headline=ex.headline, oneline=ex.oneline, paragraph=ex.paragraph,
+                    ).__dict__)
 
     return {
         "axes": {
@@ -125,6 +137,9 @@ def compute_grid(s0_values: list[float] = S0_VALUES,
             "obl": {"label": "Tilt — axial obliquity", "unit": "°",
                     "values": [round(v, 0) for v in obliquity_values],
                     "default_index": _axis_default_index(obliquity_values, OBLIQUITY_EARTH)},
+            "ocean": {"label": "Ocean — fraction of surface", "unit": "%",
+                      "values": [round(v * 100) for v in ocean_values],
+                      "default_index": _axis_default_index(ocean_values, OCEAN_FRACTION_EARTH)},
         },
         "lat": lat_half,
         "palette": {str(int(b)): BIOME_COLORS[b] for b in Biome},
@@ -150,8 +165,8 @@ main { max-width: 60rem; margin: 0 auto; padding: 1rem 1.2rem 4rem; }
 .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
             align-items: start; gap: 1rem 1.6rem; background: #131a30; border: 1px solid #232c49;
             border-radius: 12px; padding: 1.1rem 1.3rem; margin-bottom: 1.2rem; }
-/* Pin the label box height so every slider starts at the same y — the three knobs sit on one
-   aligned row — and so a value string that re-wraps the label as you drag can't jog the slider. */
+/* Pin the label box height so every slider starts at the same y — the knobs line up in their row(s)
+   — and so a value string that re-wraps the label as you drag can't jog the slider. */
 .knob label { display: block; min-height: 3.4rem; font-weight: 600; margin: 0 0 .35rem; }
 .knob .val { color: #8ab4ff; font-variant-numeric: tabular-nums; }
 .knob .hint { color: #8b95ad; font-size: .82rem; margin-top: .15rem; }
@@ -166,6 +181,8 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 .knob.greenhouse input[type=range]::-moz-range-thumb { background: #7ee0a0; box-shadow: 0 0 0 3px #7ee0a055; }
 .knob.tilt input[type=range]::-webkit-slider-thumb { background: #b69cff; box-shadow: 0 0 0 3px #b69cff55; }
 .knob.tilt input[type=range]::-moz-range-thumb { background: #b69cff; box-shadow: 0 0 0 3px #b69cff55; }
+.knob.ocean input[type=range]::-webkit-slider-thumb { background: #5cc6ff; box-shadow: 0 0 0 3px #5cc6ff55; }
+.knob.ocean input[type=range]::-moz-range-thumb { background: #5cc6ff; box-shadow: 0 0 0 3px #5cc6ff55; }
 .stage { display: flex; flex-wrap: wrap; gap: 1.2rem; }
 /* The left column is the live readout (planet disk, temperature curve, stats, biome legend); the
    right panel is pure prose. Keeping the stats and legend OUT of the prose flow is what keeps THEM
@@ -179,7 +196,7 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 .headline { font-size: 1.2rem; font-weight: 700; margin: .1rem 0 .5rem; }
 /* Pin the one-liner to a fixed ~three-line box so the "Why" toggle directly below it never moves as a
    clause is added or dropped per knob (the original complaint). Three lines holds the typical case
-   (median one-liner ~3 lines at the panel's full width); the rare four-line one — all three knobs
+   (median one-liner ~3 lines at the panel's full width); the rare four-line one — several knobs
    driven into a Snowball — SCROLLS inside the box rather than clipping (every word is real model
    output) or shoving "Why" down. The slack over 3×line-height keeps a clean three-line one-liner from
    tripping a spurious scrollbar; scrollbar-gutter keeps the text from jogging sideways as you drag
@@ -232,6 +249,12 @@ _BODY = """\
       <input type="range" id="obl" />
       <div class="hint">Earth tilts 23°. More tilt spreads the year's sunlight toward the poles.</div>
     </div>
+    <div class="knob ocean">
+      <label>🌊 <span id="ocean-label"></span>: <span class="val" id="ocean-val"></span></label>
+      <input type="range" id="ocean" />
+      <div class="hint">Earth is 71% sea. More ocean is darker (warmer) and spreads heat — but its
+      heat-storing role and the rain pattern aren't shown (this is the steady climate).</div>
+    </div>
   </div>
 
   <div class="stage">
@@ -273,19 +296,22 @@ _BODY = """\
 # Plain JS (no f-string: braces are JS). DATA is concatenated in ahead of this block.
 _APP_JS = r"""
 const D = window.PLANET_DATA;
-const nS0 = D.axes.s0.values.length, nCo2 = D.axes.co2.values.length, nObl = D.axes.obl.values.length;
-// cells are flattened s0-outermost, co2, then obliquity innermost (compute_grid's loop order)
-const cell = (i, j, k) => D.cells[(i * nCo2 + j) * nObl + k];
+const nS0 = D.axes.s0.values.length, nCo2 = D.axes.co2.values.length, nObl = D.axes.obl.values.length,
+      nOcean = D.axes.ocean.values.length;
+// cells are flattened s0-outermost, co2, obliquity, then ocean innermost (compute_grid's loop order)
+const cell = (i, j, k, l) => D.cells[((i * nCo2 + j) * nObl + k) * nOcean + l];
 let current = null;   // the cell on screen — the disk-hover read-out names a band from it
 
 const $ = id => document.getElementById(id);
-const s0El = $("s0"), co2El = $("co2"), oblEl = $("obl");
+const s0El = $("s0"), co2El = $("co2"), oblEl = $("obl"), oceanEl = $("ocean");
 s0El.min = 0; s0El.max = nS0 - 1; s0El.step = 1; s0El.value = D.axes.s0.default_index;
 co2El.min = 0; co2El.max = nCo2 - 1; co2El.step = 1; co2El.value = D.axes.co2.default_index;
 oblEl.min = 0; oblEl.max = nObl - 1; oblEl.step = 1; oblEl.value = D.axes.obl.default_index;
+oceanEl.min = 0; oceanEl.max = nOcean - 1; oceanEl.step = 1; oceanEl.value = D.axes.ocean.default_index;
 $("s0-label").textContent = D.axes.s0.label;
 $("co2-label").textContent = D.axes.co2.label;
 $("obl-label").textContent = D.axes.obl.label;
+$("ocean-label").textContent = D.axes.ocean.label;
 
 // legend (all biomes, in the equator→pole order they appear)
 $("legend").innerHTML = Object.keys(D.names).map(k =>
@@ -371,11 +397,12 @@ function drawCurve(c) {
 }
 
 function render() {
-  const i = +s0El.value, j = +co2El.value, k = +oblEl.value, c = cell(i, j, k);
+  const i = +s0El.value, j = +co2El.value, k = +oblEl.value, l = +oceanEl.value, c = cell(i, j, k, l);
   current = c;
   $("s0-val").textContent = D.axes.s0.values[i] + " " + D.axes.s0.unit;
   $("co2-val").textContent = "+" + D.axes.co2.values[j] + " " + D.axes.co2.unit;
   $("obl-val").textContent = D.axes.obl.values[k] + D.axes.obl.unit;
+  $("ocean-val").textContent = D.axes.ocean.values[l] + D.axes.ocean.unit;
   $("headline").textContent = c.headline;
   $("oneline").textContent = c.oneline;
   $("paragraph").textContent = c.paragraph;
@@ -388,6 +415,7 @@ function render() {
 s0El.addEventListener("input", render);
 co2El.addEventListener("input", render);
 oblEl.addEventListener("input", render);
+oceanEl.addEventListener("input", render);
 
 // --- hover the disk → name the biome band under the cursor (same |lat|→band map as drawDisk) --- #
 const diskEl = $("disk"), tipEl = $("tip");

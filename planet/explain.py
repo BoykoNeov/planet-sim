@@ -25,6 +25,7 @@ from planet.albedo import A_OLR, D_TRANSPORT, S0_EARTH
 from planet.biomes import Biome
 from planet.exoplanet import T_SUN
 from planet.obliquity import OBLIQUITY_EARTH
+from planet.ocean import OCEAN_FRACTION_EARTH
 
 # Ice-line sentinels (verified against the model: hothouse pins 90.0, a frozen planet pins 0.0).
 _ICE_FREE_LAT = 89.5     # ice line at/above this ≈ ice-free
@@ -33,12 +34,13 @@ _SNOWBALL_LAT = 1.0      # ice line at/below this ≈ frozen to the equator (Sno
 
 @dataclass(frozen=True)
 class Knobs:
-    """The six knobs every interactive surface exposes; defaults are present-day Earth (the baseline)."""
+    """The knobs every interactive surface exposes; defaults are present-day Earth (the baseline)."""
 
     S0: float = S0_EARTH
     A: float = A_OLR
     D: float = D_TRANSPORT
     obliquity_deg: float = OBLIQUITY_EARTH
+    ocean_fraction: float = OCEAN_FRACTION_EARTH
     T_star: float = T_SUN
     size: float = 1.0
 
@@ -89,7 +91,8 @@ class Explanation:
 # Each active knob contributes (cause-clause, gradient-effect or None). ``cause`` is phrased as
 # "<doing X> <mechanism>"; clauses are stitched into both depths. Tolerances keep a knob that
 # only nudged off its default (slider rounding) from generating spurious prose.
-_TOL = {"S0": 0.5, "A": 0.5, "D": 0.005, "obliquity_deg": 0.05, "T_star": 1.0, "size": 0.005}
+_TOL = {"S0": 0.5, "A": 0.5, "D": 0.005, "obliquity_deg": 0.05, "ocean_fraction": 0.02,
+        "T_star": 1.0, "size": 0.005}
 
 
 def _causes(knobs: Knobs, base: Knobs) -> tuple[list[str], list[str]]:
@@ -131,6 +134,17 @@ def _causes(knobs: Knobs, base: Knobs) -> tuple[list[str], list[str]]:
             causes.append(f"a smaller axial tilt ({knobs.obliquity_deg:.0f}°) starves the poles of "
                           "sunlight")
             gradient.append("steepening the gradient (the poles cool)")
+
+    if abs(knobs.ocean_fraction - base.ocean_fraction) > _TOL["ocean_fraction"]:
+        pct = round(100.0 * knobs.ocean_fraction)
+        if knobs.ocean_fraction > base.ocean_fraction:
+            causes.append(f"a wetter world — {pct}% ocean, more sea and less land — darkens the "
+                          "surface, so it soaks up more sunlight")
+            gradient.append("flattening the gradient (the added ocean carries more heat poleward)")
+        else:
+            causes.append(f"a drier world — {pct}% ocean, more land and less sea — brightens the "
+                          "surface, so it reflects more sunlight")
+            gradient.append("steepening the gradient (less ocean to carry heat poleward)")
 
     if abs(knobs.T_star - base.T_star) > _TOL["T_star"]:
         if knobs.T_star > base.T_star:
@@ -238,6 +252,23 @@ def _obliquity_cooling_note(knobs: Knobs, baseline: Knobs, now: Diagnostics) -> 
             "slightly instead of warming it.")
 
 
+def _ocean_caveat(knobs: Knobs, baseline: Knobs) -> str:
+    """The two honest limitations of the ocean knob, fired only when the ocean fraction has moved.
+
+    Both are real ceilings of an *equilibrium annual-mean* EBM whose precipitation is a prescribed
+    pattern (see :mod:`planet.ocean`): the sea's heat-capacity role drops out of the steady state, and
+    the rain bands do not migrate with the water. Surfaced so the prose never lets the knob imply more
+    than the model carries.
+    """
+    if abs(knobs.ocean_fraction - baseline.ocean_fraction) <= _TOL["ocean_fraction"]:
+        return ""
+    return ("Two things this steady-state view leaves out: the ocean's real superpower — its huge heat "
+            "capacity, which softens the seasons — does not show here, because this is the equilibrium "
+            "annual-mean climate; and the rain bands do not move with the water (precipitation follows a "
+            "fixed latitude pattern), so a wetter world rains a little more everywhere rather than "
+            "somewhere new.")
+
+
 def explain(knobs: Knobs, base_diag: Diagnostics, now_diag: Diagnostics,
             baseline: Knobs = Knobs()) -> Explanation:
     """Render the *what changed + why* prose for moving from ``baseline`` knobs to ``knobs``.
@@ -258,9 +289,9 @@ def explain(knobs: Knobs, base_diag: Diagnostics, now_diag: Diagnostics,
                        "what-if below is measured against. The planet sits at a global-mean "
                        f"{now_diag.global_mean_T:.1f} °C with the ice line near {now_diag.ice_line_lat:.0f}°; "
                        f"tropical rain forest covers {now_diag.rainforest_pct:.0f}% of it and tundra "
-                       f"{now_diag.tundra_pct:.0f}%. Brighten or dim the sun, add greenhouse gas, change "
-                       "the heat transport or the tilt, and the chain from knob to climate to biomes "
-                       "plays out here."))
+                       f"{now_diag.tundra_pct:.0f}%. Brighten or dim the sun, add greenhouse gas, tilt "
+                       "the axis or cover more of it in ocean, and the chain from knob to climate to "
+                       "biomes plays out here."))
 
     cause_text = _join(causes)
     warm = _warm_phrase(dT)
@@ -291,6 +322,9 @@ def explain(knobs: Knobs, base_diag: Diagnostics, now_diag: Diagnostics,
     obl_note = _obliquity_cooling_note(knobs, baseline, now_diag)
     if obl_note:
         parts.append(obl_note)
+    ocean_note = _ocean_caveat(knobs, baseline)
+    if ocean_note:
+        parts.append(ocean_note)
     paragraph = " ".join(parts)
 
     return Explanation(headline=headline, oneline=oneline, paragraph=paragraph)
