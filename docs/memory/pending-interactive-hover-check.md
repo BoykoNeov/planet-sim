@@ -28,6 +28,19 @@ What to verify when picked up (full numbered steps were given in session
    last; `min-height` removed. A growing one-liner or an expanded "Why" now pushes
    only the footer. Still owed: a browser eyeball that the legend truly holds still
    while dragging and while toggling "Why".
+   **FOLLOW-UP 2026-06-15 (`bbcf1fd`):** the decouple stopped the *legend* moving,
+   but the user then saw the `<details>` "Why" toggle ITSELF still jump while
+   dragging — because the one-liner *above* it grows/drops a clause per moved knob,
+   changing its own height. Fix = pin `.oneline` to a **fixed ~3-line box**
+   (`height: 4.8em; overflow-y: auto; scrollbar-gutter: stable`). Measured
+   one-liner = median 299 / max 336 chars ≈ 3 lines at the panel's full width
+   (advisor confirmed the flex panel wraps full-width below the viz, ~900px, so 3
+   lines is what the user sees); the rare 4-line case (all 3 knobs → Snowball)
+   SCROLLS inside the box rather than clipping real model output or shoving "Why".
+   `min-height` REJECTED (a 4-line one-liner still shoves the toggle);
+   `height`+`overflow-y:auto` degrades where `min-height` fails. Owed eyeball folds
+   in: confirm "Why" holds still dragging single→3-knob→Snowball, nothing clips
+   (scrollbar only on the longest cells).
 3. **Disk hover** — hovering the planet disk shows a tooltip naming the biome
    band + |lat|°, matching the band under the cursor; disappears off the globe.
 
