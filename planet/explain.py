@@ -216,6 +216,28 @@ def _caveat(now: Diagnostics) -> str:
     return ""
 
 
+def _obliquity_cooling_note(knobs: Knobs, baseline: Knobs, now: Diagnostics) -> str:
+    """Ice-free + more tilt: the geometric cooling the ice-albedo warming normally hides.
+
+    With no cap left to melt, the ice-albedo amplifier is off, and raising the tilt only
+    *redistributes* the same total sunlight (the global mean is ``S₀/4`` at every obliquity) onto the
+    model's intrinsically brighter high latitudes (the fixed ``a₂`` poleward-albedo term), so a little
+    less is absorbed and the planet cools — exactly the ``−(S₀/20)·a₂·Δs₂/B`` cross-term. The sign is
+    guaranteed *only* in this regime, so the clause fires only when the world is ice-free **and** the
+    tilt was raised above the baseline; with a cap still present, more tilt instead *warms* (it melts
+    that ice — the opposite sign), so the note must not appear there.
+    """
+    if not now.ice_free:
+        return ""
+    if knobs.obliquity_deg <= baseline.obliquity_deg + _TOL["obliquity_deg"]:
+        return ""
+    return ("There is a subtler twist: tilt only redistributes the planet's sunlight — its total "
+            "intake is fixed — and an ice-free planet's poles are slightly more reflective than its "
+            "tropics, so steering more sunlight poleward has it absorb a little less. With the "
+            "ice-melting bonus exhausted, that is why adding still more tilt now cools the planet "
+            "slightly instead of warming it.")
+
+
 def explain(knobs: Knobs, base_diag: Diagnostics, now_diag: Diagnostics,
             baseline: Knobs = Knobs()) -> Explanation:
     """Render the *what changed + why* prose for moving from ``baseline`` knobs to ``knobs``.
@@ -266,6 +288,9 @@ def explain(knobs: Knobs, base_diag: Diagnostics, now_diag: Diagnostics,
     caveat = _caveat(now_diag)
     if caveat:
         parts.append(caveat)
+    obl_note = _obliquity_cooling_note(knobs, baseline, now_diag)
+    if obl_note:
+        parts.append(obl_note)
     paragraph = " ".join(parts)
 
     return Explanation(headline=headline, oneline=oneline, paragraph=paragraph)

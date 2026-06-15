@@ -167,22 +167,29 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 .knob.tilt input[type=range]::-webkit-slider-thumb { background: #b69cff; box-shadow: 0 0 0 3px #b69cff55; }
 .knob.tilt input[type=range]::-moz-range-thumb { background: #b69cff; box-shadow: 0 0 0 3px #b69cff55; }
 .stage { display: flex; flex-wrap: wrap; gap: 1.2rem; }
+/* The left column is the live readout (planet disk, temperature curve, stats, biome legend); the
+   right panel is pure prose. Keeping the stats and legend OUT of the prose flow is what makes the
+   layout steady — a longer one-liner, or expanding "Why", can only push the footer, never the
+   numbers or the legend the eye is parked on. So the no-reflow goal is met structurally, not by
+   reserving a fixed prose height (see .oneline). */
+.vizcol { flex: 1 1 22rem; display: flex; flex-direction: column; gap: 1rem; }
 .viz { background: #0c1226; border: 1px solid #232c49; border-radius: 12px; padding: 1rem;
-       display: flex; gap: 1rem; flex: 1 1 22rem; justify-content: center; }
+       display: flex; gap: 1rem; justify-content: center; }
 .panel { flex: 1 1 18rem; }
-/* Reserve the worst-case prose height (headline ≤2 lines; the one-liner grows a clause per moved
-   knob — up to ~6 lines with all three) so the stats, legend and footer never jump while dragging.
-   `min-height` never clips: a longer string just grows the box, it doesn't hide text. */
-.headline { font-size: 1.2rem; font-weight: 700; margin: .1rem 0 .5rem; min-height: 3.7rem; }
-.oneline { color: #d6def0; min-height: 9.5rem; }
+/* No reserved height. The one-liner grows a clause per moved knob (a Snowball adds a long one), so
+   any fixed min-height is wrong both ways — too tall for the common single-knob case, too short for
+   the worst three-knob/Snowball one. Instead the elements that must stay put (stats, legend) live in
+   .vizcol, leaving the prose free to grow downward into the footer alone. */
+.headline { font-size: 1.2rem; font-weight: 700; margin: .1rem 0 .5rem; }
+.oneline { color: #d6def0; }
 .more { margin-top: .6rem; }
 .more summary { cursor: pointer; color: #8ab4ff; font-size: .9rem; }
 .more p { color: #c2cbe0; margin: .5rem 0 0; }
-.stats { display: grid; grid-template-columns: 1fr 1fr; gap: .3rem .8rem; margin: 1rem 0 0;
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: .3rem .8rem; margin: 0;
          font-size: .92rem; }
 .stats div span { color: #8b95ad; }
 .stats div b { color: #e8ecf4; font-variant-numeric: tabular-nums; }
-.legend { margin-top: 1.1rem; display: grid; grid-template-columns: 1fr 1fr; gap: .25rem .8rem;
+.legend { margin-top: 0; display: grid; grid-template-columns: 1fr 1fr; gap: .25rem .8rem;
           font-size: .82rem; color: #b9c1d6; }
 .legend i { display: inline-block; width: .8rem; height: .8rem; border-radius: 2px;
             margin-right: .4rem; vertical-align: -1px; }
@@ -225,15 +232,11 @@ _BODY = """\
   </div>
 
   <div class="stage">
-    <div class="viz">
-      <canvas id="disk" width="300" height="300" aria-label="planet disk coloured by biome"></canvas>
-      <canvas id="curve" width="320" height="300" aria-label="temperature by latitude"></canvas>
-    </div>
-    <div class="panel">
-      <div class="headline" id="headline"></div>
-      <div class="oneline" id="oneline"></div>
-      <details class="more"><summary>Why — the fuller mechanism</summary>
-        <p id="paragraph"></p></details>
+    <div class="vizcol">
+      <div class="viz">
+        <canvas id="disk" width="300" height="300" aria-label="planet disk coloured by biome"></canvas>
+        <canvas id="curve" width="320" height="300" aria-label="temperature by latitude"></canvas>
+      </div>
       <div class="stats">
         <div><span>Global mean</span> <b id="st-tbar"></b></div>
         <div><span>Ice line</span> <b id="st-ice"></b></div>
@@ -241,6 +244,14 @@ _BODY = """\
         <div><span>Tundra</span> <b id="st-tu"></b></div>
       </div>
       <div class="legend" id="legend"></div>
+    </div>
+    <!-- Pure prose, so it can grow freely: a longer one-liner or an expanded "Why" pushes only the
+         footer below — the stats and legend live in .vizcol and never move (the no-reflow goal). -->
+    <div class="panel">
+      <div class="headline" id="headline"></div>
+      <div class="oneline" id="oneline"></div>
+      <details class="more"><summary>Why — the fuller mechanism</summary>
+        <p id="paragraph"></p></details>
     </div>
   </div>
 

@@ -9,9 +9,20 @@ from __future__ import annotations
 
 from planet.albedo import A_OLR, EBMParams, S0_EARTH
 from planet.demo_biomes import compute
-from planet.explain import Knobs, diagnose, explain
+from planet.explain import Diagnostics, Knobs, diagnose, explain
+from planet.obliquity import OBLIQUITY_EARTH
 
 _BASE = diagnose(compute(EBMParams()))
+
+# A synthetic present-day-ish baseline for the prose-only tests below (explain() never recomputes —
+# it narrates the deltas — so the regime can be dialled directly via Diagnostics).
+_BASE_DIAG = Diagnostics(global_mean_T=14.7, ice_line_lat=73.0, rainforest_pct=10.0,
+                         tundra_pct=8.0, desert_pct=15.0)
+
+
+def _diag(Tbar: float, ice_line_lat: float) -> Diagnostics:
+    return Diagnostics(global_mean_T=Tbar, ice_line_lat=ice_line_lat,
+                       rainforest_pct=20.0, tundra_pct=2.0, desert_pct=12.0)
 
 
 def _explain(**knob_kw):
@@ -75,6 +86,32 @@ def test_multiple_knobs_each_appear():
     _, ex = _explain(S0=1330.0, A=A_OLR - 4)
     text = ex.paragraph.lower()
     assert "sun" in text and "greenhouse" in text
+
+
+def test_obliquity_cooling_note_fires_ice_free_and_tilt_up():
+    """Ice-free + more tilt → the paragraph carries the geometric-cooling twist (and only there)."""
+    ex = explain(Knobs(obliquity_deg=45.0), _BASE_DIAG, _diag(20.0, 90.0))
+    para = ex.paragraph.lower()
+    assert "redistributes" in para and "cools the planet slightly" in para
+    assert "more reflective than its tropics" in para
+
+
+def test_obliquity_cooling_note_absent_when_ice_present():
+    """With a cap still present, more tilt *warms* (melts ice) — the cooling note must NOT appear."""
+    ex = explain(Knobs(obliquity_deg=45.0), _BASE_DIAG, _diag(5.0, 55.0))
+    assert "redistributes" not in ex.paragraph.lower()
+
+
+def test_obliquity_cooling_note_absent_when_tilt_not_raised():
+    """Ice-free but reached by another knob (tilt at the baseline) → no tilt-cooling claim."""
+    ex = explain(Knobs(obliquity_deg=OBLIQUITY_EARTH, A=A_OLR - 20), _BASE_DIAG, _diag(35.0, 90.0))
+    assert "redistributes" not in ex.paragraph.lower()
+
+
+def test_obliquity_cooling_note_absent_when_tilt_lowered():
+    """A *smaller* tilt starves the poles (a steeper gradient) — not the redistribution-cooling case."""
+    ex = explain(Knobs(obliquity_deg=6.0), _BASE_DIAG, _diag(35.0, 90.0))
+    assert "redistributes" not in ex.paragraph.lower()
 
 
 def test_deterministic():
