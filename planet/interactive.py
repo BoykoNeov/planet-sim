@@ -168,20 +168,23 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 .knob.tilt input[type=range]::-moz-range-thumb { background: #b69cff; box-shadow: 0 0 0 3px #b69cff55; }
 .stage { display: flex; flex-wrap: wrap; gap: 1.2rem; }
 /* The left column is the live readout (planet disk, temperature curve, stats, biome legend); the
-   right panel is pure prose. Keeping the stats and legend OUT of the prose flow is what makes the
-   layout steady — a longer one-liner, or expanding "Why", can only push the footer, never the
-   numbers or the legend the eye is parked on. So the no-reflow goal is met structurally, not by
-   reserving a fixed prose height (see .oneline). */
+   right panel is pure prose. Keeping the stats and legend OUT of the prose flow is what keeps THEM
+   steady — a longer one-liner, or expanding "Why", can only push the footer, never the numbers or
+   the legend the eye is parked on. Inside the panel the one-liner is in turn pinned to a fixed height
+   so the "Why" toggle just below it holds still too (see .oneline). */
 .vizcol { flex: 1 1 22rem; display: flex; flex-direction: column; gap: 1rem; }
 .viz { background: #0c1226; border: 1px solid #232c49; border-radius: 12px; padding: 1rem;
        display: flex; gap: 1rem; justify-content: center; }
 .panel { flex: 1 1 18rem; }
-/* No reserved height. The one-liner grows a clause per moved knob (a Snowball adds a long one), so
-   any fixed min-height is wrong both ways — too tall for the common single-knob case, too short for
-   the worst three-knob/Snowball one. Instead the elements that must stay put (stats, legend) live in
-   .vizcol, leaving the prose free to grow downward into the footer alone. */
 .headline { font-size: 1.2rem; font-weight: 700; margin: .1rem 0 .5rem; }
-.oneline { color: #d6def0; }
+/* Pin the one-liner to a fixed ~three-line box so the "Why" toggle directly below it never moves as a
+   clause is added or dropped per knob (the original complaint). Three lines holds the typical case
+   (median one-liner ~3 lines at the panel's full width); the rare four-line one — all three knobs
+   driven into a Snowball — SCROLLS inside the box rather than clipping (every word is real model
+   output) or shoving "Why" down. The slack over 3×line-height keeps a clean three-line one-liner from
+   tripping a spurious scrollbar; scrollbar-gutter keeps the text from jogging sideways as you drag
+   between cells that do and don't overflow. */
+.oneline { color: #d6def0; height: 4.8em; overflow-y: auto; scrollbar-gutter: stable; }
 .more { margin-top: .6rem; }
 .more summary { cursor: pointer; color: #8ab4ff; font-size: .9rem; }
 .more p { color: #c2cbe0; margin: .5rem 0 0; }
