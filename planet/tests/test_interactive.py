@@ -15,6 +15,7 @@ import json
 import os
 import re
 
+import numpy as np
 import pytest
 
 from planet import interactive
@@ -52,6 +53,7 @@ def test_compute_grid_shape():
     assert set(grid["palette"]) == set(grid["names"])      # a colour for every named biome
     cell = grid["cells"][0]
     assert all(ch in "012345678" for ch in cell["biome"])  # biome string is single-digit codes
+    assert len(grid["cold_cells"]) == 4                    # 2 S0 × 2 CO2 — the cold branch ignores tilt/ocean
 
 
 def test_earth_detent_is_the_baseline():
@@ -92,6 +94,58 @@ def test_ocean_axis_moves_the_climate():
     assert "baseline" in earth["headline"].lower()         # Earth's sea fraction stays the baseline
 
 
+def test_cold_branch_is_the_snowball_toggle():
+    """The cold (Snowball) sub-grid is the §2 hysteresis: the same knobs, a frozen start.
+
+    It is keyed by (S0, CO2) only — on a Snowball the mean T and ice cover are exactly tilt/ocean-
+    independent (uniform ice albedo) — and every cell is frozen over. At Earth's Sun the warm branch
+    is temperate while the cold branch is a Snowball: two stable climates for one knob (the bistability
+    the toggle exposes).
+    """
+    grid = interactive.compute_grid(**_SMALL)
+    assert len(grid["cold_cells"]) == 4                    # 2 S0 × 2 CO2
+    for c in grid["cold_cells"]:
+        assert c["ice"] <= 1.0                             # every cold cell is frozen over (Snowball)
+        assert "snowball" in c["headline"].lower()
+    warm, cold = grid["cells"][0], grid["cold_cells"][0]   # both at (S0=1365, CO2=0)
+    assert warm["ice"] > 60 and cold["ice"] <= 1.0         # temperate vs frozen at the SAME Sun
+    assert "started warm sits temperate" in cold["oneline"]  # the path-dependence, named
+
+
+def test_cold_branch_mean_is_tilt_independent_but_curve_is_not():
+    """The invariant that justifies the lean 2-D cold sub-grid — verified, not just asserted in prose.
+
+    On a Snowball the global-mean T and ice cover are *exactly* tilt/ocean-independent (uniform ice
+    albedo → mean = [(S₀/4)(1−α_ice)−A]/B, no obliquity/transport term; frozen to the equator either
+    way), which is why the cold data is stored at Earth's tilt/ocean only. The per-latitude *profile*
+    is NOT invariant — obliquity reshapes the insolation — so the page's hint scopes its claim to the
+    mean/ice and labels the shown curve as Earth's tilt (this test pins both halves of that honesty).
+    """
+    from planet.demo_biomes import compute
+    from planet.obliquity import obliquity_params
+    from planet.albedo import EBMParams, A_OLR, S0_EARTH
+
+    earth = compute(EBMParams(S0=S0_EARTH, A=A_OLR), ic_equator=-40.0, ic_pole=-40.0)
+    tilted = compute(obliquity_params(45.0, EBMParams(S0=S0_EARTH, A=A_OLR)),
+                     ic_equator=-40.0, ic_pole=-40.0)
+    # The mean is invariant to the continuum identity B·⟨T⟩ = (S₀/4)(1−α_ice)−A; the discrete grid
+    # leaks ~1e-4 °C, far below the cell's 2-dp rounding, so the *stored/displayed* value is identical.
+    assert round(earth.state.global_mean_T, 2) == round(tilted.state.global_mean_T, 2)   # mean: invariant
+    assert round(earth.state.ice_line_lat, 1) == round(tilted.state.ice_line_lat, 1)     # ice: invariant
+    curve_gap = float(np.max(np.abs(earth.state.T - tilted.state.T)))
+    assert curve_gap > 1.0     # but the profile shifts several °C — why the curve is labeled Earth's
+
+
+def test_starting_climate_toggle_is_wired():
+    """The page ships the warm/frozen segmented control, the cold sub-grid, and the render branch."""
+    html = interactive.build_app_html(interactive.compute_grid(**_SMALL))
+    assert 'id="warm-btn"' in html and 'id="cold-btn"' in html   # the segmented control
+    assert '"cold_cells":' in html                               # the Snowball sub-grid is inlined
+    assert "coldCell(i, j)" in html                              # render() reads the cold branch when toggled
+    # the disclosure hint: only the frozen mean/ice are tilt/ocean-independent; the curve is Earth's
+    assert "ignore tilt & ocean" in html and "shown at Earth's tilt" in html
+
+
 def test_page_is_self_contained_and_deterministic():
     grid = interactive.compute_grid(**_SMALL)
     html = interactive.build_app_html(grid)
@@ -102,6 +156,7 @@ def test_page_is_self_contained_and_deterministic():
     assert 'src="http' not in html
     assert '<canvas id="disk"' in html and '<canvas id="curve"' in html
     assert all(f'id="{knob}"' in html for knob in ("s0", "co2", "obl", "ocean"))  # all four knob sliders
+    assert 'id="warm-btn"' in html and 'id="cold-btn"' in html             # the starting-climate toggle
     assert 'id="tip"' in html and "mousemove" in html                     # the disk biome-hover read-out
 
 
@@ -119,6 +174,7 @@ def test_committed_page_is_well_formed():
     assert "http://" not in html and "https://" not in html
     assert '<canvas id="disk"' in html
     assert all(f'id="{knob}"' in html for knob in ("s0", "co2", "obl", "ocean"))  # all four knob sliders
+    assert 'id="warm-btn"' in html and 'id="cold-btn"' in html             # the starting-climate toggle
     assert 'id="tip"' in html and "mousemove" in html                     # the disk biome-hover read-out
 
 

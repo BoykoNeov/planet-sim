@@ -328,3 +328,49 @@ def explain(knobs: Knobs, base_diag: Diagnostics, now_diag: Diagnostics,
     paragraph = " ".join(parts)
 
     return Explanation(headline=headline, oneline=oneline, paragraph=paragraph)
+
+
+# --- the Snowball (cold) branch: a DELIBERATE second prose category --------------------------- #
+# explain() above narrates the WARM branch as a function of knob *deltas*. The Snowball branch is a
+# different kind of statement: the SAME knobs, but a world that *began frozen* — the bistability /
+# path-dependence, which a knob-delta rule base structurally cannot express (no knob moved). So this
+# is intentionally a SEPARATE generator, not a drift from explain() — do not "unify" them. The two
+# stay consistent by tracing the same demo_snowball numbers (the freeze and re-melt folds below),
+# and the warm-branch _caveat() already cross-references this branch. Kept numpy-free like the module.
+_SNOWBALL_FREEZE_S0 = 1252      # ≈ demo_snowball.compute().freeze_S0 — the warm branch's fold (dim → freeze)
+_SNOWBALL_MELT_S0 = 1831        # ≈ demo_snowball.compute().melt_S0   — the Snowball's fold (bright → re-melt)
+
+
+def snowball_branch_explain(knobs: Knobs, diag: Diagnostics,
+                            warm_is_snowball: bool = False) -> Explanation:
+    """Narrate the cold (Snowball) branch — the same knobs as :func:`explain`, but a world that *began
+    frozen*. The warm and cold branches together *are* the bistability; this names the path-dependence
+    the warm-branch prose only footnotes. ``warm_is_snowball`` flags the dimmed corner where even a
+    warm start freezes (the hysteresis loop has closed), so the prose never claims a temperate twin
+    that does not exist there. ``knobs`` is accepted for symmetry with :func:`explain` (the branch's
+    character is the same across tilt/ocean — a frozen planet ignores them — so only ``diag`` is read).
+    """
+    Tbar = diag.global_mean_T
+    if warm_is_snowball:
+        headline = "Snowball — and now the only climate"
+        oneline = (f"Started frozen, this world is a Snowball at {Tbar:.0f} °C — but here the Sun is so "
+                   f"dim that even a warm start freezes: below about {_SNOWBALL_FREEZE_S0:.0f} W/m² the "
+                   "bistability is gone and the Snowball is the only stable climate.")
+        twin = ("At this dim a Sun the two branches have merged — a warm start no longer survives, so "
+                "there is just one climate left, the frozen one.")
+    else:
+        headline = "Snowball — frozen by its own history"
+        oneline = (f"Started frozen, this world stays a Snowball at the same Sun — ice reflects most of "
+                   f"the sunlight, so it holds itself at {Tbar:.0f} °C, frozen pole to pole, while a "
+                   "world that started warm sits temperate at the very same settings.")
+        twin = ("Turn no knob — just change how the world began. A planet that started warm settles "
+                "temperate; one that started frozen stays a Snowball: two stable climates for one Sun "
+                "(path-dependence, or hysteresis).")
+    paragraph = (
+        f"{twin} A white planet reflects most of the sunlight that reaches it, which is what holds it "
+        f"frozen at a global-mean {Tbar:.0f} °C. Its tilt and ocean barely matter — a frozen surface is "
+        "uniformly reflective whatever lies beneath — so only the Sun and the greenhouse nudge its "
+        "(still sub-zero) temperature. Climbing back out is far harder than falling in: you would have "
+        f"to brighten the Sun by about a third, past ~{_SNOWBALL_MELT_S0:.0f} W/m², before a Snowball "
+        "would melt. The notebook's §2 traces the full loop and its catastrophic jumps live.")
+    return Explanation(headline=headline, oneline=oneline, paragraph=paragraph)

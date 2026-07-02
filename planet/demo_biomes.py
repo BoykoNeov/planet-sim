@@ -71,7 +71,8 @@ def _classify(state: ClimateState) -> tuple[np.ndarray, np.ndarray]:
     return precip_cm, biomes.classify_field(state.T, precip_cm)
 
 
-def compute(params: EBMParams | None = None, n_tau: float = PRESENT_N_TAU) -> BiomeResult:
+def compute(params: EBMParams | None = None, n_tau: float = PRESENT_N_TAU,
+            ic_equator: float = 30.0, ic_pole: float = -30.0) -> BiomeResult:
     """Present-day climate → precip → biomes → :class:`BiomeResult` (no plotting).
 
     ``n_tau`` is the relaxation step (a multiple of τ_rad) passed through to the equilibration; it
@@ -79,10 +80,15 @@ def compute(params: EBMParams | None = None, n_tau: float = PRESENT_N_TAU) -> Bi
     (:mod:`planet.planetmap`) calls this with the same fine step so its live globe matches the
     banked figure — the steady state carries an O(Δt) operator-splitting bias, so it must *not* be
     coarsened for speed.
+
+    ``ic_equator``/``ic_pole`` are the equilibration's initial condition; the defaults land on the
+    warm **finite-cap** branch (the standard climate). The interactive page passes a frozen start
+    (e.g. ``-40``/``-40``) to land the **Snowball** branch instead — the same knobs, the cold half of
+    the bistability (the §2 hysteresis). The defaults are unchanged, so the standard call is identical.
     """
     if params is None:
         params = EBMParams()
-    state = present_day_climate(params, n_tau=n_tau)
+    state = present_day_climate(params, n_tau=n_tau, ic_equator=ic_equator, ic_pole=ic_pole)
     precip_cm, codes = _classify(state)
     return BiomeResult(params=params, state=state, precip_cm=precip_cm, codes=codes)
 

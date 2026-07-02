@@ -77,6 +77,29 @@ def test_snowball_names_the_hysteresis():
     assert "hysteresis" in ex.paragraph.lower() or "path-dependent" in ex.paragraph.lower()
 
 
+def test_snowball_branch_explain_names_the_path_dependence():
+    """The cold-branch generator: a Snowball headline, the temperate twin, and the obl/ocean caveat.
+
+    snowball_branch_explain is a deliberate second prose category (same knobs, a frozen *start*) that
+    explain()'s knob-delta rules cannot express; it must say frozen-stays-frozen-while-warm-is-temperate
+    and that a frozen world ignores tilt/ocean.
+    """
+    from planet.explain import snowball_branch_explain
+    ex = snowball_branch_explain(Knobs(S0=S0_EARTH), _diag(-40.0, 0.0))
+    assert "snowball" in ex.headline.lower()
+    assert "started warm sits temperate" in ex.oneline
+    assert "tilt and ocean barely matter" in ex.paragraph.lower()
+    assert "hysteresis" in ex.paragraph.lower() or "path-dependence" in ex.paragraph.lower()
+
+
+def test_snowball_branch_explain_warm_twin_also_frozen():
+    """At the dim corner where even a warm start freezes, the prose must NOT claim a temperate twin."""
+    from planet.explain import snowball_branch_explain
+    ex = snowball_branch_explain(Knobs(S0=1235.0), _diag(-46.0, 0.0), warm_is_snowball=True)
+    assert "even a warm start freezes" in ex.oneline
+    assert "started warm sits temperate" not in ex.oneline   # the merged-branch corner: no temperate twin
+
+
 def test_hothouse_flags_ice_free():
     _, ex = _explain(A=A_OLR - 20)
     assert "ice-free" in ex.headline.lower() or "hothouse" in ex.headline.lower()

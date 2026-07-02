@@ -50,12 +50,15 @@ python -m planet site         # build & open the landing page — a clickable ga
 ```
 
 **Turn a knob, build a climate — no install.** `python -m planet interactive` opens
-[`docs/interactive/index.html`](docs/interactive/index.html): drag the Sun, the greenhouse, and the axial
-tilt and the planet's temperature, polar ice, and bands of life respond instantly, with a plain-language
-explanation of *what changed and why* (`planet/explain.py`). It's a lookup over a precomputed grid of
-the real `planet.demo_biomes.compute` runs — instant, deterministic, and **self-contained** (the data
-is inlined, so it opens straight off disk and serves from GitHub Pages alike). Want continuous knobs,
-live re-runs, and the Snowball's two stable states? That lives in the notebook.
+[`docs/interactive/index.html`](docs/interactive/index.html): drag the Sun, the greenhouse, the axial
+tilt, and how much of the world is ocean, and the planet's temperature, polar ice, and bands of life
+respond instantly, with a plain-language explanation of *what changed and why* (`planet/explain.py`).
+You can also flip a world's *starting climate*, warm or frozen, to meet its bistable twin — at today's
+Sun a frozen start stays a Snowball where a warm start is temperate. It's a lookup over a precomputed
+grid of the real `planet.demo_biomes.compute` runs — instant, deterministic, and **self-contained** (the
+data is inlined, so it opens straight off disk and serves from GitHub Pages alike). Want continuous
+knobs, live re-runs, and the *full* hysteresis loop — the catastrophic freeze and the late re-melt?
+That lives in the notebook.
 
 **Browse it as a webpage.** `python -m planet site` (re)generates [`docs/index.html`](docs/index.html)
 — a self-contained, clickable gallery linking every demo figure, the three interactive globes, and

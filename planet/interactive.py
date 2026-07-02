@@ -37,7 +37,7 @@ from planet.albedo import A_OLR, EBMParams, S0_EARTH
 from planet.biomes import BIOME_COLORS, BIOME_NAMES, Biome
 from planet.catalog import _REPO_ROOT
 from planet.demo_biomes import compute
-from planet.explain import Knobs, diagnose, explain
+from planet.explain import Knobs, diagnose, explain, snowball_branch_explain
 from planet.obliquity import OBLIQUITY_EARTH, OBLIQUITY_FAITHFUL_MAX, obliquity_params
 from planet.ocean import OCEAN_FRACTION_EARTH, ocean_params
 
@@ -127,6 +127,44 @@ def compute_grid(s0_values: list[float] = S0_VALUES,
                         headline=ex.headline, oneline=ex.oneline, paragraph=ex.paragraph,
                     ).__dict__)
 
+    # --- the Snowball (cold) branch: the §2 hysteresis, as a "starting climate" toggle ---------- #
+    # The same (S0, CO2) relaxed from a FROZEN start lands on the Snowball branch instead of the warm
+    # finite-cap branch — the cold half of the bistability. On a Snowball the two DISPLAYED headline
+    # numbers — the global-mean T and the ice cover — are exactly tilt/ocean-independent (a frozen
+    # white planet has a uniform ice albedo: the mean is [(S₀/4)(1−α_ice)−A]/B with no obliquity or
+    # transport term, and it is frozen to the equator regardless), which is what lets the cold data be
+    # a lean 2-D (S0 × CO2) sub-grid at Earth's tilt/ocean, NOT a second full 4-D grid (≈ 2% of the
+    # page, not 2×). The assert below pins that frozen-everywhere invariant across the slider range.
+    # The per-latitude *profile curve* is NOT tilt/ocean-independent (obliquity reshapes the insolation
+    # s₂ and ocean shifts D — ≤~8 °C and ≤~2 °C respectively), so the stored curve is Earth's tilt/ocean
+    # and the on-page hint says so. The page toggles between this and the warm `cells`; obl/ocean stay
+    # live but move only the (Earth-referenced) curve's label, not the frozen mean or ice.
+    nco2 = len(co2_values)
+    nobl = len(obliquity_values)
+    noc = len(ocean_values)
+    k_earth = _axis_default_index(obliquity_values, OBLIQUITY_EARTH)
+    l_earth = _axis_default_index(ocean_values, OCEAN_FRACTION_EARTH)
+    cold_cells: list[dict] = []
+    for i, s0 in enumerate(s0_values):
+        for j, co2 in enumerate(co2_values):
+            params = EBMParams(S0=s0, A=A_OLR - co2)            # cold branch ignores tilt/ocean
+            result = compute(params, ic_equator=-40.0, ic_pole=-40.0)
+            diag = diagnose(result)
+            assert diag.ice_line_lat <= 1.0, (                  # the invariant the lean design relies on
+                f"cold branch is not a Snowball at S0={s0}, CO2={co2} (ice {diag.ice_line_lat}°) — "
+                "the 2-D cold sub-grid assumes a frozen-over branch everywhere in the slider range")
+            warm_cell = cells[((i * nco2 + j) * nobl + k_earth) * noc + l_earth]
+            ex = snowball_branch_explain(
+                Knobs(S0=s0, A=A_OLR - co2), diag, warm_is_snowball=warm_cell["ice"] <= 1.0)
+            cold_cells.append(Cell(
+                Tbar=round(diag.global_mean_T, 2), ice=round(diag.ice_line_lat, 1),
+                rainforest=round(diag.rainforest_pct, 1), tundra=round(diag.tundra_pct, 1),
+                desert=round(diag.desert_pct, 1),
+                biome="".join(str(int(c)) for c in result.codes[::_LAT_STRIDE]),
+                temp=[round(float(t), 1) for t in result.state.T[::_LAT_STRIDE]],
+                headline=ex.headline, oneline=ex.oneline, paragraph=ex.paragraph,
+            ).__dict__)
+
     return {
         "axes": {
             "s0": {"label": "Sun — stellar flux S₀", "unit": "W/m²",
@@ -147,6 +185,9 @@ def compute_grid(s0_values: list[float] = S0_VALUES,
         "baseline": {"Tbar": round(base_diag.global_mean_T, 2),
                      "ice": round(base_diag.ice_line_lat, 1)},
         "cells": cells,
+        # cold_cells is the (S0 × CO2) Snowball sub-grid; the page reads cold_cells[i·nCo2 + j] when
+        # the "started frozen" toggle is on (tilt/ocean indices ignored — the branch doesn't use them).
+        "cold_cells": cold_cells,
     }
 
 
@@ -183,6 +224,16 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 .knob.tilt input[type=range]::-moz-range-thumb { background: #b69cff; box-shadow: 0 0 0 3px #b69cff55; }
 .knob.ocean input[type=range]::-webkit-slider-thumb { background: #5cc6ff; box-shadow: 0 0 0 3px #5cc6ff55; }
 .knob.ocean input[type=range]::-moz-range-thumb { background: #5cc6ff; box-shadow: 0 0 0 3px #5cc6ff55; }
+/* The "starting climate" toggle — a history switch (warm vs frozen start), distinct from the knobs:
+   it picks which branch of the bistability to show, so it sits on its own row above the viz. */
+.branch { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin: -.3rem 0 1.2rem; }
+.branch-label { font-weight: 600; color: #cdd6ea; }
+.seg { display: inline-flex; border: 1px solid #2d3a63; border-radius: 9px; overflow: hidden; }
+.seg button { background: #131a30; color: #aeb7cc; border: 0; padding: .5rem .95rem; font: inherit;
+   cursor: pointer; }
+.seg button + button { border-left: 1px solid #2d3a63; }
+.seg button.seg-on { background: #29365e; color: #fff; }
+.branch-hint { color: #7fb0e6; font-size: .86rem; }
 .stage { display: flex; flex-wrap: wrap; gap: 1.2rem; }
 /* The left column is the live readout (planet disk, temperature curve, stats, biome legend); the
    right panel is pure prose. Keeping the stats and legend OUT of the prose flow is what keeps THEM
@@ -230,8 +281,9 @@ _BODY = """\
   <h1>Build a climate — turn a knob, watch a world</h1>
   <p>Brighten or dim the Sun, add greenhouse gas, tilt the axis, or change how much of the world is
   ocean. The planet's temperature, its polar ice, and its bands of life respond instantly — and the
-  panel tells you <em>what changed and why</em>. Every number is the real energy-balance model; this
-  page just looks it up.</p>
+  panel tells you <em>what changed and why</em>. Or flip a world's <em>starting climate</em>, warm or
+  frozen, to meet its bistable twin. Every number is the real energy-balance model; this page just
+  looks it up.</p>
 </header>
 <main>
   <div class="controls">
@@ -256,6 +308,15 @@ _BODY = """\
       <div class="hint">Earth is 71% sea. More ocean is darker (warmer) and spreads heat — but its
       heat-storing role and the rain pattern aren't shown (this is the steady climate).</div>
     </div>
+  </div>
+
+  <div class="branch">
+    <span class="branch-label">Starting climate</span>
+    <div class="seg" role="group" aria-label="starting climate">
+      <button id="warm-btn" type="button" class="seg-on">☀ Warm start</button>
+      <button id="cold-btn" type="button">❄ Frozen start (Snowball)</button>
+    </div>
+    <span class="branch-hint" id="branch-hint"></span>
   </div>
 
   <div class="stage">
@@ -286,9 +347,11 @@ _BODY = """\
 
   <footer>
     <p>A lookup over a grid of real <code>planet.demo_biomes.compute</code> runs — the same
-    validated model behind the figures. Want continuous knobs, live re-runs, and the Snowball's
-    two stable states (it won't re-melt at today's Sun — the climate is path-dependent)? That lives
-    in the teaching notebook: <code>python&nbsp;-m&nbsp;planet&nbsp;notebook</code>.
+    validated model behind the figures. The Snowball's two stable states are togglable right here
+    (try <em>frozen start</em> at today's Sun — it stays frozen where a warm start is temperate). For
+    continuous knobs, live re-runs, and the <em>full</em> hysteresis loop — the catastrophic freeze
+    and the late re-melt — open the teaching notebook:
+    <code>python&nbsp;-m&nbsp;planet&nbsp;notebook</code>.
     Back to the <a href="../index.html">gallery</a>.</p>
   </footer>
 </main>
@@ -301,6 +364,10 @@ const nS0 = D.axes.s0.values.length, nCo2 = D.axes.co2.values.length, nObl = D.a
       nOcean = D.axes.ocean.values.length;
 // cells are flattened s0-outermost, co2, obliquity, then ocean innermost (compute_grid's loop order)
 const cell = (i, j, k, l) => D.cells[((i * nCo2 + j) * nObl + k) * nOcean + l];
+// The Snowball (cold) branch sub-grid is keyed by (S0, CO2) only — a frozen white planet ignores
+// tilt and ocean. `cold` is the "started frozen" toggle; when on, render() reads coldCell instead.
+const coldCell = (i, j) => D.cold_cells[i * nCo2 + j];
+let cold = false;
 let current = null;   // the cell on screen — the disk-hover read-out names a band from it
 
 const $ = id => document.getElementById(id);
@@ -398,7 +465,8 @@ function drawCurve(c) {
 }
 
 function render() {
-  const i = +s0El.value, j = +co2El.value, k = +oblEl.value, l = +oceanEl.value, c = cell(i, j, k, l);
+  const i = +s0El.value, j = +co2El.value, k = +oblEl.value, l = +oceanEl.value;
+  const c = cold ? coldCell(i, j) : cell(i, j, k, l);
   current = c;
   $("s0-val").textContent = D.axes.s0.values[i] + " " + D.axes.s0.unit;
   $("co2-val").textContent = "+" + D.axes.co2.values[j] + " " + D.axes.co2.unit;
@@ -417,6 +485,21 @@ s0El.addEventListener("input", render);
 co2El.addEventListener("input", render);
 oblEl.addEventListener("input", render);
 oceanEl.addEventListener("input", render);
+
+// --- the "starting climate" toggle: warm finite-cap branch vs the frozen Snowball branch --- #
+const warmBtn = $("warm-btn"), coldBtn = $("cold-btn"), branchHint = $("branch-hint");
+function setBranch(c) {
+  cold = c;
+  warmBtn.classList.toggle("seg-on", !c);
+  coldBtn.classList.toggle("seg-on", c);
+  branchHint.textContent = c
+    ? "A frozen world's mean temperature and ice cover ignore tilt & ocean — only the Sun and "
+      + "greenhouse move them (the profile curve is shown at Earth's tilt & ocean)."
+    : "";
+  render();
+}
+warmBtn.addEventListener("click", () => setBranch(false));
+coldBtn.addEventListener("click", () => setBranch(true));
 
 // --- hover the disk → name the biome band under the cursor (same |lat|→band map as drawDisk) --- #
 const diskEl = $("disk"), tipEl = $("tip");
