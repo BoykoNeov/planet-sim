@@ -81,9 +81,31 @@ picked the richest option). ~9.7 k solves (~regen minutes); slow byte-golden sti
   (LAPACK last-bit near a Whittaker threshold flips a biome-string digit). Fast structural tests
   cover CI. Gate is `M:\claud_projects\planet-sim\planet\tests\test_interactive.py`.
 
-**DEFERRED (offered, user hadn't explicitly asked):** NEW live widgets on the still-static §2
-snowball (the genuine live hysteresis / two stable states), §4 winds, §5 jet. Advisor flagged: time
-the §2 continuation (~3s) / coupler sims before promising "live" — lean on `continuous_update=False`
-or precompute. Minor open: browser snowball stat shows "Tundra 100%" while prose says "bands
-collapsed" (honest model output, mild tension). See [[planet-plan]], [[pedagogy-novice-intermediate]],
-[[viz-prose-novice-intermediate]].
+**DEFERRED → NOW BUILT 2026-07-02 (commits `55a1fb9` page toggle + `017b978` notebook widgets):**
+- **Snowball "starting climate" toggle on the PAGE** (`55a1fb9`). The two *stable states* CAN be a
+  lookup after all (only the live *continuation* can't): a warm/frozen segmented control reads a second
+  **lean 2-D (S0 × CO2) cold sub-grid** relaxed from a frozen start (`ic_equator=-40/ic_pole=-40`, new
+  `demo_biomes.compute` args; defaults unchanged = bit-for-bit). New `explain.snowball_branch_explain`
+  prose generator (same knobs, a world that *began* frozen — the knob-delta rule base structurally
+  can't say this). Updates line 33-34's "defers to notebook" stance: the endpoints now live on the page;
+  the notebook keeps continuous knobs + the full loop. README + footer re-synced.
+- **HONESTY NUGGET (advisor-caught, load-bearing).** The lean 2-D cold grid stores Earth-tilt/ocean
+  only, justified by: on a Snowball the **global-mean T and ice cover are exactly tilt/ocean-independent**
+  (uniform ice albedo → mean = [(S0/4)(1−a_ice)−A]/B, no obliquity/transport term; frozen to the equator
+  regardless). BUT the **per-latitude profile CURVE is NOT** invariant (obliquity reshapes insolation s2
+  ≈ up to 8 °C; ocean shifts D ≈ up to 2 °C) — and the curve is what the page *draws*. The reviewer's
+  spot-check "verified" independence but only checked the invariants (mean, ice line = obliquity-invariant
+  by construction), missing the drawn curve → the hint "a frozen world ignores tilt & ocean" was an
+  overclaim. Fixed by **scoping the claim** (hint + comment now say *mean & ice* are independent and the
+  *curve is shown at Earth's tilt/ocean*); `test_cold_branch_mean_is_tilt_independent_but_curve_is_not`
+  pins both halves (mean invariant to 2-dp display precision — the raw grid leaks ~1e-4 °C from discrete
+  P2/diffusion; curve gap > 1 °C). The lean grid stays; only its label got honest. Pattern: **verify the
+  quantity actually displayed, not an easier invariant that happens to share the design's assumption.**
+- **§2/§4/§5 live notebook widgets** (`017b978`) — the §2 same-Sun-two-climates live slider, the §4
+  winds Run-button (resolution + bump size), the §5 coupler Run-button. Executes clean end-to-end (slow
+  notebook kernel smoke test).
+
+Regenerate note: `python -m planet.interactive` (module `main()` → `write_app()`, full ~9.7 k-solve grid)
+rebuilds the page; `python -m planet interactive` (package + arg) only *opens* the existing page (rebuilds
+only if missing). Minor open (unchanged): snowball stat "Tundra 100%" vs prose "bands collapsed". See
+[[planet-plan]], [[pedagogy-novice-intermediate]], [[viz-prose-novice-intermediate]].
