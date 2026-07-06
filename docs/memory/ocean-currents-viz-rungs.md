@@ -1,6 +1,6 @@
 ---
 name: ocean-currents-viz-rungs
-description: Ocean-currents showcase rungs O1–O5 (plan §9.6) — O1 mask BUILT 2026-07-06 (contract+renderer+serialize, all O2-spike retargets in); O2 producer next (data spike DONE, auth+format settled); real OSCAR/ECCO currents through the R1 seam onto the Rung-C globe; §11.4 fork retargeted viz-half-only
+description: Ocean-currents showcase rungs O1–O5 (plan §9.6) — O1 mask + O2 OSCAR producer BUILT 2026-07-06 (real currents banked on the Rung-C globe, R1 round-trip proven on real data); O3 beauty pass next; §11.4 fork retargeted viz-half-only
 metadata:
   type: project
 ---
@@ -22,27 +22,25 @@ narrows** to ECCO-as-validation-anchor-for-S3). The §11.2 "never ships an ocean
   (pole honesty; lon edge-clamps, periodic) + mask **applied** (zero u,v / NaN scalar on invalid cells);
   rides as an additive categorical 0/1 `mask` layer in the same `.npz` (`render(active="mask")` = a free
   coverage globe). Round-trip `==` extended to an OSCAR-shaped masked probe. NaN→0 fill = O2's job.
-- **O2 — real-ocean producer** (the deliverable + S1 de-risk): one OSCAR 0.25° snapshot (PO.DAAC) →
-  `flow_field_from_ocean` → full-globe `is_global=True` (first true-global consumer) → serialize (round-trip
-  on REAL data) → unchanged Rung-C globe → `docs/figures/planet-ocean-currents.html`. Honesty flips class:
-  a new **provenance clause** ("real reanalysis-class currents, NOT this model's output"), machine-checked
-  DOM like Rung C's. Raw netCDF never committed; reader = optional demo dep (NumPy-only-at-import holds).
-  **Spike-first: Earthdata login/data acquisition = the one external unknown.**
-  **SPIKE DONE 2026-07-06** (`OSCAR_L4_OC_FINAL_V2.0`, one granule, 33 MB, fetched to local temp workspace
-  only — never committed): **auth** = an EDL bearer token as `Authorization: Bearer <token>` against
-  `archive.podaac.earthdata.nasa.gov/podaac-ops-cumulus-protected/...` works directly, no `.netrc`/URS
-  redirect dance; **format** = netCDF4/HDF5 via `h5netcdf`+`h5py` (`cftime` also needed — time uses a
-  **`julian`** calendar `pandas` can't decode, relevant at O4); `lat`(-89.75…89.75,719)/`lon`(0…359.75,1440,
-  **0–360 not ±180**) both already ascending (no N→S flip), but the lon rewrap to ±180 un-sorts the array
-  (needs re-sort/roll); **dim order is `(time, lon, lat)`** — opposite of `FlowField`'s `(n_lat,n_lon)`,
-  transpose required; `u`/`v`=total(geo+Ekman, the fuller signal) vs `ug`/`vg`=geostrophic-only(named future
-  knob); units already m/s, no conversion. **This makes O1's mask retarget concrete, not hypothetical**
-  (see O1 above): 44% NaN=land/missing poisons `_bilinear`'s plain `np.interp` at every coastline →
-  fill-NaN→0-before-resample + nearest-neighbor mask-resample + explicit pole-masking (OSCAR doesn't reach
-  the true poles; a global field must mask them, not edge-clamp-extrapolate). **Forward flag for O3, not
-  yet acted on:** interchange round-trip grid is 2° but OSCAR is 0.25° — confirm the *render* path uses
-  native/finer res (2° spec should stay proof-only) before calling it "beautiful"; native-res global texture
-  costs much more than the eddy showcase's 758 KB, a size tradeoff needing a conscious call.
+- **O2 — real-ocean producer: BUILT 2026-07-06** (the deliverable + S1 de-risk; spike settled auth+format
+  earlier same day). `planet/ocean_currents.py` NumPy-only at import: `load_oscar` (lazy `h5netcdf`, new
+  `[ocean]` extra; owns `(time,lon,lat)`→`(lat,lon)` transpose, `_FillValue`→NaN, `stride`,
+  `geostrophic_only`) → `OceanSnapshot` (convention-raw: 0–360 lon, NaN land, provenance from granule
+  attrs) → `flow_field_from_ocean` (±180 rewrap + argsort re-sort → monotone axis; mask-from-finiteness
+  THEN NaN→0 fill — mask carries "no data", never a filled zero; scalar=speed; `is_global=True`, coverage
+  honestly ±89.75°). **Both conscious calls made:** render = **0.5°** (stride 2; 2° interchange stays
+  proof-only) → banked HTML **5.2 MB**; pace = additive default-off `crossing_seconds` knob on
+  `flow_globe_html` (eddy artifact byte-unchanged; ocean passes 45 s/360°). Provenance clause ("REAL
+  data … OSCAR L4 v2.0 PO.DAAC DOI 10.5067/OSCAR-25F20 … NOT computed by planet-sim's models")
+  machine-checked in the DOM **and on the committed artifact**. Demo `demo_ocean_currents.py`
+  (catalogued): `EARTHDATA_TOKEN` bearer download to gitignored `outputs/`, asserts the **R1 round-trip
+  on the real field** before banking `docs/figures/planet-ocean-currents.html`. Tests (17) off a
+  committed **14 KB 5° fixture** `planet/tests/fixtures/oscar_subsample.npz` (raw conventions kept so
+  rewrap/mask/poles are exercised; dir named `fixtures/` because `.gitignore` ignores any `data/`) +
+  synthetic-granule loader test (`importorskip`). Gate 531 green. Spike facts (auth = one
+  `Authorization: Bearer` header, no `.netrc`; `cftime`/`julian` calendar relevant only at O4) recorded
+  in plan §9.6. **O3 forward flags observed:** particles recycle (not wrap) at ±180°; uniform-in-lat
+  spawning over-densifies high lat on a globe → cos-weighted seeding belongs in O3 with speed styling.
 - **O3 — beauty pass** (renderer-only, contract untouched): (a) land/ocean two-tone base texture from the
   O1 mask; (b) **accumulate-and-fade trails** (third ping-pong render-target pair; CPU fallback keeps
   fade-only); (c) speed colormap + speed-weighted seeding (boundary currents dominate). Unlocks the §9.5

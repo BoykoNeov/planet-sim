@@ -74,6 +74,10 @@ DEMOS: tuple[Demo, ...] = (
     Demo("map", "planet.planetmap", "Interactive biome-map globe",
          "the present-day globe — rotate / zoom / hover (the live sliders run in the notebook)",
          ("webviz",), "docs/figures/planet-map.html", "Interactive globes"),
+    Demo("ocean_currents", "planet.demo_ocean_currents", "Real ocean currents — particle globe",
+         "one day of real OSCAR surface currents (NASA PO.DAAC) streamed through the same seam and "
+         "renderer as the eddy band — not a planet-sim simulation",
+         ("ocean",), "docs/figures/planet-ocean-currents.html", "Interactive globes"),
 )
 
 

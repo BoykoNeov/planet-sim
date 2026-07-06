@@ -960,7 +960,7 @@ the user (acceptance unchanged; **"frozen particles" now has a second GPU cause*
 visible in the read-back log — and GPU vs CPU default point size may differ by up to the pixel-ratio, ≤2×, which
 is slider-correctable, not a bug).
 
-### 9.6 Beautiful ocean currents — the real-data showcase rungs O1–O5 (scoped 2026-07-06; **O1 built 2026-07-06**, O2–O5 not built)
+### 9.6 Beautiful ocean currents — the real-data showcase rungs O1–O5 (scoped 2026-07-06; **O1 + O2 built 2026-07-06**, O3–O5 not built)
 
 **The ask (user, 2026-07-06): "visualize beautiful ocean currents."** The project already owns both halves
 of the machinery: the Rung-C particle globe (`flow_globe.py` — GPU-advected by default, honest-by-disclosure)
@@ -1059,6 +1059,36 @@ rule each rung is provisional until its predecessor lands; the `Retarget-when-do
   and that tradeoff needs a conscious call, not a default. *Retarget-when-done:* the
   real field's dims/mask/units retarget O1's mask and R1's schema (the §11.2 R1 note foresaw exactly this
   revisit), and the O3/O4 payloads are re-judged against what the product actually carries.
+  **BUILT 2026-07-06.** Producer = `planet/ocean_currents.py` (NumPy-only at import): `load_oscar`
+  (lazy `h5netcdf` — the new `[ocean]` extra; owns the file-layout knowledge: the `(time, lon, lat)`
+  transpose, `_FillValue`→NaN, a `stride` subsampler, the `geostrophic_only` `ug`/`vg` knob) →
+  `OceanSnapshot` (loader-normalized but convention-raw: 0–360 lon, NaN land, provenance strings read
+  from the granule's own attrs) → `flow_field_from_ocean` (pure arrays: the ±180 rewrap with the
+  `argsort` column re-sort that restores a monotone axis, mask-from-finiteness *then* NaN→0 fill — the
+  O1 rule that the mask, never a filled zero, carries "no data" — scalar = speed, `is_global=True`
+  with the coverage box honestly cell-centred at ±89.75°). **Both flagged conscious calls made:**
+  (1) *resolution* — the banked render consumes **0.5°** (stride 2 off native 0.25°; the 2° interchange
+  grid stays proof-only): boundary currents stay sharp, the self-contained HTML lands at **5.2 MB**
+  (native would be ~20 MB for detail a 20 000-particle render can't resolve); (2) *pace* — the
+  auto-accel's "fastest particle crosses the span in 6 s" was band tuning, so `flow_globe_html` grew an
+  **additive default-off `crossing_seconds` knob** (eddy artifact byte-unchanged; the ocean demo passes
+  45 s for 360°). The provenance clause ships in `field.honesty` ("REAL data … OSCAR L4 v2.0, PO.DAAC,
+  DOI 10.5067/OSCAR-25F20 … **NOT computed by planet-sim's models**") and is machine-checked as a
+  visible DOM element — including on the **committed artifact itself** (a regeneration can't silently
+  drop it). Demo = `planet/demo_ocean_currents.py` (catalogued): bearer-token downloader
+  (`EARTHDATA_TOKEN` env var, one `Authorization: Bearer` header, token never logged; raw granule lives
+  in gitignored `outputs/`, never committed), asserts the **R1 round-trip identity on the real field**
+  (the proof, now non-synthetic) before banking `docs/figures/planet-ocean-currents.html`. Tests =
+  `test_ocean_currents.py` (17): real-data checks run off a committed **14 KB 5° fixture**
+  (`planet/tests/fixtures/oscar_subsample.npz` — raw conventions kept on purpose so rewrap/mask/pole
+  handling is exercised; OSCAR is freely-distributable, provenance in `fixtures/README.md`; NB
+  `.gitignore`'s `data/` rule is why the dir is named `fixtures/`), the loader against a synthetic
+  granule with OSCAR's exact layout (`importorskip`-gated). Renderer + contract byte-level untouched
+  apart from the pacing knob — the §9.3 win recurring. Full fast gate 531 green. *O3 forward flags
+  observed while here (renderer-side, not acted on):* particles recycle (not wrap) at the ±180° seam;
+  uniform-in-lat spawning over-densifies high latitudes on a global field (cos-weighted/equal-area
+  seeding belongs in the O3 beauty pass, alongside speed colouring — the shipped RdBu_r speed scalar
+  reads, but a dedicated ramp + speed-weighted seeding is where "beautiful" gets earned).
 - **O3 — the beauty pass (renderer-only; `FlowField` untouched — the recurring §9.3 win).** Three upgrades,
   all on the three.js side, each independently landable:
   - **(a) Land/ocean base layer.** A lat/lon two-tone (dark land / deep ocean) `CanvasTexture` generated

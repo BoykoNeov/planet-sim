@@ -168,7 +168,8 @@ def _three_js() -> str:
 
 
 def _build_data(field: FlowField, n_particles: int, particle_size: float,
-                particle_opacity: float, particle_sharpness: float) -> dict:
+                particle_opacity: float, particle_sharpness: float,
+                crossing_seconds: float = _BAND_CROSSING_SECONDS) -> dict:
     """Pack a :class:`FlowField` into the JSON the in-browser renderer consumes (compact, rounded)."""
     lat = np.asarray(field.lat, dtype=float)
     lon = np.asarray(field.lon, dtype=float)
@@ -182,11 +183,13 @@ def _build_data(field: FlowField, n_particles: int, particle_size: float,
     span_lon = float(lon.max() - lon.min()) or 1.0
     umax = float(np.max(np.abs(u))) or 1.0
     # `accel` (model-seconds per wall-clock second) is auto-scaled so the *fastest* particle crosses the
-    # band's longitude width in ~`_BAND_CROSSING_SECONDS` — readable streaming regardless of the field's
+    # field's longitude width in ~`crossing_seconds` — readable streaming regardless of the field's
     # actual speeds. In-browser step: Δλ_deg = deg(u/(a·cosφ)) · accel · dt_real (the honest metric × a
     # purely-visual time-acceleration; the showcase's physics-fidelity is relaxed, ADR 0002 note).
+    # The default (`_BAND_CROSSING_SECONDS`) was tuned on the ~55° eddy band; a 360° global field wants a
+    # proportionally longer crossing (else the whole ocean sprints), so the pace is a caller knob (§9.6 O2).
     dlamdt_max = math.degrees(umax / (field.radius_m * math.cos(math.radians(center_lat))))
-    accel = (span_lon / _BAND_CROSSING_SECONDS) / dlamdt_max if dlamdt_max > 0 else 1.0
+    accel = (span_lon / crossing_seconds) / dlamdt_max if dlamdt_max > 0 else 1.0
 
     def flat(arr, nd):
         return [round(float(x), nd) for x in np.asarray(arr).ravel(order="C")]
@@ -686,7 +689,8 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
                     n_particles: int = DEFAULT_N_PARTICLES,
                     particle_size: float = DEFAULT_PARTICLE_SIZE,
                     particle_opacity: float = DEFAULT_PARTICLE_OPACITY,
-                    particle_sharpness: float = DEFAULT_PARTICLE_SHARPNESS) -> str:
+                    particle_sharpness: float = DEFAULT_PARTICLE_SHARPNESS,
+                    crossing_seconds: float = _BAND_CROSSING_SECONDS) -> str:
     """Render ``field`` as one deterministic, self-contained three.js HTML page (data + three.js inlined).
 
     The disclaimer (``field.honesty``) is written into a **visible** ``<div class="disclaimer">`` in the
@@ -697,9 +701,12 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
     flows to both the material init and its live slider's initial position (one source, no drift), so a
     viewer can fine-tune appearance in the browser without regenerating, and a notebook can ship different
     defaults. Sharpness ∈ [0,1] is the sprite's opaque-core radius (0 = soft bloom, 1 = near-hard disc).
+    ``crossing_seconds`` sets the visual pace (wall-clock seconds for the fastest particle to cross the
+    field's longitude span); the default is the eddy band's tuning, so pre-O2 artifacts are unchanged.
     """
     data_json = json.dumps(
-        _build_data(field, n_particles, particle_size, particle_opacity, particle_sharpness),
+        _build_data(field, n_particles, particle_size, particle_opacity, particle_sharpness,
+                    crossing_seconds),
         separators=(",", ":"), ensure_ascii=False)
     disclaimer = html.escape(field.honesty)
     return (
