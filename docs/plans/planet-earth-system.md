@@ -960,7 +960,7 @@ the user (acceptance unchanged; **"frozen particles" now has a second GPU cause*
 visible in the read-back log — and GPU vs CPU default point size may differ by up to the pixel-ratio, ≤2×, which
 is slider-correctable, not a bug).
 
-### 9.6 Beautiful ocean currents — the real-data showcase rungs O1–O5 (scoped 2026-07-06; **O1 + O2 built 2026-07-06**, O3–O5 not built)
+### 9.6 Beautiful ocean currents — the real-data showcase rungs O1–O5 (scoped 2026-07-06; **O1 + O2 + O3 built 2026-07-06**, O4–O5 not built)
 
 **The ask (user, 2026-07-06): "visualize beautiful ocean currents."** The project already owns both halves
 of the machinery: the Rung-C particle globe (`flow_globe.py` — GPU-advected by default, honest-by-disclosure)
@@ -1089,8 +1089,37 @@ rule each rung is provisional until its predecessor lands; the `Retarget-when-do
   uniform-in-lat spawning over-densifies high latitudes on a global field (cos-weighted/equal-area
   seeding belongs in the O3 beauty pass, alongside speed colouring — the shipped RdBu_r speed scalar
   reads, but a dedicated ramp + speed-weighted seeding is where "beautiful" gets earned).
-- **O3 — the beauty pass (renderer-only; `FlowField` untouched — the recurring §9.3 win).** Three upgrades,
-  all on the three.js side, each independently landable:
+- **O3 — the beauty pass (renderer-only; `FlowField` untouched — the recurring §9.3 win). BUILT 2026-07-06**
+  (all three sub-parts + both §9.5 knobs; `flow_globe.py` only, three commits). The contract held: not one
+  line of `FlowField` moved — the entire beauty pass is three.js-side, the §9.3 win recurring a *fourth*
+  time. Advisor-shaped on three load-bearing calls: **(a)** the base layer is **honest-by-construction**,
+  not a `CanvasTexture` — a base fragment shader inverts each surface point to `(lat, lon)` with the SAME
+  `sph()` mapping the particles use (`atan(n.z, n.x)`) and samples the SAME mask on the SAME 0.5 coastline
+  rule as `validAt()`, so the coast under the particles can never drift from the coast under the base; no
+  mask (the eddy band) or a compile miss degrades to the plain solid sphere. **(b)** trails default-OFF
+  behind a kwarg (no WebGL CI + blind hand-off ⇒ the ocean globe is the first to exercise them, the shipped
+  eddy artifact can't silently regress); the **depth-only occluder prepass is load-bearing** — it kills
+  back-hemisphere particles *before* they enter the accumulation buffer, so nothing bleeds through the
+  planet at composite time; **additive** accumulation (One+One), not alpha-`over`, sidesteps
+  premultiplied-alpha fringing and *is* the ocean glow; and the **rotation-smear fix** = `decay=0 while
+  dragging` (a screen-space buffer smears when the projection moves, so history pauses during rotation and
+  resumes when still — trails degrade to a clean fade mid-drag). New fullscreen shaders gated through
+  `compileOK`, RT creation `try/catch`-wrapped, screen-sized targets realloc on resize — any miss drops to
+  the plain single-pass render, never the CPU fallback (which stays fade-only). **(c)** the colour path was
+  *already* producer-driven (eddy=θ, ocean=speed) so there was nothing to recolour; the genuinely new part
+  is **speed-weighted seeding in the RESPAWN path** (weighting only the initial seed relaxes back to uniform
+  as particles age out), composing with the mask reject via the same invisible-retry idiom, floored so calm
+  water keeps an ambient fill — plus a **sequential** speed ramp as an opt-in default (RdBu_r is diverging
+  and bleaches a 0→max field; RdBu_r stays default for signed θ, the ocean demo opts in). Both §9.5 knobs
+  shipped: **density** (GPU rank-cut uniform / CPU tail-hide) and **trail length** (the decay). The ocean
+  demo (`demo_ocean_currents.py`) opts into `colormap="speed"` + `trails=True`; the eddy artifact re-banked
+  on the same renderer (trails off, no mask, θ ramp — the visible change is jet-core concentration from
+  speed seeding). Verified end-to-end on the committed **5° OSCAR fixture** (masked pipeline, both artifacts
+  node-`--check` clean); full fast gate **538 green**. *Honesty edge, named:* trails pause-to-fade during a
+  drag is a deliberate property, not a bug — the smear fix, worth saying in the browser hand-off. The 0.5°
+  banked ocean artifact re-bank needs an `EARTHDATA_TOKEN` (user hand-off; the code + fixture prove it).
+  *Original scoping (kept for the record):* Three upgrades, all on the three.js side, each independently
+  landable:
   - **(a) Land/ocean base layer.** A lat/lon two-tone (dark land / deep ocean) `CanvasTexture` generated
     from the O1 mask and draped on the sphere — currents are unreadable on a bare globe, and coastlines are
     what make the Gulf Stream *look* like the Gulf Stream. Reuse-not-invent: the mask is already in the

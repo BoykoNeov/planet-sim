@@ -1,6 +1,6 @@
 ---
 name: ocean-currents-viz-rungs
-description: Ocean-currents showcase rungs O1–O5 (plan §9.6) — O1 mask + O2 OSCAR producer BUILT 2026-07-06 (real currents banked on the Rung-C globe, R1 round-trip proven on real data); O3 beauty pass next; §11.4 fork retargeted viz-half-only
+description: Ocean-currents showcase rungs O1–O5 (plan §9.6) — O1 mask + O2 OSCAR producer + O3 beauty pass BUILT 2026-07-06 (real currents banked on the Rung-C globe, land/ocean base + trails + speed styling, FlowField untouched a 4th time); O4 frames next; §11.4 fork retargeted viz-half-only
 metadata:
   type: project
 ---
@@ -41,10 +41,25 @@ narrows** to ECCO-as-validation-anchor-for-S3). The §11.2 "never ships an ocean
   `Authorization: Bearer` header, no `.netrc`; `cftime`/`julian` calendar relevant only at O4) recorded
   in plan §9.6. **O3 forward flags observed:** particles recycle (not wrap) at ±180°; uniform-in-lat
   spawning over-densifies high lat on a globe → cos-weighted seeding belongs in O3 with speed styling.
-- **O3 — beauty pass** (renderer-only, contract untouched): (a) land/ocean two-tone base texture from the
-  O1 mask; (b) **accumulate-and-fade trails** (third ping-pong render-target pair; CPU fallback keeps
-  fade-only); (c) speed colormap + speed-weighted seeding (boundary currents dominate). Unlocks the §9.5
-  control-surface seam (trail length + density = first knobs).
+- **O3 — beauty pass: BUILT 2026-07-06** (renderer-only, `FlowField` untouched a 4th time; `flow_globe.py`
+  only, 3 commits + eddy re-bank). **(a)** land/ocean base is **honest-by-construction** NOT a CanvasTexture
+  — a base fragment shader inverts each point to `(lat,lon)` with the SAME `sph()` mapping (`atan(n.z,n.x)`)
+  + samples the SAME mask on the SAME 0.5 rule as `validAt()`, so coast-under-particles can't drift from
+  coast-under-base; no-mask/compile-miss → solid sphere. **(b)** trails **default-OFF** behind a kwarg (no
+  WebGL CI + blind hand-off ⇒ ocean globe exercises them first, eddy can't silently regress); the
+  **depth-only occluder prepass is load-bearing** (kills back-hemisphere particles BEFORE the accum buffer
+  ⇒ nothing bleeds through the planet); **additive** One+One accumulation (not alpha-over) sidesteps
+  premultiplied fringing + IS the glow; **rotation-smear fix = `decay=0 while dragging`** (screen-space
+  buffer smears when projection moves → history pauses mid-drag, resumes still — a NAMED property, not a
+  bug). New shaders `compileOK`-gated, RTs try/catch + resize-realloc, any miss → plain single-pass (never
+  the CPU fade-only fallback). **(c)** colour path was ALREADY producer-driven (eddy=θ/ocean=speed) so
+  nothing to recolour — the new part is **speed-weighted seeding in the RESPAWN path** (seed-only relaxes to
+  uniform as particles age), composing w/ the mask reject via the invisible-retry idiom, floored for calm
+  water; + a **sequential** speed ramp opt-in default (RdBu_r diverging bleaches 0→max; stays default for θ,
+  ocean opts in). Both §9.5 knobs shipped: **density** (GPU rank-cut/CPU tail-hide) + **trail length**
+  (decay). Verified on the committed **5° OSCAR fixture** (masked pipeline, node-`--check` clean), gate
+  **538 green**. The 0.5° banked ocean artifact re-bank needs `EARTHDATA_TOKEN` (user hand-off; code +
+  fixture prove it). Advisor's 3 load-bearing calls (occluder-prepass / additive / respawn-not-seed) all in.
 - **O4 — frames time axis**: the R1 deferral, built after O2's real dims are seen; `(nt,ny,nx)` stacked
   npz + crossfaded `uVelA`/`uVelB` textures; OSCAR monthly climatology → Somali Current monsoon reversal.
 - **O5 — QG producer** `flow_field_from_qg` (independent): second EMERGENT producer, box coverage no mask;
