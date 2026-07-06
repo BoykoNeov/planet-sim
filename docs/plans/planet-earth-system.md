@@ -925,7 +925,8 @@ anti-aliased rim). All three initial positions flow from `particle_size`/`partic
 Python kwargs (one source feeding both the material init via `FLOW_DATA` and the slider `value=`, no drift), so a
 notebook can ship different defaults while a viewer fine-tunes in-browser without regenerating. **Deferred as a
 named seam:** the open-ended remainder — colour ramps, particle density presets, trail length, shape menus — is
-speculative with no second consumer, so it stays named-not-built. No test changes (the carve-out keeps the
+speculative with no second consumer, so it stays named-not-built. *(2026-07-06: the second consumer is now
+scoped — the §9.6 ocean producer; O3 names trail length + density as the first knobs to build.)* No test changes (the carve-out keeps the
 disclaimer the only machine-checked thing; the 6 structural tests pass untouched); artifact re-banked, gate still
 303 fast-lane pass.
 
@@ -958,6 +959,91 @@ exactly as §9.3 predicted. Gate **304 fast-lane pass**; the browser play-throug
 the user (acceptance unchanged; **"frozen particles" now has a second GPU cause** — an incomplete float target,
 visible in the read-back log — and GPU vs CPU default point size may differ by up to the pixel-ratio, ≤2×, which
 is slider-correctable, not a bug).
+
+### 9.6 Beautiful ocean currents — the real-data showcase rungs O1–O5 (scoped 2026-07-06; **not built**)
+
+**The ask (user, 2026-07-06): "visualize beautiful ocean currents."** The project already owns both halves
+of the machinery: the Rung-C particle globe (`flow_globe.py` — GPU-advected by default, honest-by-disclosure)
+and the producer-agnostic serialization seam (R1 `flow_serialize.py`, whose own docstring names an
+ECCO-shaped field as the target grid). What is missing is an **ocean producer** — every consumer today is
+the ~55° emergent eddy band. These rungs feed a real global surface-current field through the pipe that was
+built for exactly this, then make the render earn the word *beautiful* (the NASA *Perpetual-Ocean* look the
+§9.5 requirement always referenced).
+
+**The scope amendment this section makes (§11.4's living-staircase rule, exercised).** §11.2 declared
+*"planet-sim stays atmosphere-only — it never ships an ocean visual,"* and §11.4 settled ECCO-ingest into
+the spin-out as S1 **while explicitly keeping the alternative named** ("ECCO as planet-sim's last rung, to
+de-risk against real data *before* the split"). **The named alternative is now taken — for the viz half
+only** (user-ordered, 2026-07-06): planet-sim ships a real-data ocean **visual** (ingest → viz seam →
+globe), because the renderer and the seam live *here* and the deliverable is wanted *now*. The **engine**
+half of the boundary stands untouched: no ocean physics in this repo, ClimaOcean stays the spin-out, and
+the forcing/input seam stays undesigned until the API is seen (§11.1's two-seams rule unbroken). Net
+roadmap effect: **spin-out S1 narrows** — its data pipeline and Perpetual-Ocean visual are inherited from
+O2 instead of rebuilt, leaving S1 as "ECCO as the *validation anchor* for S3" (§11.3 status note).
+
+**Rung ladder — execution order O1 → O2 → O3 → O4; O5 independent/opportunistic.** Per the living-staircase
+rule each rung is provisional until its predecessor lands; the `Retarget-when-done` notes say what moves.
+
+- **O1 — the mask increment (the first genuine contract growth past R1).** `Coverage` is a lat/lon *box*;
+  an ocean field needs a **per-cell validity mask** (land). `FlowField` gains `mask: Optional[(ny, nx)
+  bool]` (`None` = all-valid = **bit-for-bit today** — the default-off discipline), `Coverage` stays as the
+  bounding box. Particles are **seeded only in masked cells** — the honesty style of the R1 band-zeros
+  embedding: *where-the-data-is carried in the data, not a caption*; land = no flow, honest-by-construction.
+  Concrete renderer hook: the velocity `DataTexture` is already `(u, v, θ, 0)` — the free 4th channel
+  carries the mask, so the GPU respawn/advection logic rejects land texels with **no new texture** (CPU
+  fallback mirrors it in `step()`). Serialization: the mask rides as one more array on the `VECTOR_OVERLAY`
+  layer's `.npz`; the round-trip `==` extends to cover it, and the no-mask spec stays loadable (schema is
+  additive). *Retarget-when-done:* judge the mask's shape against the real ocean product at O2 (partial-ice
+  cells, NaN-vs-fill conventions, staggered grids) before freezing it.
+- **O2 — the real-ocean producer (the deliverable, and the S1 de-risk).** Ingest one **OSCAR** global
+  surface-current snapshot (0.25°, NASA PO.DAAC; ECCO acceptable if friction is lower) →
+  `flow_field_from_ocean(...)`: full-globe grid (**`is_global=True` — the contract's first true-global
+  consumer**), ocean mask, scalar = speed (or SST), provenance in `style`. Serialize through `planet_spec`
+  (**round-trip identity on real data** — the R1 proof, now non-synthetic) and render through the
+  **unchanged** Rung-C globe → banked `docs/figures/planet-ocean-currents.html`. **Honesty flips class:**
+  the field is *real* but *not this model's output* — a new **provenance clause** under the
+  honest-by-disclosure carve-out ("real reanalysis-class ocean currents [product, version]; **not** computed
+  by this project's models"), machine-checked as a visible DOM element exactly like Rung C's reversibility
+  clause. Data discipline: the raw netCDF is **never committed** (size); a small subsampled `.npz` fixture
+  pins the tests; the netCDF reader is a demo-side **optional dep** (`flow_globe`/`flow_serialize` stay
+  NumPy-only at import). **The one external unknown = data acquisition/auth** (PO.DAAC needs an Earthdata
+  login) — **spike-first: download one file by hand before building anything.** *Retarget-when-done:* the
+  real field's dims/mask/units retarget O1's mask and R1's schema (the §11.2 R1 note foresaw exactly this
+  revisit), and the O3/O4 payloads are re-judged against what the product actually carries.
+- **O3 — the beauty pass (renderer-only; `FlowField` untouched — the recurring §9.3 win).** Three upgrades,
+  all on the three.js side, each independently landable:
+  - **(a) Land/ocean base layer.** A lat/lon two-tone (dark land / deep ocean) `CanvasTexture` generated
+    from the O1 mask and draped on the sphere — currents are unreadable on a bare globe, and coastlines are
+    what make the Gulf Stream *look* like the Gulf Stream. Reuse-not-invent: the mask is already in the
+    payload; no new data source.
+  - **(b) Motion trails.** The signature *Perpetual-Ocean* element: an accumulate-and-fade offscreen
+    render-target pair (previous accumulation × ~0.96 decay + this frame's particles on top, then composited
+    to screen) — a **third ping-pong** alongside the state textures, so it fits the architecture already in
+    the file. The CPU fallback simply keeps today's fade-only look — trails degrade gracefully to a working
+    globe, the same blind-hand-off discipline as the GPU advection build.
+  - **(c) Speed styling.** Colour particles by `|u, v|` (the `speed` layer is already universal to every
+    producer) + **speed-weighted seeding** so western-boundary currents (Gulf Stream, Kuroshio, Agulhas)
+    visually dominate the way they physically do.
+  - The §9.5 **control-surface seam unlocks**: the ocean producer is the named "second consumer," so
+    **trail length + particle density** become the first two knobs (colour ramps / shape menus stay named).
+- **O4 — frames: the time axis (seasonal currents).** The R1-deferred schema increment, built **after** O2
+  per its own retarget note: stack `(u, v, scalar)` as `(nt, ny, nx)` arrays in the `.npz` + time labels in
+  `style`; the renderer crossfades **two velocity `DataTexture`s** (`uVelA`/`uVelB` + a mix uniform) so the
+  particles steer smoothly through the year. Payload: the OSCAR **monthly climatology** (12 frames); the
+  showpiece is the **Somali Current monsoon reversal** — the one major current on Earth that flips direction
+  seasonally. *Retarget-when-done:* whether frames also back-port to the eddy band (Rung B/C animation
+  parity) is decided here, not promised now.
+- **O5 — the QG producer (independent bonus, does not gate O1–O4).** `flow_field_from_qg`: the rung-3
+  two-layer QG condensate — vortex filaments streaming in a box — as a **second emergent** producer.
+  Cheap (`(u, v) = (−∂ψ/∂y, ∂ψ/∂x)` is already recoverable from the spectral state), needs no mask (box
+  coverage suffices — the eddy-band embedding pattern), honest with the same model-output disclaimer family.
+  Its side effect is architectural: a *third* producer through `flow_serialize` re-trips the §9.4
+  rule-of-three question for the **geometry** helpers that R2 deliberately held at two consumers.
+
+**What stays out (the boundary, restated so this section can't scope-creep).** No ocean *engine* (ClimaOcean
+= the spin-out); no forcing/input seam (S2 — designed at the boundary against the *seen* API); no real-time
+what-if on real data (a reanalysis snapshot has no knobs — interactivity stays the model side's job). The
+honesty ceiling carries: Earth reanalysis is the anchor; nothing here validates a custom world's ocean.
 
 ---
 
@@ -2104,6 +2190,11 @@ needs the forcing seam at all** — those run on JRA55. The forcing seam only go
 These finish *in this repo*, and bank the viz/output seam so the spin-out has something stable to consume.
 planet-sim stays **atmosphere-only** throughout — it never ships an ocean visual.
 
+> **Status note (2026-07-06): the *visual* half of that sentence is amended by §9.6.** planet-sim now ships
+> a real-data ocean **visual** (the O-rungs: OSCAR/ECCO ingest → viz/output seam → Rung-C globe) — the
+> §11.4 named alternative, exercised under the living-staircase rule. The **engine** half stands: no ocean
+> *physics* in this repo, ever; ClimaOcean stays the spin-out, and the forcing seam stays S2's.
+
 - **R1 — materialize & serialize the viz contract (this is what the spin-out binds on).** Today the
   circulation field is *computed-then-viewed* (§9.1 `vector_overlay`, the Phase-4 jet) — R1 **serializes**
   it: pin the §9.3 planet-spec schema to carry a **vector-field layer** (grid + `(u,v)` + scalar + frames +
@@ -2143,6 +2234,8 @@ planet-sim stays **atmosphere-only** throughout — it never ships an ocean visu
   >   shape** (a full-globe `(u,v)`+SST with data everywhere) — *the grid you serialize is the grid you
   >   render*. **`frames`** (a time axis) is a **named, deferred** schema increment (orthogonal to
   >   producer-agnosticism; trivially a stacked `.npz` later) — R1 serializes a single saturated snapshot.
+  >   **The deferral is now scheduled: §9.6 O4** (built after the real ocean field's dimensions are seen
+  >   at O2 — exactly the "revisit against a real field" this note reserved).
 - **R2 — toolkit promotion (§9.4 rule-of-three, the natural co-rung).** With the frame side-channel, the
   flow-globe renderer, and the serialization now serving a **third** consumer (the synthetic producer / the
   spin-out), the rule-of-three is met: promote the viz+serialization machinery to a documented, shared
@@ -2179,6 +2272,13 @@ Numbered by *logical grouping*; the **execution order** has S3 teach the API tha
   stands up the data pipeline cheaply, and (ii) the **validation anchor** for S3. Independent of all the
   Julia work. *Retarget-when-done:* the ECCO field's real dimensions/coverage retarget the viz-seam schema
   inherited from R1.
+
+  > **Status note (2026-07-06): S1 narrows — role (i) moves to planet-sim as §9.6 O2.** The real-data
+  > ingest + the Perpetual-Ocean visual now land in planet-sim (the §11.4 named alternative, taken for the
+  > viz half). What remains of S1 in the new repo: role (ii) — **ECCO as the validation anchor for S3**
+  > (standing up the *Julia-side* data path, re-confirming the CliMA package landscape) — inheriting O2's
+  > pipeline and schema knowledge instead of rebuilding them. The R1-schema retarget duty moves to O2's
+  > own retarget note.
 - **S2 — design the forcing/input seam (NetCDF encoding, at the boundary).** The atmosphere→ocean contract:
   wind stress + heat-flux components + `P−E` (+ optional SST-restoring), encoded as NetCDF (the Julia-friendly
   encoding of the §9.3 schema). **Designed against ClimaOcean's *seen* input API** — which is why it follows,
@@ -2204,6 +2304,11 @@ Numbered by *logical grouping*; the **execution order** has S3 teach the API tha
 **One fork, settled: ECCO-ingest lives in the *new* repo as S1** (planet-sim stays atmosphere-only). The
 alternative — ECCO as planet-sim's last rung, to de-risk against real data *before* the split — stays named,
 because (per the rule below) even settled forks can be retargeted.
+
+> **Retargeted (2026-07-06) — the named alternative taken, proving the rule.** Real-data ocean
+> ingest-for-*display* now lives in planet-sim as §9.6 O2 (user-ordered: the renderer and the seam live
+> there, and the deliverable is wanted now). Only the **viz half** of the fork moved — the engine/forcing
+> half (ClimaOcean, S2–S5) is unmoved, and S1 keeps its validation-anchor role (§11.3 status note).
 
 **The rule (the user's caveat, 2026-06-12): every rung is provisional until the previous one lands.** This
 is not a frozen waterfall — it is the **same living-contract discipline the rest of this plan runs on**
@@ -2417,6 +2522,15 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
   untouched (S0 keeps the snowball cliff + detent), `_LAT_STRIDE` 3→6 (free, 30 lats indistinguishable on a
   300px canvas) keeps the page ~4 MB (≈ the eddy-globe precedent). `cells[(i·nCo2 + j)·nObl + k]`; cells
   ≈3.7 k, the slow byte-golden stays CI-skipped. **[shipped — ~free, as scoped]** → [[interactive-what-if]].
+- **Ocean-currents showcase, rungs O1–O5** · real global surface currents through the R1 seam onto the
+  Rung-C globe (§9.6, scoped 2026-07-06 — the §11.4 fork retargeted, viz half only): **O1** per-cell
+  validity mask (`FlowField.mask` — the first contract growth past R1) · **O2** OSCAR/ECCO producer +
+  provenance disclaimer clause (the deliverable; narrows spin-out S1) · **O3** renderer beauty pass (land
+  base layer, accumulate-and-fade trails, speed-weighted seeding; unlocks the §9.5 control-surface seam) ·
+  **O4** frames time axis (the R1 deferral; OSCAR monthly climatology → the Somali-Current reversal) ·
+  **O5** QG producer (independent; re-trips §9.4 for the geometry helpers). Wall-or-cost: O2's data
+  acquisition/auth (Earthdata login) is the one external unknown — spike-first. **[scoped — not built]**
+  → §9.6.
 
 ### 12.4 Pedagogy (the notebook)
 
