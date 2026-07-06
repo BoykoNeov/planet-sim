@@ -1,8 +1,10 @@
 ---
 name: ocean-currents-viz-rungs
-description: Ocean-currents showcase rungs O1–O5 (plan §9.6) — O1 mask + O2 OSCAR producer + O3 beauty pass + O4 seasonal frames (time axis) all BUILT + BANKED 2026-07-06 (O4 browser-verified: month badge cycles, particles stream, GPU crossfade ran — no CPU fallback); O5 QG producer next; §11.4 fork retargeted viz-half-only
-metadata:
+description: "Ocean-currents showcase rungs O1–O5 (plan §9.6) — ALL FIVE BUILT + BANKED 2026-07-06. O1 mask + O2 OSCAR producer + O3 beauty pass + O4 seasonal frames (browser-verified) + O5 QG emergent producer (flow_field_from_qg; rule-of-three re-affirmed HOLD, no transpose, explicit 45° display latitude not derived, fresh irreversible-not-reversible honesty); §11.4 fork retargeted viz-half-only"
+metadata: 
+  node_type: memory
   type: project
+  originSessionId: 2c3400c6-1bf1-4351-9bb8-4b7944907744
 ---
 
 **Scoped 2026-07-06; O1 BUILT 2026-07-06 (see below) — plan §9.6 is the record.** The user's "visualize beautiful ocean
@@ -85,8 +87,37 @@ narrows** to ECCO-as-validation-anchor-for-S3). The §11.2 "never ships an ocean
   52% valid-in-every-frame ocean, |current| max 2.83 m/s, round-trip identity OK); demo **catalogued**
   (`ocean_seasonal`, "Interactive globes") + on the landing page (`python -m planet site` regen). Rung-B/C
   eddy-band animation back-port = deferred-not-owed.
-- **O5 — QG producer** `flow_field_from_qg` (independent): second EMERGENT producer, box coverage no mask;
-  a third producer re-trips §9.4 rule-of-three for the two-consumer geometry helpers.
+- **O5 — QG producer: BUILT + BANKED 2026-07-06** (independent bonus, did not gate O1–O4).
+  `flow_field_from_qg` (`flow_globe.py`, beside `flow_field_from_eddy`) = the **second EMERGENT** producer:
+  the rung-3 two-layer QG condensate (coherent vortices + PV filaments, [[planet-rung3-qg-built]]) as
+  particles. `(u,v)` from the model's own `invert`→`velocities`; **advisor: axes already match the contract
+  → NO transpose** (unlike OSCAR); colour = **upper-layer PV anomaly `q₁`** (signed → diverging RdBu_r, the
+  eddy-θ twin) **÷f₀** (advisor caught PRE-COMMIT: raw PV is `O(1e-4/s)` → `_build_data`'s 3-dp `flat(scalar,3)`
+  rounds it to a constant 0 = every particle one flat colour, erasing the vortex field; ÷f₀ = an `O(1)`
+  Rossby-like field that survives the rounding, monotone so RdBu_r still centres on 0; fix in the PRODUCER
+  not the shared renderer; a payload-fidelity regression test now pins a non-flat rendered scalar — the class
+  the Python-side `np.allclose`+disclaimer-grep tests missed); **box coverage, no mask, no frames = the plain
+  pre-O1 contract shape.** Two advisor content
+  calls, both taken: (1) display latitude **explicit `center_lat_deg=45°`, NOT derived from f₀/β** — the
+  idealized `(f₀,β)` are independent knobs, not a consistent `(sinφ,cosφ)` pair (demo's f₀→~43°, β→~44°), so
+  `atan(f₀/βa)` would *manufacture* a latitude never put in; box maps by `Δlon=Δx/(a cosφ_c)`, `Δlat=Δy/a`,
+  centred, its honest ~box-width sector, never 360°-wrapped. (2) honesty string **FRESH, NOT the eddy's
+  reversibility clause** — the rung-3 win is this saturated flux is *irreversible* (persistent turbulence),
+  so "~90%-reversible/mostly-sloshes" is *false* here; carries the QG edges (idealized model / not real data
+  / box-not-planet-wide / inverse-cascade condensate) + names the colour (PV). QG-specific honesty test pins
+  the fresh clauses + asserts the eddy's absent (the generic disclaimer machine-check runs only on the eddy
+  field, doesn't misfire). **§9.4 rule-of-three (the architectural side-effect): third *geometry* consumer
+  arrived → re-affirmed HOLD** — `flow_field_from_qg` **cannot** call `_band_geometry` (takes a frames obj
+  with `.phi/.x/.y` the metre-space box lacks) + never touches `_sphere_xyz` (renderer-side), so the sector
+  formula is *inlined*; extracting a shared helper would force the banked eddy path to recompute lat from `y`
+  (ULP-risk on banked art) = the pre-emptive promotion R2 forbids. Resolution = **documentation, not
+  extraction** (mirrors R2). **R1 round-trip = named deliverable, PASSES** (plain box shape → `save`/`load ==`
+  free; a `test_flow_serialize` case pins it as the third producer). Demo `demo_qg_particles.py` (catalogued
+  `qg_particles`, "runs a short sim") reuses `demo_baroclinic_qg` params but keeps the **model** (renderer
+  needs the grid metric), runs to a saturated `v'≫U_s` condensate (nx=96), banks
+  `docs/figures/planet-qg-particles.html`. Producer tests fast-lane (cheap `random_state`, no spin-up); bank
+  = slow smoke-test. **Verification LIGHTER than O4** (advisor): reuses the already-browser-verified
+  single-snapshot GPU path — no new shaders, so O4's "GLSL-never-runs-in-CI" hand-off gap does not reapply.
 
 Out of scope, restated: no ocean engine, no forcing seam (S2 designs against the SEEN ClimaOcean API), no
 real-time what-if on real data. [[planet-spinout-roadmap]] [[planet-viz-animation-rungs]]

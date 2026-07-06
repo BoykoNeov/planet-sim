@@ -91,6 +91,77 @@ def test_honesty_string_carries_both_clauses():
     assert "reversible" in h and "sloshes" in h and "κ" in h     # ~90%-reversible / net is the κ residual
 
 
+def _qg_model_and_state():
+    """A tiny two-layer QG model + a cheap random (non-turbulent) state — fast lane, no integration.
+
+    The O5 producer only needs a *valid* state (shapes / coverage / honesty / round-trip), not a
+    *saturated* one; the long spin-up to turbulence lives in the demo (slow). Idealized rung-3 params."""
+    from planet.baroclinic_qg import TwoLayerQG
+    m = TwoLayerQG.symmetric(16, 12, 2.0e6, 1.5e6, f0=1.0e-4, gp=2.0, H1=400.0, H2=400.0,
+                             Us=4.0, beta=1.6e-11)
+    return m, m.random_state(amplitude=1e-3, seed=0)
+
+
+def test_flow_field_from_qg_is_a_bounded_box_coloured_by_pv():
+    # §9.6 O5 — the second EMERGENT producer: the QG condensate as a box patch on the globe. Coverage is a
+    # bounded sector (never global, never a 360° wrap), the display latitude is explicit (45° default,
+    # centred), there is no land mask (box coverage) and no time axis, and the colour scalar is the
+    # upper-layer PV anomaly (the vortex-filament field) recovered from the state.
+    m, s = _qg_model_and_state()
+    field = fg.flow_field_from_qg(m, s)
+    cov = field.coverage
+    assert cov.is_global is False
+    assert 0.0 < cov.lon_max - cov.lon_min < 90.0                 # a box patch, NOT a 360° planet wrap
+    assert np.isclose(0.5 * (cov.lat_min + cov.lat_max), 45.0)    # centred on the explicit display latitude
+    ny, nx = field.lat.size, field.lon.size
+    assert (ny, nx) == (m.ny, m.nx)
+    assert field.u.shape == (ny, nx) and field.v.shape == (ny, nx)
+    assert field.mask is None and field.frames is None           # box coverage → no mask; snapshot → no frames
+    # colour = the upper-layer PV anomaly, nondimensionalised by f₀ (see the payload-fidelity test below).
+    assert np.allclose(field.scalar, s.q[0] / m.f0) and "PV anomaly" in field.scalar_label
+
+
+def test_flow_field_from_qg_velocity_matches_the_model_inversion_no_transpose():
+    # No transpose / no sign flip: the producer's (u, v) ARE the model's upper-layer geostrophic velocity
+    # (u eastward = −∂ψ/∂y, v northward = ∂ψ/∂x), whose axes already match the contract. layer=1 → lower.
+    m, s = _qg_model_and_state()
+    u_all, v_all = m.velocities(m.invert(s.q))
+    field = fg.flow_field_from_qg(m, s)
+    assert np.allclose(field.u, u_all[0]) and np.allclose(field.v, v_all[0])
+    lower = fg.flow_field_from_qg(m, s, layer=1)
+    assert np.allclose(lower.u, u_all[1]) and np.allclose(lower.scalar, s.q[1] / m.f0)
+
+
+def test_flow_field_from_qg_pv_colour_survives_the_payload_rounding():
+    # Regression (advisor caught this pre-commit): the raw QG PV anomaly is O(1e-4 /s), which the renderer's
+    # 3-dp scalar rounding (`_build_data`'s `flat(scalar, 3)`) would collapse to a constant 0 → every particle
+    # one flat colour, ERASING the vortex-filament field the producer exists to show. The producer
+    # nondimensionalises PV by f₀ (an O(1) Rossby-like field) so the colour survives the payload. A
+    # realistic-magnitude state (a strong seed — no turbulence spin-up needed) exercises the actual payload.
+    from planet.baroclinic_qg import TwoLayerQG
+    m = TwoLayerQG.symmetric(16, 12, 2.0e6, 1.5e6, f0=1.0e-4, gp=2.0, H1=400.0, H2=400.0,
+                             Us=4.0, beta=1.6e-11)
+    field = fg.flow_field_from_qg(m, m.random_state(amplitude=5.0, seed=0))
+    assert np.abs(field.scalar).max() > 0.1                       # PV/f₀ is O(1), not the raw ~1e-4
+    pd = fg._build_data(field, 400, 0.03, 0.9, 0.5)
+    assert pd["scalar_max"] > pd["scalar_min"]                    # a real colour range in the rendered payload…
+    assert len(set(pd["scalar"])) > 3                            # …not the flat single value the raw PV rounded to
+
+
+def test_flow_field_from_qg_honesty_is_qg_specific_not_the_eddy_reversibility_clause():
+    # The QG disclaimer is FRESH, not the eddy's copy: the whole rung-3 win is that this saturated flux is
+    # IRREVERSIBLE (a persistent turbulent field), so the eddy's "~90%-reversible / mostly-sloshes" clause
+    # would be FALSE here. It carries the QG edges (idealized model / not real data / box / condensate) and
+    # names what the colour is (PV) — and must NOT inherit the reversibility wording.
+    h = fg.flow_field_from_qg(*_qg_model_and_state()).honesty
+    assert "idealized" in h and "box" in h and "not a planet-wide flow" in h
+    assert "quasi-geostrophic" in h and "condensate" in h
+    assert "potential-vorticity" in h                            # names the colour field
+    assert "sloshes" not in h and "reversible" not in h          # the eddy's clause is false for QG
+    # the fresh disclaimer still reaches the on-screen license div (the carve-out's one machine-check).
+    assert "quasi-geostrophic" in fg.flow_globe_html(fg.flow_field_from_qg(*_qg_model_and_state()))
+
+
 def test_artifact_is_self_contained_with_three_js_inlined():
     # The §6 deliverable + the file:// property: three.js is vendored INLINE (its @license banner travels
     # with the artifact), the data is inlined (no fetch), and there is NO external reference — the page
@@ -379,3 +450,21 @@ def test_demo_eddy_particles_banks_the_artifact(tmp_path):
     assert out.exists() and out.stat().st_size > 0
     text = out.read_text(encoding="utf-8")
     assert "Three.js Authors" in text and 'class="disclaimer"' in text
+
+
+@pytest.mark.slow
+def test_demo_qg_particles_banks_the_artifact(tmp_path):
+    # §9.6 O5: an execution smoke-test of the QG producer end-to-end (test_baroclinic_qg validates the
+    # physics). Runs a short turbulence spin-up, so it is slow-marked; small grid / few e-folds keeps it
+    # cheap. Confirms the emergent QG state flows through flow_field_from_qg to a self-contained artifact.
+    from planet import demo_qg_particles as demo
+
+    r = demo.compute(nx=32, n_efold=8.0)
+    assert r.vrms > 0.0                                          # the shear spun up an eddy field
+    field = fg.flow_field_from_qg(r.model, r.state)
+    assert field.coverage.is_global is False and field.mask is None
+    out = tmp_path / "qg-particles.html"
+    fg.save_flow_globe_html(field, out)
+    text = out.read_text(encoding="utf-8")
+    assert "Three.js Authors" in text and 'class="disclaimer"' in text
+    assert "quasi-geostrophic" in text                          # the fresh QG disclaimer reached the page

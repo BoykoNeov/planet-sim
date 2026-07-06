@@ -187,6 +187,78 @@ def flow_field_from_eddy(eddy) -> FlowField:
                      scalar=theta, scalar_label="θ (°C)", radius_m=a)
 
 
+def flow_field_from_qg(model, state, *, layer: int = 0, center_lat_deg: float = 45.0,
+                       radius_m: float = 6.371e6) -> FlowField:
+    """Map a saturated two-layer QG turbulence state onto the generic contract (§9.6 O5).
+
+    The **second emergent producer**: the rung-3 Phase-B condensate (:mod:`planet.baroclinic_qg`) —
+    coherent vortices and rolled-up potential-vorticity filaments streaming in a doubly-periodic β-plane
+    box — as particles on the globe. The upper-layer geostrophic velocity ``(u, v) = (−∂ψ/∂y, ∂ψ/∂x)``
+    is recovered from the PV anomaly by the model's own spectral inversion (:meth:`~planet.baroclinic_qg.
+    TwoLayerQG.invert` → :meth:`~planet.baroclinic_qg.TwoLayerQG.velocities`); its axes already match the
+    contract (``u`` eastward, ``v`` northward; row = ``y`` → lat, col = ``x`` → lon), so **no transpose**.
+    Particles are coloured by the **upper-layer PV anomaly** ``q₁`` — the vortex-filament field the demo
+    headlines — a *signed* scalar, so the diverging RdBu_r ramp fits (like the eddy's θ; ``sequential``
+    stays off). ``layer=1`` renders the lower layer instead.
+
+    The box → globe embedding (and why the display latitude is explicit, not derived). The QG domain is a
+    Cartesian ``Lx × Ly`` β-plane patch in metres with **no intrinsic latitude**. Unlike the eddy band —
+    whose stored ``(fr.phi, fr.y)`` are a *consistent linear metric* the radius is recovered *from*
+    (:func:`planet.eddy_globe._earth_radius`) — the QG ``(f₀, β)`` are **independent idealized numerical
+    knobs**, not a consistent ``(sinφ, cosφ)`` pair (the demo's f₀ implies ~43°, its β ~44°), so deriving
+    a latitude from them would *manufacture* one never put in. The box is therefore placed at an
+    **explicit display latitude** ``center_lat_deg`` (illustrative placement, stated in the honesty
+    string): the zonal extent maps by the spherical metric ``Δlon = Δx/(a·cosφ_c)`` and the meridional by
+    ``Δlat = Δy/a``, centred on ``(center_lat_deg, lon 0)`` — its honest ~box-width sector, **never
+    wrapped to 360°** (the eddy band's bounded-patch discipline). Box coverage suffices: the box has no
+    land, so ``mask=None`` (and no time axis, ``frames=None``) — the plain pre-O1 contract shape.
+
+    Rule-of-three (§9.4), re-affirmed **hold**. O5 is the third *geometry* consumer the §9.6 rung names,
+    and it confirms the two-consumer hold was right: this producer **cannot** call
+    :func:`planet.eddy_globe._band_geometry` (that takes a frames object carrying ``.phi/.x/.y`` the box
+    lacks) and never touches ``_sphere_xyz`` (renderer-side), so the one-line sector formula is inlined
+    here — extracting a shared helper would force the banked eddy path to recompute its latitude from
+    ``y`` (ULP-risk on a banked artifact), the pre-emptive promotion the R2 note forbids.
+    """
+    layer = int(layer)
+    psi = model.invert(state.q)                             # (2, ny, nx) streamfunction from the PV anomaly
+    u_all, v_all = model.velocities(psi)                    # geostrophic (u, v), each (2, ny, nx)
+    u = np.asarray(u_all[layer], dtype=float)
+    v = np.asarray(v_all[layer], dtype=float)
+    # the PV-anomaly (vortex-filament) colour field, NONDIMENSIONALISED by f₀ (a Rossby-number-like field,
+    # O(0.1–1)). The raw QG PV anomaly is O(1e-4 /s), which the renderer's 3-dp payload rounding
+    # (`_build_data`'s `flat(scalar, 3)`) would collapse to a constant 0 → every particle one flat colour,
+    # erasing the vortex structure the whole producer is for. Scaling by the positive constant f₀ is
+    # monotone, so the diverging RdBu_r still centres on 0; the fix lives here, not in the shared renderer.
+    q_layer = np.asarray(state.q[layer], dtype=float) / model.f0
+
+    a = float(radius_m)
+    phi_c = float(center_lat_deg)
+    # cell coordinates (m) on the periodic β-plane grid; only the spacing and centring matter for the
+    # display embedding (the box is centred on lon 0 / lat φ_c, then subtends its honest angular width).
+    x = np.arange(model.nx, dtype=float) * model.dx
+    y = np.arange(model.ny, dtype=float) * model.dy
+    lon = np.degrees((x - x.mean()) / (a * np.cos(np.radians(phi_c))))     # Δlon = Δx/(a cosφ_c)
+    lat = phi_c + np.degrees((y - y.mean()) / a)                           # Δlat = Δy/a
+
+    layer_name = "upper-layer" if layer == 0 else "lower-layer"
+    honesty = (
+        "This is emergent output from an IDEALIZED two-layer quasi-geostrophic turbulence model — NOT "
+        "real ocean data and NOT a real place. The flow lives in a doubly-periodic β-plane box; it is "
+        "drawn as a single patch at an arbitrary display latitude (the box carries no true geographic "
+        f"position), and the rest of the globe is left bare — one idealized box, not a planet-wide flow. "
+        f"The particle colour is the {layer_name} potential-vorticity anomaly (the vortex-filament "
+        "field), not temperature or speed. The large coherent vortices are an inverse-cascade condensate "
+        "whose size and strength are set by the box and the bottom drag; the model is validated as a "
+        "dimensionless, config-tuned mechanism (rung 3), not at Earth current speeds. The saturated "
+        "turbulent transport here is genuinely persistent — but it remains an idealized box, not the sea."
+    )
+    coverage = Coverage(lat_min=float(lat.min()), lat_max=float(lat.max()),
+                        lon_min=float(lon.min()), lon_max=float(lon.max()), is_global=False)
+    return FlowField(lat=lat, lon=lon, u=u, v=v, coverage=coverage, honesty=honesty,
+                     scalar=q_layer, scalar_label=f"{layer_name} PV anomaly / f₀", radius_m=a)
+
+
 # --------------------------------------------------------------------------------------------------- #
 # The renderer — emit a self-contained three.js HTML scene (data + three.js + app, all inlined).
 # --------------------------------------------------------------------------------------------------- #

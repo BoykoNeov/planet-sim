@@ -71,6 +71,11 @@ DEMOS: tuple[Demo, ...] = (
          "any producer's (u, v) through one schema + one renderer: a synthetic global flow, the seam the spin-out binds on",
          ("webviz",), "docs/figures/planet-flow-serialize.html",
          "Circulation — shallow-water (runs a short sim)", sim=True),
+    Demo("qg_particles", "planet.demo_qg_particles", "QG turbulence — particle globe",
+         "the emergent rung-3 two-layer QG condensate (coherent vortices + PV filaments) streamed as "
+         "particles through the same seam and renderer as the eddy band — an idealized box, not the sea",
+         (), "docs/figures/planet-qg-particles.html",
+         "Circulation — shallow-water (runs a short sim)", sim=True),
     Demo("map", "planet.planetmap", "Interactive biome-map globe",
          "the present-day globe — rotate / zoom / hover (the live sliders run in the notebook)",
          ("webviz",), "docs/figures/planet-map.html", "Interactive globes"),

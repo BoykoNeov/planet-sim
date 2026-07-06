@@ -29,6 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 PROV_EDDY = "planet.eddy_flux (saturated frame)"
 PROV_SYN = "synthetic analytic global flow"
+PROV_QG = "planet.baroclinic_qg (saturated condensate)"
 
 
 def _band_flow_field() -> fg.FlowField:
@@ -98,6 +99,19 @@ def test_round_trip_identity_of_the_real_eddy_producer(tmp_path):
     spec = fs.vector_spec_from_flow_field(field, provenance=PROV_EDDY)
     ps.save(spec, tmp_path / "real")
     assert ps.load(tmp_path / "real") == spec
+
+
+def test_round_trip_identity_of_the_qg_producer(tmp_path):
+    # §9.6 O5 — the THIRD producer through flow_serialize (re-tripping the §9.4 rule-of-three): the QG
+    # condensate is a plain bounded box — no mask, no frames = the pre-O1 contract shape — so the R1
+    # round-trip identity covers it for free. A cheap random state (no turbulence spin-up) keeps it fast.
+    from planet.baroclinic_qg import TwoLayerQG
+    m = TwoLayerQG.symmetric(16, 12, 2.0e6, 1.5e6, f0=1.0e-4, gp=2.0, H1=400.0, H2=400.0,
+                             Us=4.0, beta=1.6e-11)
+    field = fg.flow_field_from_qg(m, m.random_state(amplitude=1e-3, seed=0))
+    spec = fs.vector_spec_from_flow_field(field, provenance=PROV_QG)
+    ps.save(spec, tmp_path / "qg")
+    assert ps.load(tmp_path / "qg") == spec
 
 
 def test_round_trip_negative_control(tmp_path):
