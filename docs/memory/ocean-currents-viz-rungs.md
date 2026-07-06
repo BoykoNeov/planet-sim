@@ -1,6 +1,6 @@
 ---
 name: ocean-currents-viz-rungs
-description: Ocean-currents showcase rungs O1–O5 scoped 2026-07-06 (plan §9.6, NOT built) — real OSCAR/ECCO currents through the R1 seam onto the Rung-C globe; §11.4 fork retargeted viz-half-only
+description: Ocean-currents showcase rungs O1–O5 scoped 2026-07-06 (plan §9.6, NOT built) — real OSCAR/ECCO currents through the R1 seam onto the Rung-C globe; §11.4 fork retargeted viz-half-only; O2 data spike DONE 2026-07-06 (auth+format settled, O1 retargeted concrete)
 metadata:
   type: project
 ---
@@ -22,6 +22,21 @@ narrows** to ECCO-as-validation-anchor-for-S3). The §11.2 "never ships an ocean
   a new **provenance clause** ("real reanalysis-class currents, NOT this model's output"), machine-checked
   DOM like Rung C's. Raw netCDF never committed; reader = optional demo dep (NumPy-only-at-import holds).
   **Spike-first: Earthdata login/data acquisition = the one external unknown.**
+  **SPIKE DONE 2026-07-06** (`OSCAR_L4_OC_FINAL_V2.0`, one granule, 33 MB, fetched to local temp workspace
+  only — never committed): **auth** = an EDL bearer token as `Authorization: Bearer <token>` against
+  `archive.podaac.earthdata.nasa.gov/podaac-ops-cumulus-protected/...` works directly, no `.netrc`/URS
+  redirect dance; **format** = netCDF4/HDF5 via `h5netcdf`+`h5py` (`cftime` also needed — time uses a
+  **`julian`** calendar `pandas` can't decode, relevant at O4); `lat`(-89.75…89.75,719)/`lon`(0…359.75,1440,
+  **0–360 not ±180**) both already ascending (no N→S flip), but the lon rewrap to ±180 un-sorts the array
+  (needs re-sort/roll); **dim order is `(time, lon, lat)`** — opposite of `FlowField`'s `(n_lat,n_lon)`,
+  transpose required; `u`/`v`=total(geo+Ekman, the fuller signal) vs `ug`/`vg`=geostrophic-only(named future
+  knob); units already m/s, no conversion. **This makes O1's mask retarget concrete, not hypothetical**
+  (see O1 above): 44% NaN=land/missing poisons `_bilinear`'s plain `np.interp` at every coastline →
+  fill-NaN→0-before-resample + nearest-neighbor mask-resample + explicit pole-masking (OSCAR doesn't reach
+  the true poles; a global field must mask them, not edge-clamp-extrapolate). **Forward flag for O3, not
+  yet acted on:** interchange round-trip grid is 2° but OSCAR is 0.25° — confirm the *render* path uses
+  native/finer res (2° spec should stay proof-only) before calling it "beautiful"; native-res global texture
+  costs much more than the eddy showcase's 758 KB, a size tradeoff needing a conscious call.
 - **O3 — beauty pass** (renderer-only, contract untouched): (a) land/ocean two-tone base texture from the
   O1 mask; (b) **accumulate-and-fade trails** (third ping-pong render-target pair; CPU fallback keeps
   fade-only); (c) speed colormap + speed-weighted seeding (boundary currents dominate). Unlocks the §9.5

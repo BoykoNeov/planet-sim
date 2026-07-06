@@ -994,7 +994,18 @@ rule each rung is provisional until its predecessor lands; the `Retarget-when-do
   fallback mirrors it in `step()`). Serialization: the mask rides as one more array on the `VECTOR_OVERLAY`
   layer's `.npz`; the round-trip `==` extends to cover it, and the no-mask spec stays loadable (schema is
   additive). *Retarget-when-done:* judge the mask's shape against the real ocean product at O2 (partial-ice
-  cells, NaN-vs-fill conventions, staggered grids) before freezing it.
+  cells, NaN-vs-fill conventions, staggered grids) before freezing it. **Retargeted 2026-07-06 by the O2
+  spike (concrete now, not hypothetical):** OSCAR's land cells are `NaN` in `u`/`v`, and the existing
+  `_bilinear` in `flow_serialize.py` runs plain `np.interp` — a `NaN` neighbor poisons interpolated ocean
+  cells within roughly one source-cell of every coastline. So the mask can't just ride along passively:
+  `flow_field_from_ocean` must (a) fill `NaN`→0 in `u`/`v` **before** resampling, (b) resample the boolean
+  mask **separately with nearest-neighbor** (not bilinear — keeps it boolean, and nearest-neighbor doesn't
+  smear the land/ocean boundary), then (c) re-apply the mask after resampling so filled-zero land cells
+  read as "no data" rather than "zero current." Pole handling is the other retarget: OSCAR's grid is
+  cell-centered (`-89.75…89.75`, 719 rows) and does **not** reach the true poles, while the interchange's
+  `_globe_grid` is pole-inclusive (`-90…90` exactly) — for an `is_global=True` field the poles must come
+  out masked (`mask=False`), not edge-clamp-extrapolated open ocean, or the render paints current at a
+  point the source never measured.
 - **O2 — the real-ocean producer (the deliverable, and the S1 de-risk).** Ingest one **OSCAR** global
   surface-current snapshot (0.25°, NASA PO.DAAC; ECCO acceptable if friction is lower) →
   `flow_field_from_ocean(...)`: full-globe grid (**`is_global=True` — the contract's first true-global
@@ -1007,7 +1018,28 @@ rule each rung is provisional until its predecessor lands; the `Retarget-when-do
   clause. Data discipline: the raw netCDF is **never committed** (size); a small subsampled `.npz` fixture
   pins the tests; the netCDF reader is a demo-side **optional dep** (`flow_globe`/`flow_serialize` stay
   NumPy-only at import). **The one external unknown = data acquisition/auth** (PO.DAAC needs an Earthdata
-  login) — **spike-first: download one file by hand before building anything.** *Retarget-when-done:* the
+  login) — **spike-first: download one file by hand before building anything.** **Spike DONE 2026-07-06**
+  (`OSCAR_L4_OC_FINAL_V2.0`, granule `oscar_currents_final_20200601.nc`, one day/global/0.25°, 33 MB;
+  fetched to the local temp workspace, never committed): **auth settled** — an EDL bearer token
+  (`Authorization: Bearer <token>` header) against
+  `archive.podaac.earthdata.nasa.gov/podaac-ops-cumulus-protected/...` works directly, no `.netrc`/URS
+  redirect handshake needed, so the demo downloader is a one-header `curl`/`requests` call, token supplied
+  via env var (never committed, never logged). **Format settled:** netCDF4/HDF5 (`h5netcdf`+`h5py` read it;
+  `cftime` additionally needed to decode the **`julian`** calendar — `pandas` can't, relevant for O4's time
+  axis); both `lat` (`-89.75…89.75`, 719 rows) and `lon` (`0…359.75`, 1440 cols, **0–360 convention, not
+  ±180**) are already ascending — no north-to-south flip to handle, but the lon **rewrap**
+  (`((lon+180)%360)-180`) makes the array non-monotonic and needs a re-sort/roll before
+  `flow_field_from_ocean` hands it to `_bilinear`. **Dim order is `(time, longitude, latitude)`** — lon
+  before lat, opposite of `FlowField`'s `(n_lat, n_lon)` — a transpose is required, not optional. Variables:
+  `u`/`v` (total = geostrophic+Ekman, the fuller "beautiful" signal) and `ug`/`vg` (geostrophic-only,
+  named as a future knob); units already m/s, range ±3 — no conversion needed. `NaN` = land/missing (44%
+  of the global grid) — this is what makes O1's fill-before-resample/nearest-neighbor-mask/pole-masking
+  retarget (above) concrete rather than speculative. **Forward flag for O3/render, not yet acted on:** the
+  interchange's round-trip proof grid is coarse (2°, `GLOBE_N_LAT=91`/`GLOBE_N_LON=181`) but OSCAR is
+  0.25° — confirm at O2/O3 build time that the *rendered* texture consumes native resolution (or a
+  deliberately-chosen finer grid) and the 2° spec stays only the serialization round-trip proof, or
+  "beautiful" dies at 2°; a native-res global texture also costs far more than the eddy showcase's 758 KB
+  and that tradeoff needs a conscious call, not a default. *Retarget-when-done:* the
   real field's dims/mask/units retarget O1's mask and R1's schema (the §11.2 R1 note foresaw exactly this
   revisit), and the O3/O4 payloads are re-judged against what the product actually carries.
 - **O3 — the beauty pass (renderer-only; `FlowField` untouched — the recurring §9.3 win).** Three upgrades,
