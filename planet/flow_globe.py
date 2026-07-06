@@ -114,6 +114,34 @@ class FlowField:
     scalar_label: str = ""
     radius_m: float = 6.371e6
     mask: Optional[np.ndarray] = None
+    frames: Optional["FlowFrames"] = None
+
+
+@dataclass(frozen=True)
+class FlowFrames:
+    """A **time axis** for a :class:`FlowField` — the §9.6 O4 seasonal-currents increment (default-off).
+
+    ``u``/``v`` are ``(n_frames, ny, nx)`` velocity stacks on the **same** lat×lon grid as the parent
+    :class:`FlowField` (m/s); ``labels`` (n_frames,) the per-frame captions — month names for the OSCAR
+    monthly payload — shown in the renderer's time badge as the field morphs. ``scalar`` an *optional*
+    ``(n_frames, ny, nx)`` per-frame colour field: ``None`` (the ocean default) means **colour by the
+    in-shader current speed** ``|mix(u, v)|`` — a per-frame speed stack would be redundant with the
+    velocity already in the payload, so it is dropped (the §9.6 O4 payload call).
+
+    The renderer **crossfades consecutive frames cyclically** (Dec→Jan wraps, no hard cut) so particles
+    steer smoothly through the year; ``speed_max`` for the colour ramp and speed-weighted seeding is taken
+    across **all** frames so the palette does not flicker frame to frame. It is a **GPU-path-only** view
+    (like O3 trails): the CPU fallback advects the parent field's representative snapshot, static.
+
+    The parent :class:`FlowField`'s ``u``/``v``/``scalar``/``mask`` stay the **representative (frame-0)**
+    snapshot, so a ``frames=None`` field is **bit-for-bit** the pre-O4 single-snapshot path, and every
+    existing producer/consumer is untouched (the default-off discipline O1/O2/O3 each kept).
+    """
+
+    u: np.ndarray
+    v: np.ndarray
+    labels: tuple[str, ...]
+    scalar: Optional[np.ndarray] = None
 
 
 def flow_field_from_eddy(eddy) -> FlowField:
@@ -171,7 +199,7 @@ def _build_data(field: FlowField, n_particles: int, particle_size: float,
                 particle_opacity: float, particle_sharpness: float,
                 crossing_seconds: float = _BAND_CROSSING_SECONDS,
                 sequential: bool = False, trails: bool = False,
-                trail_decay: float = 0.96) -> dict:
+                trail_decay: float = 0.96, seconds_per_year: float = 24.0) -> dict:
     """Pack a :class:`FlowField` into the JSON the in-browser renderer consumes (compact, rounded)."""
     lat = np.asarray(field.lat, dtype=float)
     lon = np.asarray(field.lon, dtype=float)
@@ -180,14 +208,27 @@ def _build_data(field: FlowField, n_particles: int, particle_size: float,
     scalar = None if field.scalar is None else np.asarray(field.scalar, dtype=float)
     mask = None if field.mask is None else np.asarray(field.mask, dtype=bool)
 
+    # §9.6 O4 — the seasonal time axis (default-off). When the field carries frames, the animated GPU path
+    # crossfades the `(nt, ny, nx)` velocity stacks; the single `(u, v)` above stays the representative
+    # (frame-0) snapshot the CPU fallback and the land/ocean base still use. The per-frame *scalar* is
+    # deliberately NOT shipped (ocean colour = in-shader |mix(u, v)|), so the payload carries velocity only.
+    frames = field.frames
+
     center_lat = float(lat.mean())
     center_lon = float(lon.mean())
     span_lon = float(lon.max() - lon.min()) or 1.0
-    umax = float(np.max(np.abs(u))) or 1.0
     # the field's peak *speed* — the normaliser for speed-weighted seeding (§9.6 O3c): particles respawn
     # with acceptance ∝ |u,v|/speed_max so the fast western-boundary currents visually dominate the way
     # they physically do. Independent of the `scalar` (which may be θ, not speed), so it is always honest.
-    speed_max = float(np.max(np.hypot(u, v))) or 1.0
+    # With frames, the peak is taken across ALL frames so the colour ramp / seeding do not flicker (O4).
+    if frames is not None:
+        uf = np.asarray(frames.u, dtype=float)
+        vf = np.asarray(frames.v, dtype=float)
+        umax = float(np.max(np.abs(uf))) or 1.0
+        speed_max = float(np.max(np.hypot(uf, vf))) or 1.0
+    else:
+        umax = float(np.max(np.abs(u))) or 1.0
+        speed_max = float(np.max(np.hypot(u, v))) or 1.0
     # `accel` (model-seconds per wall-clock second) is auto-scaled so the *fastest* particle crosses the
     # field's longitude width in ~`crossing_seconds` — readable streaming regardless of the field's
     # actual speeds. In-browser step: Δλ_deg = deg(u/(a·cosφ)) · accel · dt_real (the honest metric × a
@@ -214,6 +255,12 @@ def _build_data(field: FlowField, n_particles: int, particle_size: float,
         "sequential": bool(sequential),             # True → the sequential speed ramp (else diverging RdBu_r)
         "trails": bool(trails),                     # True → the O3b accumulate-and-fade feedback buffer (GPU only)
         "trail_decay": float(trail_decay),          # per-frame history retention (the trail-length knob's start)
+        "frames": (None if frames is None else {    # §9.6 O4 seasonal time axis (GPU crossfade; null = single snapshot)
+            "nt": int(uf.shape[0]),
+            "u": flat(uf, 2), "v": flat(vf, 2),     # 2 dp — ocean currents ≤3 m/s, cm/s precision is ample and lean
+            "labels": [str(x) for x in frames.labels],
+            "seconds_per_year": float(seconds_per_year),   # wall-clock seconds for one full cycle through the frames
+        }),
         "coverage": {
             "lat_min": round(float(field.coverage.lat_min), 4),
             "lat_max": round(float(field.coverage.lat_max), 4),
@@ -255,6 +302,10 @@ body { font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
             text-shadow: 0 1px 6px #000a; }
 .controls label { display: flex; align-items: center; gap: .6rem; justify-content: space-between; }
 .controls input[type="range"] { width: 9rem; accent-color: #ffd166; }
+.timebadge { position: absolute; top: 64px; right: 16px; padding: .35rem .8rem; border-radius: 8px;
+             background: rgba(12, 18, 38, .82); border: 1px solid #2a3358; color: #ffd166;
+             font-size: 1.05rem; font-weight: 650; letter-spacing: .02em; pointer-events: none;
+             text-shadow: 0 1px 6px #000a; min-width: 5.5rem; text-align: center; }
 """
 
 # The in-browser app. Plain JS (no f-string — the braces are JS). DATA + three.js are inlined ahead of
@@ -272,6 +323,7 @@ const SEQ = !!D.sequential;            // §9.6 O3c: sequential speed ramp (ocea
 const SPEEDMAX = D.speed_max || 1.0;   // peak |u,v| — the speed-weighted-seeding normaliser
 const SEED_FLOOR = 0.08;               // min respawn acceptance so calm regions keep a light ambient fill
 const TRAILS = !!D.trails;             // §9.6 O3b: the accumulate-and-fade trail buffer (GPU path only)
+const FRAMES = D.frames || null;       // §9.6 O4: the seasonal time axis (GPU crossfade; null = single snapshot)
 let density = 1.0;                      // the §9.5 density knob (fraction of particles drawn; 1 = all)
 let trailDecay = D.trail_decay || 0.96;   // the §9.5 trail-length knob (per-frame history retention)
 
@@ -541,6 +593,88 @@ void main() {
   gl_FragColor = vec4(vColor, alpha);
 }`;
 
+// ===== (§9.6 O4) the seasonal crossfade — two-texture variants of the advection shaders ============= #
+// GPU-path only (like O3 trails). These are byte-for-byte the single-snapshot shaders above with the ONE
+// velocity sampler replaced by a `velAt()` that lerps two frame textures by `uMix` — so the single path's
+// UPDATE_FS/DRAW_VS stay untouched (the eddy/ocean single-frame artifacts don't regress), and the frames
+// path steers particles through a smoothly-morphing field. Colour is the in-shader mixed *speed*
+// (|mix(u,v)|/speed_max), so no per-frame scalar texture is shipped (the O4 payload call).
+const UPDATE_FS_F = `precision highp float;
+uniform sampler2D uState, uVelA, uVelB;
+uniform float uDt, uAccel, uRadius, uRandom, uSpeedMax, uSeedFloor, uMix;
+uniform vec2 uLonRange, uLatRange, uVelGrid;
+varying vec2 vUv;
+const float DEG = 57.29577951308232, RAD = 0.017453292519943295;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+vec2 velUV(float lon, float lat) {
+  float gx = clamp((lon - uLonRange.x) / max(1e-6, uLonRange.y - uLonRange.x), 0.0, 1.0);
+  float gy = clamp((lat - uLatRange.x) / max(1e-6, uLatRange.y - uLatRange.x), 0.0, 1.0);
+  return vec2((gx * (uVelGrid.x - 1.0) + 0.5) / uVelGrid.x,
+              (gy * (uVelGrid.y - 1.0) + 0.5) / uVelGrid.y);
+}
+vec4 velAt(vec2 uv) { return mix(texture2D(uVelA, uv), texture2D(uVelB, uv), uMix); }
+void main() {
+  vec4 st = texture2D(uState, vUv);
+  float lon = st.x, lat = st.y, age = st.z, life = st.w;
+  vec4 vel = velAt(velUV(lon, lat));
+  float cosp = max(0.05, cos(lat * RAD));
+  lon += DEG * (vel.x / (uRadius * cosp)) * uAccel * uDt;
+  lat += DEG * (vel.y / uRadius) * uAccel * uDt;
+  age += uDt;
+  bool gone = lon < uLonRange.x || lon > uLonRange.y || lat < uLatRange.x || lat > uLatRange.y
+           || velAt(velUV(lon, lat)).w < 0.5;                    // static mask (same in both frames) → land recycle
+  if (age > life || gone) {
+    lat = uLatRange.x + hash(vUv + vec2(uRandom, 0.123)) * (uLatRange.y - uLatRange.x);
+    lon = uLonRange.x + hash(vUv + vec2(0.456, uRandom)) * (uLonRange.y - uLonRange.x);
+    age = 0.0; life = 2.0 + hash(vUv * 1.7 + uRandom) * 4.0;
+    vec4 rv = velAt(velUV(lon, lat));                            // same invisible-retry idiom as UPDATE_FS
+    if (rv.w < 0.5) age = life + 1.0;
+    else if (hash(vUv * 2.3 + vec2(uRandom, uRandom * 1.7))
+             > max(uSeedFloor, length(rv.xy) / max(1e-6, uSpeedMax))) age = life + 1.0;
+  }
+  gl_FragColor = vec4(lon, lat, age, life);
+}`;
+
+const DRAW_VS_F = `precision highp float;
+uniform mat4 modelViewMatrix, projectionMatrix;
+uniform sampler2D uState, uVelA, uVelB;
+uniform float uSize, uScale, uRadius, uSeq, uDensity, uSpeedMax, uMix;
+uniform vec2 uLonRange, uLatRange, uVelGrid;
+attribute vec3 position; attribute float aSeq;
+varying vec3 vColor; varying float vFade;
+const float RAD = 0.017453292519943295;
+vec2 velUV(float lon, float lat) {
+  float gx = clamp((lon - uLonRange.x) / max(1e-6, uLonRange.y - uLonRange.x), 0.0, 1.0);
+  float gy = clamp((lat - uLatRange.x) / max(1e-6, uLatRange.y - uLatRange.x), 0.0, 1.0);
+  return vec2((gx * (uVelGrid.x - 1.0) + 0.5) / uVelGrid.x,
+              (gy * (uVelGrid.y - 1.0) + 0.5) / uVelGrid.y);
+}
+vec4 velAt(vec2 uv) { return mix(texture2D(uVelA, uv), texture2D(uVelB, uv), uMix); }
+vec3 cmap(float t, float seq) {
+  if (seq > 0.5) {
+    vec3 s0 = vec3(0.16, 0.34, 0.60), s1 = vec3(0.24, 0.63, 0.75), s2 = vec3(0.55, 0.86, 0.60), s3 = vec3(0.98, 0.95, 0.55);
+    if (t < 0.4) return mix(s0, s1, t / 0.4);
+    if (t < 0.75) return mix(s1, s2, (t - 0.4) / 0.35);
+    return mix(s2, s3, (t - 0.75) / 0.25);
+  }
+  vec3 lo = vec3(0.23, 0.31, 0.75), mid = vec3(0.96, 0.96, 0.96), hi = vec3(0.79, 0.16, 0.18);
+  return t < 0.5 ? mix(lo, mid, t / 0.5) : mix(mid, hi, (t - 0.5) / 0.5);
+}
+void main() {
+  if (aSeq > uDensity) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; vFade = 0.0; vColor = vec3(0.0); return; }
+  vec4 st = texture2D(uState, position.xy);
+  float lon = st.x, lat = st.y, age = st.z, life = st.w;
+  float p = lat * RAD, l = lon * RAD;
+  vec3 xyz = vec3(cos(p) * cos(l), sin(p), cos(p) * sin(l)) * 1.012;
+  vec4 mv = modelViewMatrix * vec4(xyz, 1.0);
+  gl_Position = projectionMatrix * mv;
+  gl_PointSize = uSize * uScale / max(0.001, -mv.z);
+  vec2 vxy = velAt(velUV(lon, lat)).xy;                          // colour = the mixed-field speed (§9.6 O4)
+  float t = clamp(length(vxy) / max(1e-6, uSpeedMax), 0.0, 1.0);
+  vColor = cmap(t, uSeq);
+  vFade = min(1.0, age / 0.3) * min(1.0, (life - age) / 0.5);
+}`;
+
 function buildGPU() {
   // velocity (+θ +mask) as a linear-filtered half-float texture: RGBA = (u, v, θ, mask). Half precision
   // is ample for a few-m/s velocity, a colour channel, and a 0/1 validity flag (linear filtering blends
@@ -554,6 +688,27 @@ function buildGPU() {
   const velTex = new T.DataTexture(velData, nx, ny, T.RGBAFormat, T.HalfFloatType);
   velTex.minFilter = velTex.magFilter = T.LinearFilter;
   velTex.wrapS = velTex.wrapT = T.ClampToEdgeWrapping; velTex.needsUpdate = true;
+
+  // §9.6 O4 — one velocity texture per frame, built ONCE up front (upload cost paid at init, not per frame).
+  // RGBA = (u, v, 0, static-mask): the .z colour channel is unused (frames colour = in-shader mixed speed),
+  // and the mask is the same in every frame (finite-in-all-frames — the producer's job), so mixing two
+  // frames' .w is exact at the coastline. The tick crossfades velFrames[k] → velFrames[(k+1)%nt] by uMix.
+  let velFrames = null, NT = 0;
+  if (FRAMES) {
+    NT = FRAMES.nt; const UF = FRAMES.u, VF = FRAMES.v, cells = nx * ny;
+    velFrames = [];
+    for (let fI = 0; fI < NT; fI++) {
+      const fd = new Uint16Array(cells * 4), off = fI * cells;
+      for (let k = 0; k < cells; k++) {
+        fd[k * 4] = toHalf(UF[off + k]); fd[k * 4 + 1] = toHalf(VF[off + k]);
+        fd[k * 4 + 2] = 0; fd[k * 4 + 3] = toHalf(MASK ? MASK[k] : 1);
+      }
+      const tex = new T.DataTexture(fd, nx, ny, T.RGBAFormat, T.HalfFloatType);
+      tex.minFilter = tex.magFilter = T.LinearFilter;
+      tex.wrapS = tex.wrapT = T.ClampToEdgeWrapping; tex.needsUpdate = true;
+      velFrames.push(tex);
+    }
+  }
 
   // pack the particles into the smallest square float texture that holds them (one texel each).
   const texSize = Math.ceil(Math.sqrt(N)), M = texSize * texSize;
@@ -580,14 +735,20 @@ function buildGPU() {
     { uniforms: { uSeed: { value: seedTex } }, vertexShader: QUAD_VS, fragmentShader: INIT_FS }));
   quad.frustumCulled = false;            // the shader writes clip coords directly — never cull the update pass
   quadScene.add(quad);
+  // the velocity sampler(s): single path binds `uVel`; the frames path binds `uVelA`/`uVelB`/`uMix` (the
+  // two frames the tick crossfades), and swaps in the two-texture UPDATE_FS_F. Everything else is shared.
+  const updVel = FRAMES
+    ? { uVelA: { value: velFrames[0] }, uVelB: { value: velFrames[0] }, uMix: { value: 0 } }
+    : { uVel: { value: velTex } };
   const updateMat = new T.RawShaderMaterial({
-    uniforms: { uState: { value: null }, uVel: { value: velTex }, uDt: { value: 0 }, uAccel: { value: ACCEL },
+    uniforms: Object.assign({
+                uState: { value: null }, uDt: { value: 0 }, uAccel: { value: ACCEL },
                 uRadius: { value: A }, uRandom: { value: 0 }, uSpeedMax: { value: SPEEDMAX },
                 uSeedFloor: { value: SEED_FLOOR },
                 uLonRange: { value: new T.Vector2(cov.lon_min, cov.lon_max) },
                 uLatRange: { value: new T.Vector2(cov.lat_min, cov.lat_max) },
-                uVelGrid: { value: new T.Vector2(nx, ny) } },
-    vertexShader: QUAD_VS, fragmentShader: UPDATE_FS });
+                uVelGrid: { value: new T.Vector2(nx, ny) } }, updVel),
+    vertexShader: QUAD_VS, fragmentShader: FRAMES ? UPDATE_FS_F : UPDATE_FS });
   renderer.setRenderTarget(rtCur); renderer.render(quadScene, quadCam);   // seed both targets from the LCG state
   renderer.setRenderTarget(rtNext); renderer.render(quadScene, quadCam);
   renderer.setRenderTarget(null);
@@ -615,20 +776,46 @@ function buildGPU() {
   const gpuGeo = new T.BufferGeometry();
   gpuGeo.setAttribute("position", new T.BufferAttribute(refs, 3));
   gpuGeo.setAttribute("aSeq", new T.BufferAttribute(seqs, 1));
+  // the frames draw colours by the mixed-field speed (DRAW_VS_F) — no θ scalar; the single path keeps the
+  // producer-driven θ/speed scalar (DRAW_VS + uHasScalar/uScalarRange). Shared uniforms are set in common.
+  const drawVel = FRAMES
+    ? { uVelA: { value: velFrames[0] }, uVelB: { value: velFrames[0] }, uMix: { value: 0 } }
+    : { uVel: { value: velTex }, uHasScalar: { value: S ? 1 : 0 }, uScalarRange: { value: new T.Vector2(smin, smax) } };
   const drawMat = new T.RawShaderMaterial({
-    uniforms: { uState: { value: rtCur.texture }, uVel: { value: velTex }, uSize: { value: D.particle_size },
+    uniforms: Object.assign({
+                uState: { value: rtCur.texture }, uSize: { value: D.particle_size },
                 uScale: { value: 0.5 * (renderer.domElement.height || H) }, uOpacity: { value: D.particle_opacity },
-                uSharp: { value: D.particle_sharpness }, uRadius: { value: A }, uHasScalar: { value: S ? 1 : 0 },
+                uSharp: { value: D.particle_sharpness }, uRadius: { value: A }, uSpeedMax: { value: SPEEDMAX },
                 uSeq: { value: SEQ ? 1 : 0 }, uDensity: { value: density },
                 uLonRange: { value: new T.Vector2(cov.lon_min, cov.lon_max) },
                 uLatRange: { value: new T.Vector2(cov.lat_min, cov.lat_max) },
-                uVelGrid: { value: new T.Vector2(nx, ny) }, uScalarRange: { value: new T.Vector2(smin, smax) } },
-    vertexShader: DRAW_VS, fragmentShader: DRAW_FS,
+                uVelGrid: { value: new T.Vector2(nx, ny) } }, drawVel),
+    vertexShader: FRAMES ? DRAW_VS_F : DRAW_VS, fragmentShader: DRAW_FS,
     transparent: true, depthTest: true, depthWrite: false, blending: T.NormalBlending });   // occlude far side
   const gpuPoints = new T.Points(gpuGeo, drawMat); gpuPoints.frustumCulled = false;
   scene.add(gpuPoints); gpuPointsRef = gpuPoints;   // trails re-parent this into a points-only scene (O3b)
 
+  // §9.6 O4 — advance the seasonal crossfade: which two frames, and the mix between them. `yearTime` runs
+  // in wall-clock seconds; one full cycle through the NT frames takes `seconds_per_year`. The wrap is
+  // CYCLIC — frame NT-1 crossfades back into frame 0 (Dec→Jan), never a hard cut — and the time badge
+  // shows the current frame's label (the month), which IS the Somali-reversal showpiece.
+  const badge = FRAMES ? document.getElementById("timebadge") : null;
+  const SPY = FRAMES ? (FRAMES.seconds_per_year || 24.0) : 0;
+  let yearTime = 0, shownFrame = -1;
+  function stepSeason(dt) {
+    yearTime += dt;
+    const phase = (yearTime / SPY) * NT;
+    let k = Math.floor(phase) % NT; if (k < 0) k += NT;
+    const kn = (k + 1) % NT, mixv = phase - Math.floor(phase);
+    updateMat.uniforms.uVelA.value = velFrames[k]; updateMat.uniforms.uVelB.value = velFrames[kn];
+    updateMat.uniforms.uMix.value = mixv;
+    drawMat.uniforms.uVelA.value = velFrames[k]; drawMat.uniforms.uVelB.value = velFrames[kn];
+    drawMat.uniforms.uMix.value = mixv;
+    if (badge && k !== shownFrame) { badge.textContent = FRAMES.labels[k] || ""; shownFrame = k; }
+  }
+
   tick = function (dt) {
+    if (FRAMES) stepSeason(dt);
     updateMat.uniforms.uDt.value = dt; updateMat.uniforms.uRandom.value = Math.random();
     updateMat.uniforms.uState.value = rtCur.texture;
     renderer.setRenderTarget(rtNext); renderer.render(quadScene, quadCam); renderer.setRenderTarget(null);
@@ -825,7 +1012,10 @@ let useGPU = false, why = "";
 if (!renderer.capabilities.isWebGL2) why = "WebGL2 unavailable";
 else if (!renderer.getContext().getExtension("EXT_color_buffer_float")) why = "EXT_color_buffer_float unavailable";
 else {
-  const u = compileOK(QUAD_VS, UPDATE_FS), d = compileOK(DRAW_VS, DRAW_FS), z = compileOK(QUAD_VS, INIT_FS);
+  // gate the shaders the chosen path will actually use: the frames path validates the two-texture
+  // crossfade variants (UPDATE_FS_F / DRAW_VS_F), the single path the originals.
+  const u = compileOK(QUAD_VS, FRAMES ? UPDATE_FS_F : UPDATE_FS), d = compileOK(FRAMES ? DRAW_VS_F : DRAW_VS, DRAW_FS),
+        z = compileOK(QUAD_VS, INIT_FS);
   if (u.ok && d.ok && z.ok) useGPU = true;
   else { why = "shader compile/link failed"; console.warn("[flow-globe] GPU shaders rejected:\n" + u.log + d.log + z.log); }
 }
@@ -898,7 +1088,7 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
                     particle_sharpness: float = DEFAULT_PARTICLE_SHARPNESS,
                     crossing_seconds: float = _BAND_CROSSING_SECONDS,
                     colormap: str = "RdBu_r", trails: bool = False,
-                    trail_decay: float = 0.96) -> str:
+                    trail_decay: float = 0.96, seconds_per_year: float = 24.0) -> str:
     """Render ``field`` as one deterministic, self-contained three.js HTML page (data + three.js inlined).
 
     The disclaimer (``field.honesty``) is written into a **visible** ``<div class="disclaimer">`` in the
@@ -920,13 +1110,20 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
     per-particle fade). It is default-off for the same reason as ``colormap``: no WebGL CI means the ocean
     globe you eyeball is the first thing to exercise it, and the shipped eddy artifact can't silently
     regress. ``trail_decay`` (per-frame history retention, ~0.90–0.985) sets the trail-length slider's start.
+    ``seconds_per_year`` is the §9.6 O4 seasonal pace — wall-clock seconds for one full cycle through a
+    framed field's frames (only consumed when ``field.frames`` is set; the crossfade is GPU-path only, and
+    the current frame's label rides a live time badge). A field with no ``frames`` ignores it entirely.
     """
     sequential = colormap == "speed"
-    data_json = json.dumps(
-        _build_data(field, n_particles, particle_size, particle_opacity, particle_sharpness,
-                    crossing_seconds, sequential, trails, trail_decay),
-        separators=(",", ":"), ensure_ascii=False)
+    data = _build_data(field, n_particles, particle_size, particle_opacity, particle_sharpness,
+                       crossing_seconds, sequential, trails, trail_decay, seconds_per_year)
+    data_json = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
     disclaimer = html.escape(field.honesty)
+    # §9.6 O4 — the seasonal time badge (present only for a framed field): initialised to the first frame's
+    # label so a CPU-fallback (which does not animate the year) still names what it is showing.
+    frames = data.get("frames")
+    time_badge = (f"  <div class=\"timebadge\" id=\"timebadge\">{html.escape(str(frames['labels'][0]))}</div>\n"
+                  if frames and frames.get("labels") else "")
     return (
         "<!doctype html>\n<html lang=\"en\">\n<head>\n"
         "<meta charset=\"utf-8\">\n"
@@ -949,7 +1146,8 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
         + (f"    <label>Trail length<input id=\"trailRange\" type=\"range\" min=\"0.85\" max=\"0.985\" "
            f"step=\"0.005\" value=\"{trail_decay}\"></label>\n" if trails else "")
         + "  </div>\n"
-        f"  <div class=\"disclaimer\" id=\"disclaimer\"><strong>Illustrative showcase — read this.</strong> "
+        + time_badge
+        + f"  <div class=\"disclaimer\" id=\"disclaimer\"><strong>Illustrative showcase — read this.</strong> "
         f"{disclaimer}</div>\n"
         "</div>\n"
         f"<script>{_three_js()}</script>\n"

@@ -27,6 +27,7 @@ from planet import ocean_currents as oc
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = Path(__file__).parent / "fixtures" / "oscar_subsample.npz"
 BANKED = REPO_ROOT / "docs" / "figures" / "planet-ocean-currents.html"
+BANKED_SEASONAL = REPO_ROOT / "docs" / "figures" / "planet-ocean-currents-seasonal.html"
 
 
 def _fixture_snapshot() -> oc.OceanSnapshot:
@@ -201,6 +202,94 @@ def _write_synthetic_granule(path):
             var.attrs["units"] = "m s-1"
         f.attrs["time_coverage_start"] = "2020-06-15T00:00:00"
         f.attrs["product_version"] = "v9.9"
+
+
+# --------------------------------------------------------------------------- #
+# 8. The seasonal series producer (§9.6 O4) — frames, the all-frames mask, honesty
+# --------------------------------------------------------------------------- #
+def _fixture_series(nt=12):
+    """`nt` snapshots grounded in the real subsample: real OSCAR values, seasonally modulated. Raw
+    conventions throughout (0–360 lon, NaN land) so the producer's rewrap/mask/stack runs on real shapes."""
+    base = _fixture_snapshot()
+    snaps = []
+    for m in range(nt):
+        s = float(np.cos(2 * np.pi * m / nt))
+        snaps.append(oc.OceanSnapshot(lat=base.lat, lon=base.lon,
+                                      u=base.u * (0.6 + 0.4 * s), v=base.v * (0.6 + 0.4 * s),
+                                      product=base.product, doi=base.doi, credit=base.credit,
+                                      date=f"2020-{m + 1:02d}-15", depth_note=base.depth_note))
+    return snaps
+
+
+def test_series_stacks_frames_and_defaults_to_month_labels():
+    field = oc.flow_field_from_ocean_series(_fixture_series(12), period="monthly means for 2020")
+    assert field.frames is not None
+    nt, ny, nx = field.frames.u.shape
+    assert nt == 12 and field.frames.v.shape == (12, ny, nx)
+    assert field.frames.labels == ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    # the parent field is the representative (frame-0) snapshot (CPU fallback / land-ocean base still work)
+    assert np.array_equal(field.u, field.frames.u[0]) and np.array_equal(field.v, field.frames.v[0])
+    assert field.coverage.is_global is True
+
+
+def test_series_mask_is_finite_in_every_frame_and_applied_across_the_stack():
+    # The static mask is finite-in-ALL-frames (conservative — a cell measured only part of the year is
+    # left bare, never blinking), and it is APPLIED to the whole stack (no filled-zero land leaks).
+    ny, nx = 5, 8
+    lat = np.linspace(-80.0, 80.0, ny)
+    lon = np.linspace(0.0, 315.0, nx)                            # raw 0–360
+    snaps = []
+    for m in range(4):
+        u = np.full((ny, nx), 0.2 + 0.1 * m)
+        v = np.full((ny, nx), -0.1)
+        u[0, 0] = np.nan                                         # land in EVERY frame
+        if m == 2:
+            u[2, 3] = np.nan                                     # a single-frame gap → must mask out in all
+        snaps.append(oc.OceanSnapshot(lat=lat, lon=lon, u=u, v=v))
+    field = oc.flow_field_from_ocean_series(snaps)
+    assert int((~field.mask).sum()) == 2                         # the always-land cell AND the one-frame gap
+    inv = ~field.mask
+    assert np.all(field.frames.u[:, inv] == 0.0) and np.all(field.frames.v[:, inv] == 0.0)
+    assert np.isfinite(field.frames.u).all() and np.isfinite(field.frames.v).all()   # no NaN reaches a sampler
+
+
+def test_series_honesty_is_a_time_series_and_stays_acquisition_agnostic():
+    # The honesty clause names it a TIME series and carries the caller's phrase VERBATIM — the producer
+    # never invents "climatology"; the demo owns what the frames actually are (advisor's decouple call).
+    field = oc.flow_field_from_ocean_series(_fixture_series(12), period="monthly means for 2020")
+    h = field.honesty
+    assert "REAL data" in h and "OSCAR" in h and "NOT computed by planet-sim" in h
+    assert "TIME series" in h and "monthly means for 2020" in h
+    assert "climatology" not in h                                # not claimed unless the caller's data is one
+    assert "no data and no particles" in h
+
+
+def test_framed_field_serializes_with_a_seasonal_frames_layer(tmp_path):
+    from planet import planet_spec as ps
+    from planet.flow_serialize import FRAMES_LAYER, vector_spec_from_flow_field
+
+    field = oc.flow_field_from_ocean_series(_fixture_series(4), period="four snapshots, 2020")
+    spec = vector_spec_from_flow_field(field, provenance="planet.ocean_currents (OSCAR series)")
+    fl = spec.view().layer(FRAMES_LAYER)
+    assert fl.data.ndim == 4 and fl.data.shape[0] == 4 and fl.data.shape[1] == 2
+    assert fl.style["labels"] == list(field.frames.labels)
+    ps.save(spec, tmp_path / "series")
+    assert ps.load(tmp_path / "series") == spec                  # the R1 round-trip, now on a framed field
+
+
+def test_seasonal_banked_artifact_carries_the_provenance_and_frames_when_present():
+    # The O4 banked artifact is a token hand-off (12 granules); guard it IF it exists — a regeneration
+    # can't silently drop the provenance clause, the frames payload, or the inlined three.js licence.
+    if not BANKED_SEASONAL.exists():
+        pytest.skip("seasonal artifact not banked yet (EARTHDATA_TOKEN hand-off — code + tests prove it)")
+    text = BANKED_SEASONAL.read_text(encoding="utf-8")
+    assert 'class="disclaimer"' in text
+    assert "OSCAR" in text and "NOT computed by planet-sim" in text
+    assert "Three.js Authors" in text and "SPDX-License-Identifier: MIT" in text
+    assert '"frames":' in text and '"seconds_per_year":' in text   # the time axis really shipped
+    assert 'id="timebadge"' in text                                # the month badge is in the DOM
+    assert '"is_global":true' in text
 
 
 def test_loader_transposes_fills_and_reads_attrs(tmp_path):

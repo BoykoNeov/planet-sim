@@ -46,7 +46,11 @@ from typing import Optional
 
 import numpy as np
 
-from .flow_globe import Coverage, FlowField
+from .flow_globe import Coverage, FlowField, FlowFrames
+
+# Calendar-month abbreviations — the default frame labels for a 12-snapshot monthly series (the O4 payload);
+# any other length falls back to the snapshots' own dates, so the labels always say what the frames are.
+_MONTH_ABBR = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 # The granule the spike settled on (one day, global, 0.25°, ~33 MB) — the demo's default target.
 OSCAR_PRODUCT = "OSCAR L4 v2.0 total surface currents"
@@ -161,3 +165,86 @@ def flow_field_from_ocean(snap: OceanSnapshot) -> FlowField:
                         lon_min=float(lon.min()), lon_max=float(lon.max()), is_global=True)
     return FlowField(lat=lat, lon=lon, u=u, v=v, coverage=coverage, honesty=honesty,
                      scalar=speed, scalar_label="current speed (m/s)", mask=mask)
+
+
+def flow_field_from_ocean_series(snaps, *, labels=None, period: str = "",
+                                 pace_note: str = "one model year compressed to a few seconds") -> FlowField:
+    """A time-ordered list of :class:`OceanSnapshot` → a **framed** :class:`FlowField` — the §9.6 O4 producer.
+
+    The seasonal-currents deliverable: the same rewrap→mask→fill pipeline as :func:`flow_field_from_ocean`,
+    run over every frame and stacked into a :class:`~planet.flow_globe.FlowFrames` time axis the renderer
+    crossfades through the year (the Somali-Current monsoon reversal is the showpiece). All snapshots must
+    share one grid (the OSCAR product's lat/lon); ``snaps`` is expected already time-ordered.
+
+    **Acquisition-agnostic (advisor call).** This function does not know or claim *how* the frames were
+    built — whether a true multi-year climatology or one year's 12 monthly means. The caller (the demo)
+    owns acquisition and passes ``period`` — the honest phrase describing what the series actually is (e.g.
+    ``"monthly means for 2020"``) — which rides verbatim into the provenance clause. Do **not** let the
+    word "climatology" leak in unless the data is one.
+
+    Two honesty rules carry from O1/O2, tightened for the time axis:
+
+    * **Static mask = finite in *every* frame** (conservative): a cell is valid only where all frames carry
+      data, so a cell measured for only part of the year is left bare rather than blinking in and out —
+      never over-claiming. Sea-ice seasonality (the ice edge that genuinely moves) is a documented
+      second-order edge folded into this "no data in any frame → bare" rule, not animated.
+    * The mask is **applied to every frame** (zero ``(u, v)`` on invalid cells) so a filled-zero land cell
+      can never read back as a measured zero current — the O1 rule, now across the stack.
+
+    ``labels`` overrides the per-frame captions (the time badge); the default is calendar-month
+    abbreviations for a 12-frame series, else each snapshot's own date. The parent field's
+    ``u``/``v``/``scalar`` are the **representative (frame-0)** snapshot (the CPU fallback and land/ocean
+    base still work); the per-frame *scalar* is not stacked (the renderer colours by in-shader speed).
+    """
+    snaps = list(snaps)
+    if not snaps:
+        raise ValueError("flow_field_from_ocean_series needs at least one snapshot")
+    lat = np.asarray(snaps[0].lat, dtype=float)
+    lon180 = ((np.asarray(snaps[0].lon, dtype=float) + 180.0) % 360.0) - 180.0
+    order = np.argsort(lon180, kind="stable")      # the same monotone re-sort flow_field_from_ocean applies
+    lon = lon180[order]
+    ny, nx = np.asarray(snaps[0].u).shape
+
+    # per-frame rewrap; the validity mask is finite-in-ALL-frames (the conservative static mask, above).
+    us, vs, finite = [], [], np.ones((ny, nx), dtype=bool)
+    for s in snaps:
+        u = np.asarray(s.u, dtype=float)
+        v = np.asarray(s.v, dtype=float)
+        if u.shape != (ny, nx) or v.shape != (ny, nx):
+            raise ValueError("all snapshots must share one grid (same OSCAR product / stride)")
+        u, v = u[:, order], v[:, order]
+        finite &= np.isfinite(u) & np.isfinite(v)
+        us.append(u)
+        vs.append(v)
+    mask = finite
+    uf = np.stack([np.where(mask, u, 0.0) for u in us])    # (nt, ny, nx) — mask applied across the whole stack
+    vf = np.stack([np.where(mask, v, 0.0) for v in vs])
+
+    nt = len(snaps)
+    if labels is not None:
+        frame_labels = tuple(str(x) for x in labels)
+    elif nt == 12:
+        frame_labels = _MONTH_ABBR
+    else:
+        frame_labels = tuple((s.date or f"frame {i + 1}") for i, s in enumerate(snaps))
+
+    prov = snaps[0]
+    ocean_pct = round(100.0 * float(mask.mean()))
+    span = period or f"a {nt}-frame seasonal series"
+    honesty = (
+        f"REAL data, not this project's model: these are reanalysis-class ocean surface currents — "
+        f"{prov.product}, {prov.credit}, DOI {prov.doi} — measured-and-derived from satellite "
+        f"observations, NOT computed by planet-sim's models (this project renders the field; it did not "
+        f"produce it). This is a TIME series — {span}, {nt} frames — and the globe crossfades between "
+        f"frames, heavily time-accelerated ({pace_note}); the streaming particles are illustrative: they "
+        f"trace each frame's snapshot velocity, not actual water parcels, and the smooth morph between "
+        f"frames is interpolation, not resolved day-to-day flow. The velocity is the {prov.depth_note}. "
+        f"Land and unobserved cells (~{100 - ocean_pct}% of the grid, including the poles beyond "
+        f"±{abs(lat).max():.2f}° and anywhere lacking data in ANY frame) carry no data and no particles."
+    )
+    coverage = Coverage(lat_min=float(lat.min()), lat_max=float(lat.max()),
+                        lon_min=float(lon.min()), lon_max=float(lon.max()), is_global=True)
+    frames = FlowFrames(u=uf, v=vf, labels=frame_labels)
+    return FlowField(lat=lat, lon=lon, u=uf[0], v=vf[0], coverage=coverage, honesty=honesty,
+                     scalar=np.hypot(uf[0], vf[0]), scalar_label="current speed (m/s)",
+                     mask=mask, frames=frames)

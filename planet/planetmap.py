@@ -558,6 +558,9 @@ def _overlay_traces(go, grid: Grid, view: PlanetView) -> list:
                 x=ax, y=ay, z=az, mode="lines", name=ly.style.get("label", ly.name),
                 line=dict(color=ly.style.get("color", "#000000"), width=5), hoverinfo="name"))
         elif ly.kind is LayerKind.VECTOR_OVERLAY:
+            if np.asarray(ly.data).ndim >= 4:
+                continue          # a serialized seasonal frame stack (§9.6 O4, (nt,2,ny,nx)) — the flow-globe
+                                  # renderer animates it; the interactive map paints the primary snapshot only
             traces.append(_vector_overlay_trace(go, grid, ly))
     return traces
 

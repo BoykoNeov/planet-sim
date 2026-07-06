@@ -78,6 +78,9 @@ DEMOS: tuple[Demo, ...] = (
          "one day of real OSCAR surface currents (NASA PO.DAAC) streamed through the same seam and "
          "renderer as the eddy band — not a planet-sim simulation",
          ("ocean",), "docs/figures/planet-ocean-currents.html", "Interactive globes"),
+    # NB: the O4 seasonal demo (planet.demo_ocean_seasonal) is deliberately NOT catalogued yet — its
+    # artifact (docs/figures/planet-ocean-currents-seasonal.html) is a token hand-off and is not banked,
+    # and the landing page must not link a file that doesn't exist. Add the entry when the artifact lands.
 )
 
 

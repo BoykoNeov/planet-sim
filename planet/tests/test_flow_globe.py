@@ -283,6 +283,87 @@ def test_trail_length_knob_and_resize_realloc_are_wired():
     assert 'id="trailRange"' not in fg.flow_globe_html(_masked_field())
 
 
+def _framed_field(nt=4, ny=6, nx=8) -> fg.FlowField:
+    """A tiny masked FlowField carrying an O4 :class:`FlowFrames` time axis (a land cell, ``M#`` labels)."""
+    lat = np.linspace(-40.0, 40.0, ny)
+    lon = np.linspace(-100.0, 100.0, nx)
+    rng = np.random.default_rng(0)
+    u = rng.standard_normal((nt, ny, nx)) * 0.5
+    v = rng.standard_normal((nt, ny, nx)) * 0.5
+    mask = np.ones((ny, nx), dtype=bool)
+    mask[0, 0] = False
+    u[:, ~mask] = 0.0
+    v[:, ~mask] = 0.0
+    cov = fg.Coverage(-40.0, 40.0, -100.0, 100.0, is_global=True)
+    frames = fg.FlowFrames(u=u, v=v, labels=tuple(f"M{i + 1}" for i in range(nt)))
+    return fg.FlowField(lat=lat, lon=lon, u=u[0], v=v[0], coverage=cov,
+                        honesty="a framed probe — illustrative test data, real currents not this model",
+                        scalar=np.hypot(u[0], v[0]), scalar_label="speed", mask=mask, frames=frames)
+
+
+def test_frames_default_off_leaves_the_single_snapshot_payload_unchanged():
+    # O4 default-off: a field with no frames ships `frames: null`, and the whole single-snapshot HTML
+    # carries no seasonal DOM/JS surface — every pre-O4 producer/consumer is byte-untouched.
+    d = fg._build_data(_masked_field(), 100, 0.03, 0.9, 0.5)
+    assert d["frames"] is None
+    html = fg.flow_globe_html(_masked_field())
+    assert 'id="timebadge"' not in html                          # no time badge for an unframed field
+    assert '"frames":null' in html.replace(" ", "")
+
+
+def test_build_data_packs_the_frame_stack_dropping_the_per_frame_scalar():
+    # O4 payload call: frames ride as flat (nt·ny·nx) u/v arrays + labels + the seasonal pace; the peak
+    # speed is the ALL-frame max (so the ramp/seeding don't flicker); NO per-frame scalar is shipped
+    # (colour is the in-shader mixed speed).
+    field = _framed_field(nt=4, ny=6, nx=8)
+    d = fg._build_data(field, 100, 0.03, 0.9, 0.5, seconds_per_year=18.0)
+    fr = d["frames"]
+    assert fr is not None and fr["nt"] == 4
+    assert len(fr["u"]) == 4 * 6 * 8 and len(fr["v"]) == 4 * 6 * 8
+    assert fr["labels"] == ["M1", "M2", "M3", "M4"]
+    assert fr["seconds_per_year"] == 18.0
+    assert "scalar" not in fr                                     # per-frame scalar dropped (speed in-shader)
+    all_max = float(np.max(np.hypot(field.frames.u, field.frames.v)))
+    assert np.isclose(d["speed_max"], round(all_max, 4))         # the all-frame peak, not frame 0's
+
+
+def test_flow_globe_html_emits_the_time_badge_and_the_crossfade_shaders():
+    # The renderer surface for O4: a visible time badge (the month label — the Somali-reversal showpiece),
+    # the two-texture crossfade shaders, and the cyclic Dec→Jan wrap in the season stepper.
+    html = fg.flow_globe_html(_framed_field(), colormap="speed", seconds_per_year=12.0)
+    m = re.search(r'<div class="timebadge"[^>]*>(.*?)</div>', html, re.S)
+    assert m and m.group(1) == "M1"                              # badge initialised to the first frame's label
+    assert '"frames":' in html and '"seconds_per_year":12' in html
+    assert "const UPDATE_FS_F" in html and "const DRAW_VS_F" in html   # the crossfade shader variants
+    assert "vec4 velAt(vec2 uv) { return mix(texture2D(uVelA, uv), texture2D(uVelB, uv), uMix); }" in html
+    assert "const kn = (k + 1) % NT" in html                     # cyclic wrap — no hard cut Dec→Jan
+    assert "badge.textContent = FRAMES.labels[k]" in html        # the badge updates in the loop
+
+
+def test_frames_are_gpu_only_and_the_single_path_shaders_are_untouched():
+    # Frames animate on the GPU crossfade only (like trails); the single-snapshot UPDATE_FS/DRAW_VS ship
+    # unchanged so the eddy/ocean single-frame artifacts don't regress. The frames path is behind `if (FRAMES)`.
+    html = fg.flow_globe_html(_framed_field())
+    assert "if (FRAMES) stepSeason(dt);" in html                 # the season step is gated on frames
+    assert "fragmentShader: FRAMES ? UPDATE_FS_F : UPDATE_FS" in html   # single path keeps the original shader
+    assert "gl_FragColor = vec4(lon, lat, age, life)" in html    # the untouched single-path UPDATE_FS body
+    assert "buildCPU" in html and "CPU advection fallback active" in html   # a frame miss still shows a globe
+
+
+def test_emitted_app_js_parses_with_a_framed_field(tmp_path):
+    # The frames crossfade shaders + the season stepper are new JS — parse them too (a GLSL/JS slip here
+    # blanks the animated globe exactly as it would the single one). Skips where node is absent.
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node not available — JS syntax check skipped")
+    html = fg.flow_globe_html(_framed_field(), colormap="speed", trails=True, seconds_per_year=12.0)
+    app = re.findall(r"<script>(.*?)</script>", html, re.S)[-1]
+    js = tmp_path / "app_framed.js"
+    js.write_text("var window = {};\n" + app, encoding="utf-8")
+    r = subprocess.run([node, "--check", str(js)], capture_output=True, text=True)
+    assert r.returncode == 0, f"emitted framed app JS failed to parse:\n{r.stderr}"
+
+
 @pytest.mark.slow
 def test_demo_eddy_particles_banks_the_artifact(tmp_path):
     # ADR 0002: an execution smoke-test, not a physics check (test_eddy_flux validates the numbers). Runs

@@ -1,6 +1,6 @@
 ---
 name: ocean-currents-viz-rungs
-description: Ocean-currents showcase rungs O1–O5 (plan §9.6) — O1 mask + O2 OSCAR producer + O3 beauty pass BUILT 2026-07-06 (real currents banked on the Rung-C globe, land/ocean base + trails + speed styling, FlowField untouched a 4th time); O4 frames next; §11.4 fork retargeted viz-half-only
+description: Ocean-currents showcase rungs O1–O5 (plan §9.6) — O1 mask + O2 OSCAR producer + O3 beauty pass BUILT 2026-07-06; O4 seasonal frames (time axis) CODE-BUILT 2026-07-06 but animation UNVERIFIED (GLSL never compiled — token + browser eyeball owed); O5 QG producer next; §11.4 fork retargeted viz-half-only
 metadata:
   type: project
 ---
@@ -60,8 +60,27 @@ narrows** to ECCO-as-validation-anchor-for-S3). The §11.2 "never ships an ocean
   (decay). Verified on the committed **5° OSCAR fixture** (masked pipeline, node-`--check` clean), gate
   **538 green**. The 0.5° banked ocean artifact re-bank needs `EARTHDATA_TOKEN` (user hand-off; code +
   fixture prove it). Advisor's 3 load-bearing calls (occluder-prepass / additive / respawn-not-seed) all in.
-- **O4 — frames time axis**: the R1 deferral, built after O2's real dims are seen; `(nt,ny,nx)` stacked
-  npz + crossfaded `uVelA`/`uVelB` textures; OSCAR monthly climatology → Somali Current monsoon reversal.
+- **O4 — frames time axis: CODE-BUILT 2026-07-06 (animation UNVERIFIED — token + browser eyeball owed).**
+  All four pieces built, fast gate **552 pass/1 skip**, **default-off so pre-O4 is bit-for-bit** (single-snapshot
+  shaders byte-untouched). **Contract** `FlowFrames` on `FlowField` (`u`/`v` `(nt,ny,nx)`+`labels`; `frames=None`
+  = exact pre-O4 path — O1-mask/O3-trails discipline). **Producer** `flow_field_from_ocean_series`: rewrap→mask→fill
+  over N snaps, stacked; **static mask = finite-in-EVERY-frame** (advisor: conservative, never blinks; sea-ice
+  folded into "no data in any frame → bare"); **acquisition-agnostic** (advisor: producer never says "climatology"
+  — caller passes the honest `period` phrase). **Renderer** (GPU-only like trails): **separate** crossfade shaders
+  `UPDATE_FS_F`/`DRAW_VS_F` (`velAt()=mix(velA,velB,uMix)` substitution — single-path `UPDATE_FS`/`DRAW_VS`
+  untouched), N frame textures once, `stepSeason` cyclic **Dec→Jan `(k+1)%NT`** wrap, `seconds_per_year` pace,
+  **live month time badge** (the showpiece). **Advisor payload calls taken:** colour = in-shader mixed speed ⇒
+  **per-frame scalar dropped** (−⅓); animation grid **coarser than the O2 still** (demo `STRIDE=6`=1.5°, motion
+  hides res) ⇒ 12-frame HTML ~5 MB (12×`(u,v)`@0.5° would be ~30 MB). **Serializer**: the R1 frames deferral acted
+  on — `(nt,2,ny,nx)` stack rides as ONE additive `FRAMES_LAYER` VECTOR_OVERLAY (labels in style), round-trip `==`
+  free; interactive map **skips the 4-D stack** (one-line `planetmap._overlay_traces` `ndim>=4` guard — paints the
+  primary snapshot). **Demo** `demo_ocean_seasonal.py` (bearer token, 12 mid-month-day granules of 2020). **Frame
+  data (user 2026-07-06): 12 monthly SNAPSHOTS = one day/month of 2020, NOT means/climatology** (Somali reversal
+  reads in a day-per-month series; label says exactly that). **The honesty gap (advisor):** `node --check` ≠ GLSL
+  compile + no WebGL CI ⇒ the whole frames GPU path (crossfade shaders, stepSeason, badge, trails+frames) ran
+  NOWHERE; a frames-shader compile error degrades **silently** to CPU fallback (static frame-0 = reads as "not
+  animating"). ⇒ **code-complete, animation-UNVERIFIED**; browser play-through owed (as O3). Seasonal demo
+  **NOT catalogued yet** (artifact unbanked — no dangling landing-page link; catalogue+page land WITH the artifact).
 - **O5 — QG producer** `flow_field_from_qg` (independent): second EMERGENT producer, box coverage no mask;
   a third producer re-trips §9.4 rule-of-three for the two-consumer geometry helpers.
 

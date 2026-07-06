@@ -960,7 +960,7 @@ the user (acceptance unchanged; **"frozen particles" now has a second GPU cause*
 visible in the read-back log — and GPU vs CPU default point size may differ by up to the pixel-ratio, ≤2×, which
 is slider-correctable, not a bug).
 
-### 9.6 Beautiful ocean currents — the real-data showcase rungs O1–O5 (scoped 2026-07-06; **O1 + O2 + O3 built 2026-07-06**, O4–O5 not built)
+### 9.6 Beautiful ocean currents — the real-data showcase rungs O1–O5 (scoped 2026-07-06; **O1 + O2 + O3 built 2026-07-06; O4 code-built 2026-07-06 (animation unverified — token + browser eyeball pending)**, O5 not built)
 
 **The ask (user, 2026-07-06): "visualize beautiful ocean currents."** The project already owns both halves
 of the machinery: the Rung-C particle globe (`flow_globe.py` — GPU-advected by default, honest-by-disclosure)
@@ -1134,13 +1134,42 @@ rule each rung is provisional until its predecessor lands; the `Retarget-when-do
     visually dominate the way they physically do.
   - The §9.5 **control-surface seam unlocks**: the ocean producer is the named "second consumer," so
     **trail length + particle density** become the first two knobs (colour ramps / shape menus stay named).
-- **O4 — frames: the time axis (seasonal currents).** The R1-deferred schema increment, built **after** O2
-  per its own retarget note: stack `(u, v, scalar)` as `(nt, ny, nx)` arrays in the `.npz` + time labels in
-  `style`; the renderer crossfades **two velocity `DataTexture`s** (`uVelA`/`uVelB` + a mix uniform) so the
-  particles steer smoothly through the year. Payload: the OSCAR **monthly climatology** (12 frames); the
-  showpiece is the **Somali Current monsoon reversal** — the one major current on Earth that flips direction
-  seasonally. *Retarget-when-done:* whether frames also back-port to the eddy band (Rung B/C animation
-  parity) is decided here, not promised now.
+- **O4 — frames: the time axis (seasonal currents). CODE-BUILT 2026-07-06 (animation unverified).** The
+  R1-deferred schema increment, all four pieces built and fast-gate-green (552 pass/1 skip), **default-off so
+  every pre-O4 producer/consumer is bit-for-bit** and the single-snapshot shaders are byte-untouched.
+  **Contract:** `FlowFrames` side-channel on `FlowField` (`u`/`v` `(nt, ny, nx)` + `labels`; optional per-frame
+  `scalar` left `None`), `frames=None` = the exact pre-O4 path — the same additive-default-off discipline as
+  O1's `mask`/O3's `trails`. **Producer** `flow_field_from_ocean_series` (`ocean_currents.py`): the same
+  rewrap→mask→fill pipeline over N snapshots, stacked; **static mask = finite-in-EVERY-frame** (advisor:
+  conservative — a cell measured only part of the year is left bare, never blinking; sea-ice seasonality
+  folded into the "no data in any frame → bare" rule, not animated) applied across the whole stack;
+  **acquisition-agnostic** (advisor: the producer never claims "climatology" — the caller passes the honest
+  `period` phrase, which rides verbatim into the provenance clause). **Renderer** (`flow_globe.py`,
+  GPU-path-only like trails): **separate two-texture crossfade shaders** `UPDATE_FS_F`/`DRAW_VS_F` (a `velAt()`
+  = `mix(velA, velB, uMix)` substitution of the working shaders — the single path's `UPDATE_FS`/`DRAW_VS`
+  untouched), N frame textures built once, a `stepSeason` tick advancing wall-clock `yearTime` through the
+  frames with a **cyclic Dec→Jan wrap** `(k+1)%NT` (no hard cut), a `seconds_per_year` pace knob, and a
+  **live month-label time badge** (the showpiece read-out). **Advisor payload calls, both taken:** colour is
+  the **in-shader mixed speed** so the **per-frame scalar is dropped** (−⅓ payload), and the animation grid is
+  **coarser than the O2 still** (demo `STRIDE=6` = 1.5°; motion hides resolution) → a 12-frame HTML ~5 MB,
+  comparable to O2's single-frame 5.2 MB (12 frames of `(u,v)` at 0.5° would be ~30 MB). **Serializer**
+  (`flow_serialize.py`): the R1 frames deferral now acted on — the `(nt, 2, n_lat, n_lon)` stack rides as ONE
+  additive `FRAMES_LAYER` `VECTOR_OVERLAY` (each frame embedded on the globe grid exactly like the primary
+  snapshot, labels in `style`), round-trip `==` extends for free; the interactive Plotly map **skips the 4-D
+  stack** (a one-line `planetmap._overlay_traces` `ndim>=4` guard — it paints the primary snapshot; the
+  flow-globe animates the stack). **Demo** `demo_ocean_seasonal.py` (bearer-token, 12 mid-month-day granules
+  of 2020, gitignored `outputs/`, round-trip proof on the framed field → `docs/figures/…-seasonal.html`).
+  **Frame-data choice (user, 2026-07-06): twelve monthly snapshots — ONE day per month of 2020, NOT means and
+  NOT a climatology** (the Somali reversal is a large monsoon signal that reads clearly in a day-per-month
+  series; the honesty label says exactly that). **The honesty gap (advisor, load-bearing):** `node --check`
+  validates the JS template syntax but **not GLSL**, and there is no WebGL CI — so the *entire frames GPU path*
+  (the crossfade shaders, `stepSeason`, the badge, trails+frames composition) **has compiled/run nowhere**; a
+  frames-shader compile error degrades **silently** to the CPU fallback (static frame-0, which reads as "just
+  not animating"). O4 is therefore **code-complete, animation-UNVERIFIED** — the browser play-through is the
+  hand-off boundary (as O3), and it is **owed** before O4 is banked. The seasonal demo is **deliberately NOT
+  catalogued yet** (its artifact isn't banked — the landing page must not link a missing file); the catalogue +
+  landing-page entry land *with* the artifact. *Retarget-when-done:* whether frames also back-port to the eddy
+  band (Rung B/C animation parity) is still decided when banked, not promised now.
 - **O5 — the QG producer (independent bonus, does not gate O1–O4).** `flow_field_from_qg`: the rung-3
   two-layer QG condensate — vortex filaments streaming in a box — as a **second emergent** producer.
   Cheap (`(u, v) = (−∂ψ/∂y, ∂ψ/∂x)` is already recoverable from the spectral state), needs no mask (box

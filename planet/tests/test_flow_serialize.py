@@ -341,7 +341,62 @@ def test_mask_layer_renders_as_a_categorical_coverage_globe():
 
 
 # --------------------------------------------------------------------------- #
-# 7. The real, live eddy producer end-to-end (slow — runs the short sim)
+# 7. The seasonal time axis (§9.6 O4) — frames ride as an additive 4-D layer
+# --------------------------------------------------------------------------- #
+def _framed_global_flow_field(nt=4) -> fg.FlowField:
+    """The O2-shaped masked global field grown with a :class:`FlowFrames` time axis (a per-frame stack)."""
+    base = _masked_global_flow_field()
+    ny, nx = base.u.shape
+    rng = np.random.default_rng(1)
+    uf = np.stack([base.u * (0.5 + 0.5 * np.cos(2 * np.pi * k / nt)) for k in range(nt)])
+    vf = np.stack([base.v + 0.1 * rng.standard_normal((ny, nx)) for _ in range(nt)])
+    uf[:, ~base.mask] = 0.0
+    vf[:, ~base.mask] = 0.0
+    frames = fg.FlowFrames(u=uf, v=vf, labels=tuple(f"F{k + 1}" for k in range(nt)))
+    return fg.FlowField(lat=base.lat, lon=base.lon, u=uf[0], v=vf[0], coverage=base.coverage,
+                        honesty=base.honesty, scalar=np.hypot(uf[0], vf[0]), scalar_label="speed",
+                        mask=base.mask, frames=frames)
+
+
+def test_frames_round_trip_as_an_additive_4d_layer(tmp_path):
+    # O4 un-defers the frames increment: the (nt, 2, n_lat, n_lon) stack rides as ONE additive
+    # VECTOR_OVERLAY layer with the labels in style, and the round-trip == extends to it for free
+    # (np.array_equal is shape-agnostic — no new equality machinery).
+    field = _framed_global_flow_field(nt=4)
+    spec = fs.vector_spec_from_flow_field(field, provenance="framed probe")
+    ps.save(spec, tmp_path / "framed")
+    assert ps.load(tmp_path / "framed") == spec
+    fl = spec.view().layer(fs.FRAMES_LAYER)
+    assert fl.data.ndim == 4 and fl.data.shape[0] == 4 and fl.data.shape[1] == 2
+    assert fl.data.shape[2:] == (fs.GLOBE_N_LAT, fs.GLOBE_N_LON)
+    assert fl.style["labels"] == ["F1", "F2", "F3", "F4"]
+
+
+def test_frames_layer_is_additive_absent_without_frames():
+    # The default-off discipline: a field with no frames registers NO frames layer — every pre-O4 spec
+    # keeps its exact layer list.
+    plain = fs.vector_view_from_flow_field(_masked_global_flow_field(), provenance="masked probe")
+    assert all(ly.name != fs.FRAMES_LAYER for ly in plain.layers)
+    framed = fs.vector_view_from_flow_field(_framed_global_flow_field(), provenance="framed probe")
+    assert any(ly.name == fs.FRAMES_LAYER for ly in framed.layers)
+
+
+def test_interactive_render_skips_the_frame_stack_paints_the_primary_snapshot():
+    # The planetmap guard: the 4-D frame stack is NOT a paintable snapshot — the interactive Plotly map
+    # skips it (ndim>=4) and paints the primary `circulation` snapshot; the flow-globe renderer animates
+    # it. Without the guard, _vector_overlay_trace would choke on the 4-D data.
+    pytest.importorskip("plotly")
+    import plotly.graph_objects as go
+
+    view = fs.vector_view_from_flow_field(_framed_global_flow_field(), provenance="framed probe")
+    traces = pm._overlay_traces(go, view.grid, view)
+    assert len(traces) == 1                                       # only the primary circulation; frames skipped
+    fig = pm.render(view, active="speed", caption="framed test")  # a full render still succeeds
+    assert fig is not None and len(fig.data) >= 1
+
+
+# --------------------------------------------------------------------------- #
+# 8. The real, live eddy producer end-to-end (slow — runs the short sim)
 # --------------------------------------------------------------------------- #
 @pytest.mark.slow
 def test_live_eddy_band_serializes_and_round_trips(tmp_path):

@@ -50,12 +50,19 @@ masked** (OSCAR stops at ±89.75° — extrapolated poles would be fabricated oc
 can never read back as measured zero current. Serialized, the mask is one more (categorical 0/1) layer
 in the same ``.npz`` — schema-additive, so a no-mask spec loads exactly as before.
 
-Frames — a named, deferred increment
-------------------------------------
-The plan's R1 list names *frames* (a time axis of ``(u, v, scalar)``). R1 serializes a single
-(saturated) **snapshot**: a time axis is **orthogonal** to producer-agnosticism (it is the §9.5
-time-animation concern) and is trivially a stacked ``.npz`` array later — so it is a conscious deferral,
-not a gap, revisited at S1 against a real ocean field's dimensions (the *Retarget-when-done* rule).
+Frames — the time axis (§9.6 O4, the R1 deferral now acted on)
+--------------------------------------------------------------
+R1 serialized a single **snapshot** and named *frames* (a time axis of ``(u, v, scalar)``) a conscious
+deferral — orthogonal to producer-agnosticism, and "trivially a stacked ``.npz`` array later." O4 is
+that later: a framed :class:`FlowField` (:class:`~planet.flow_globe.FlowFrames`) rides as **one more
+additive layer** — a :data:`FRAMES_LAYER` ``VECTOR_OVERLAY`` whose ``data`` is the ``(nt, 2, n_lat,
+n_lon)`` stack (each frame's ``[u, v]`` embedded on the globe grid exactly like the primary snapshot),
+with the per-frame **labels** in its JSON-safe ``style``. This keeps "one structure serialized, not a
+second invented" (ADR 0004 #3): the stack is a Layer like any other, so ``save``/``load`` round-trip it
+unchanged and the round-trip ``==`` extends to it for free (:func:`numpy.array_equal` is shape-agnostic).
+The interactive Plotly map paints the **primary** ``circulation`` snapshot and *skips* the 4-D stack
+(:func:`planet.planetmap._overlay_traces` guards on ``ndim``); the flow-globe renderer is what animates
+it. A field with no frames has no such layer and loads exactly as before (the additive discipline).
 
 This module is **NumPy-only at import** (it imports the headless halves of :mod:`planet.planetmap`,
 :mod:`planet.planet_spec`, and :mod:`planet.flow_globe` — no Plotly / matplotlib), so the round-trip
@@ -79,6 +86,7 @@ VECTOR_LAYER = "circulation"     # the VECTOR_OVERLAY layer name (mirrors planet
 SPEED_LAYER = "speed"            # the universal scalar: |(u, v)| — present for EVERY producer
 SCALAR_LAYER = "scalar"          # the field's own optional scalar (θ for the eddy band; absent for synthetic)
 MASK_LAYER = "mask"              # the optional per-cell validity mask (§9.6 O1) — absent when all-valid
+FRAMES_LAYER = "circulation_frames"   # the optional seasonal time axis (§9.6 O4) — a 4-D (nt,2,ny,nx) stack
 
 
 def _globe_grid(n_lat: int = GLOBE_N_LAT, n_lon: int = GLOBE_N_LON) -> Grid:
@@ -230,6 +238,24 @@ def vector_view_from_flow_field(field: FlowField, *, provenance: str,
                                    "colors": {"0": "#4a4a52", "1": "#2e6fba"},
                                    "names": {"0": "no data (land / unobserved)", "1": "valid cell"}},
                             z_order=3))
+    if field.frames is not None:
+        # §9.6 O4 — the seasonal time axis as a 4-D (nt, 2, n_lat, n_lon) stack: embed EACH frame's [u, v]
+        # on the globe grid with the SAME masking/box rules as the primary snapshot (a per-frame probe field
+        # reusing _embed_on_globe), then stack. Labels ride the style. The interactive map skips this (4-D);
+        # the flow-globe renderer animates it. One more additive layer — the round-trip == covers it for free.
+        fr = field.frames
+        frame_uv = []
+        for k in range(np.asarray(fr.u).shape[0]):
+            probe = FlowField(lat=field.lat, lon=field.lon, u=fr.u[k], v=fr.v[k],
+                              coverage=field.coverage, honesty="", mask=field.mask)
+            fu, fv, _, _ = _embed_on_globe(probe, grid)
+            frame_uv.append(np.stack([fu, fv]))
+        frames_arr = np.stack(frame_uv)                   # (nt, 2, n_lat, n_lon)
+        layers.append(Layer(FRAMES_LAYER, LayerKind.VECTOR_OVERLAY, frames_arr, "m/s",
+                            style={"frames": True, "labels": [str(x) for x in fr.labels],
+                                   "coverage": _coverage_style(cov), "provenance": str(provenance),
+                                   "label": f"seasonal frames — {provenance} ({len(fr.labels)} frames)"},
+                            z_order=4))
     return PlanetView(grid=grid, layers=tuple(layers))
 
 
