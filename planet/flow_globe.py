@@ -278,9 +278,69 @@ function sph(latd, lond, r) {
 }
 
 // the bare planet: an OPAQUE sphere, so particles on the far side are correctly occluded (back-face).
-const base = new T.Mesh(new T.SphereGeometry(1.0, 64, 48),
-                        new T.MeshPhongMaterial({ color: 0x1f2c4d, shininess: 6, specular: 0x0c1326 }));
-scene.add(base);
+// ===== (§9.6 O3a) the land/ocean base layer ======================================================== #
+// When the field carries an O1 validity mask, drape the sphere with a two-tone land/ocean skin derived
+// from that mask — coastlines are what make a stream read as *the Gulf Stream*. Alignment is
+// honest-by-CONSTRUCTION: the base fragment shader inverts every surface point to (lat, lon) with the
+// SAME mapping the particles use (`sph()`), then samples the SAME mask on the SAME bilinear + 0.5-threshold
+// coastline rule as `validAt()` — so the coast under the particles can never drift from the coast under the
+// base. No mask (the eddy band) → the plain solid sphere, exactly as before; a base-shader compile miss
+// also degrades to the solid sphere (and says why), the same discipline as the advection path.
+const BASE_VS = `precision highp float;
+uniform mat4 modelViewMatrix, projectionMatrix;
+attribute vec3 position; varying vec3 vPos;
+void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+
+const BASE_FS = `precision highp float;
+uniform sampler2D uMask; uniform vec2 uLonRange, uLatRange;
+uniform vec3 uOcean, uLand, uBare, uLight;
+varying vec3 vPos;
+const float DEG = 57.29577951308232;
+void main() {
+  vec3 n = normalize(vPos);
+  float lat = asin(clamp(n.y, -1.0, 1.0)) * DEG;
+  float lon = atan(n.z, n.x) * DEG;               // inverse of sph(): x = cos p cos l, z = cos p sin l
+  float gx = (lon - uLonRange.x) / max(1e-6, uLonRange.y - uLonRange.x);
+  float gy = (lat - uLatRange.x) / max(1e-6, uLatRange.y - uLatRange.x);
+  vec3 col = uBare;                               // outside the data box → the plain planet, no invented land
+  if (gx >= 0.0 && gx <= 1.0 && gy >= 0.0 && gy <= 1.0) {
+    float m = texture2D(uMask, vec2(gx, gy)).r;   // linear-filtered mask; 0.5 = the coast (as validAt())
+    col = m >= 0.5 ? uOcean : uLand;
+  }
+  float lambert = 0.42 + 0.58 * max(0.0, dot(n, normalize(uLight)));
+  gl_FragColor = vec4(col * lambert, 1.0);
+}`;
+
+function solidBase() {                             // the pre-O3 look: the fallback when there is no mask
+  const m = new T.Mesh(new T.SphereGeometry(1.0, 64, 48),
+                       new T.MeshPhongMaterial({ color: 0x1f2c4d, shininess: 6, specular: 0x0c1326 }));
+  scene.add(m); return m;
+}
+function buildBase() {
+  if (!MASK) return solidBase();                  // no validity mask (the eddy band) → the plain sphere
+  if (!compileOK(BASE_VS, BASE_FS).ok) {
+    console.warn("[flow-globe] base-layer shader rejected — solid sphere"); return solidBase();
+  }
+  // the mask as a linear-filtered byte texture (row-major: lat_min→lat_max = data row 0→last, matching
+  // _build_data's C-order ravel and DataTexture's un-flipped rows, so gy=0 reads lat_min).
+  const md = new Uint8Array(nx * ny * 4);
+  for (let k = 0; k < nx * ny; k++) {
+    const val = MASK[k] ? 255 : 0; md[k*4] = val; md[k*4+1] = val; md[k*4+2] = val; md[k*4+3] = 255;
+  }
+  const maskTex = new T.DataTexture(md, nx, ny, T.RGBAFormat, T.UnsignedByteType);
+  maskTex.minFilter = maskTex.magFilter = T.LinearFilter;
+  maskTex.wrapS = maskTex.wrapT = T.ClampToEdgeWrapping; maskTex.needsUpdate = true;
+  const mat = new T.RawShaderMaterial({
+    uniforms: { uMask: { value: maskTex },
+                uLonRange: { value: new T.Vector2(cov.lon_min, cov.lon_max) },
+                uLatRange: { value: new T.Vector2(cov.lat_min, cov.lat_max) },
+                uOcean: { value: new T.Color(0x0b2038) }, uLand: { value: new T.Color(0x2a2a20) },
+                uBare: { value: new T.Color(0x1f2c4d) }, uLight: { value: new T.Vector3(2, 1.4, 2.2) } },
+    vertexShader: BASE_VS, fragmentShader: BASE_FS });
+  const m = new T.Mesh(new T.SphereGeometry(1.0, 96, 64), mat);   // a touch finer for crisper coasts
+  scene.add(m); return m;
+}
+buildBase();
 scene.add(new T.AmbientLight(0x8c9bc4, 0.95));
 const sun = new T.DirectionalLight(0xffffff, 0.65); sun.position.set(2, 1.4, 2.2); scene.add(sun);
 

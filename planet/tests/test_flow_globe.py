@@ -190,6 +190,22 @@ def test_particles_reject_masked_cells_in_both_advection_paths():
     assert '"mask":[' in html                                         # the mask data actually shipped
 
 
+def test_land_ocean_base_layer_is_mask_driven_and_alignment_is_by_construction():
+    # §9.6 O3a: the base sphere gets a two-tone land/ocean skin from the O1 mask. The one thing we CAN pin
+    # headlessly (no WebGL) is the honesty-by-construction invariant + the graceful degrade: the base
+    # fragment shader inverts each surface point to (lat, lon) with the SAME mapping the particles use
+    # (`atan(n.z, n.x)` = the inverse of `sph()`), samples the mask on the SAME 0.5 coastline rule, and a
+    # no-mask / compile-fail field falls back to the plain solid sphere.
+    html = fg.flow_globe_html(_masked_field())
+    assert "function buildBase(" in html                        # the mask-driven base path is wired
+    assert "m >= 0.5 ? uOcean : uLand" in html                  # two-tone, 0.5 = the coast (as validAt())
+    assert "atan(n.z, n.x)" in html                             # lat/lon inverse of sph() → alignment by construction
+    assert "function solidBase(" in html and "MeshPhongMaterial" in html   # the no-mask / compile-fail fallback
+    # the base only lights up where there IS a mask: a mask-less field (the eddy band) ships mask:null, so
+    # buildBase() takes the solidBase() branch at runtime (same static app, the DATA is what differs).
+    assert fg._build_data(fg.flow_field_from_eddy(_synthetic_eddy()), 100, 0.03, 0.9, 0.5)["mask"] is None
+
+
 @pytest.mark.slow
 def test_demo_eddy_particles_banks_the_artifact(tmp_path):
     # ADR 0002: an execution smoke-test, not a physics check (test_eddy_flux validates the numbers). Runs
