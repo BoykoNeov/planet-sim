@@ -113,7 +113,8 @@ def save_globe(field) -> Path:
     for target in (DOCS_FIGURE, OUTPUT_FIGURE):
         save_flow_globe_html(field, target, title=TITLE, subtitle=SUBTITLE,
                              n_particles=N_PARTICLES, crossing_seconds=CROSSING_SECONDS,
-                             colormap="speed")     # ocean speed is a 0→max field → the sequential ramp (§9.6 O3c)
+                             colormap="speed",     # ocean speed is a 0→max field → the sequential ramp (§9.6 O3c)
+                             trails=True)           # the Perpetual-Ocean motion-trail look (§9.6 O3b)
     return DOCS_FIGURE
 
 

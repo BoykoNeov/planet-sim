@@ -245,6 +245,44 @@ def test_density_knob_is_wired_in_both_paths():
     assert "applyDensity" in html                                           # dispatched to the active path
 
 
+def test_trails_are_an_opt_in_default_off_kwarg():
+    # §9.6 O3b: motion trails are default-OFF — no WebGL CI + a blind hand-off means the ocean globe the
+    # user eyeballs is the first thing to exercise them, and the already-shipped eddy artifact can't
+    # silently regress. The choice rides the payload; trail_decay seeds the trail-length knob.
+    field = _masked_field()
+    assert '"trails":false' in fg.flow_globe_html(field)                    # default off
+    assert '"trails":true' in fg.flow_globe_html(field, trails=True)        # opt-in
+    assert '"trail_decay":0.96' in fg.flow_globe_html(field, trails=True)   # the knob's start rides along
+
+
+def test_trail_pipeline_is_gpu_only_with_the_rotation_smear_fix_and_a_plain_fallback():
+    # The trail architecture, pinned structurally (no WebGL here): an accumulate-and-fade feedback buffer
+    # gated on the GPU advection path, the depth-only occluder prepass that keeps back-side particles out
+    # of the buffer, the additive composite, and the load-bearing rotation-smear fix (decay=0 while
+    # dragging). Any miss degrades to the plain single-pass render — the CPU fallback is never touched.
+    html = fg.flow_globe_html(_masked_field(), trails=True)
+    assert "function buildTrails(" in html                                  # the trail build
+    assert "if (useGPU && TRAILS) {" in html                                # gated on the GPU path only
+    assert "renderer.render(occScene, camera);          // globe depth only" in html   # the occluder prepass
+    assert "const decay = drag ? 0.0 : trailDecay;" in html                 # THE rotation-smear fix
+    assert "T.CustomBlending" in html and "blendSrc: T.OneFactor" in html   # additive One+One composite
+    # the degrade: renderFrame defaults to the plain single-pass, and trails ride ON TOP of GPU advection
+    # (never the CPU fallback) — so a trail miss can only drop back to the O3a/O3c globe, never blank it.
+    assert "let renderFrame = () => renderer.render(scene, camera);" in html
+    assert "CPU advection fallback active" in html                          # the fade-only fallback survives intact
+
+
+def test_trail_length_knob_and_resize_realloc_are_wired():
+    # The §9.5 trail-length knob (the second control the ocean producer unlocks) + the omission the advisor
+    # flagged: the screen-sized trail targets must be reallocated on resize or they misalign with the globe.
+    html = fg.flow_globe_html(_masked_field(), trails=True)
+    assert 'id="trailRange"' in html                                        # the slider (present only when trails on)
+    assert "applyTrail = (v) => { trailDecay = v; };" in html               # dispatches to the decay uniform
+    assert "trailResize = () =>" in html and "if (trailResize) trailResize();" in html   # realloc on resize
+    # the slider is omitted when trails are off (no dead control on the eddy globe).
+    assert 'id="trailRange"' not in fg.flow_globe_html(_masked_field())
+
+
 @pytest.mark.slow
 def test_demo_eddy_particles_banks_the_artifact(tmp_path):
     # ADR 0002: an execution smoke-test, not a physics check (test_eddy_flux validates the numbers). Runs

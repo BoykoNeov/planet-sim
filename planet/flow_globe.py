@@ -170,7 +170,8 @@ def _three_js() -> str:
 def _build_data(field: FlowField, n_particles: int, particle_size: float,
                 particle_opacity: float, particle_sharpness: float,
                 crossing_seconds: float = _BAND_CROSSING_SECONDS,
-                sequential: bool = False) -> dict:
+                sequential: bool = False, trails: bool = False,
+                trail_decay: float = 0.96) -> dict:
     """Pack a :class:`FlowField` into the JSON the in-browser renderer consumes (compact, rounded)."""
     lat = np.asarray(field.lat, dtype=float)
     lon = np.asarray(field.lon, dtype=float)
@@ -211,6 +212,8 @@ def _build_data(field: FlowField, n_particles: int, particle_size: float,
         "accel": accel,
         "speed_max": round(speed_max, 4),           # normaliser for speed-weighted seeding (§9.6 O3c)
         "sequential": bool(sequential),             # True → the sequential speed ramp (else diverging RdBu_r)
+        "trails": bool(trails),                     # True → the O3b accumulate-and-fade feedback buffer (GPU only)
+        "trail_decay": float(trail_decay),          # per-frame history retention (the trail-length knob's start)
         "coverage": {
             "lat_min": round(float(field.coverage.lat_min), 4),
             "lat_max": round(float(field.coverage.lat_max), 4),
@@ -268,7 +271,9 @@ const DEG = 180 / Math.PI, RAD = Math.PI / 180;
 const SEQ = !!D.sequential;            // §9.6 O3c: sequential speed ramp (ocean) vs diverging RdBu_r (θ)
 const SPEEDMAX = D.speed_max || 1.0;   // peak |u,v| — the speed-weighted-seeding normaliser
 const SEED_FLOOR = 0.08;               // min respawn acceptance so calm regions keep a light ambient fill
+const TRAILS = !!D.trails;             // §9.6 O3b: the accumulate-and-fade trail buffer (GPU path only)
 let density = 1.0;                      // the §9.5 density knob (fraction of particles drawn; 1 = all)
+let trailDecay = D.trail_decay || 0.96;   // the §9.5 trail-length knob (per-frame history retention)
 
 const stage = document.getElementById("stage");
 const canvas = document.getElementById("globe");
@@ -413,6 +418,9 @@ function cmap(t) {
 // --------------------------------------------------------------------------------------------------- #
 const N = D.n_particles;
 let tick = null, applySize = null, applyOpacity = null, applySharp = null, applyDensity = null, onResizeHook = null;
+let gpuPointsRef = null;                          // the Points cloud — the trail build re-parents it (O3b)
+let applyTrail = null, trailResize = null;        // the trail-length knob + the screen-RT resize hook
+let renderFrame = () => renderer.render(scene, camera);   // the per-frame render; O3b swaps in a multi-pass
 
 // a deterministic, fixed-seed LCG → a reproducible *initial* state for either path (the motion is then
 // stochastic, which the honest-by-disclosure carve-out permits — there is no byte-golden on this figure).
@@ -618,7 +626,7 @@ function buildGPU() {
     vertexShader: DRAW_VS, fragmentShader: DRAW_FS,
     transparent: true, depthTest: true, depthWrite: false, blending: T.NormalBlending });   // occlude far side
   const gpuPoints = new T.Points(gpuGeo, drawMat); gpuPoints.frustumCulled = false;
-  scene.add(gpuPoints);
+  scene.add(gpuPoints); gpuPointsRef = gpuPoints;   // trails re-parent this into a points-only scene (O3b)
 
   tick = function (dt) {
     updateMat.uniforms.uDt.value = dt; updateMat.uniforms.uRandom.value = Math.random();
@@ -632,6 +640,93 @@ function buildGPU() {
   applySharp = (v) => { drawMat.uniforms.uSharp.value = v; };
   applyDensity = (v) => { density = v; drawMat.uniforms.uDensity.value = v; };   // the §9.5 density knob
   onResizeHook = () => { drawMat.uniforms.uScale.value = 0.5 * (renderer.domElement.height || H); };
+}
+
+// ===== (§9.6 O3b) motion trails — an accumulate-and-fade feedback buffer (the Perpetual-Ocean look) === #
+// GPU-path ONLY (it needs render targets; the CPU fallback keeps today's per-particle fade). Each frame:
+//   • RELAY:   trailNext = decay · trailCur          (a fullscreen quad, NoBlending — lay the faded history)
+//   • OCCLUDE: render the globe DEPTH only into trailNext (a colour-off sphere) — this is load-bearing: it
+//     kills back-hemisphere particles BEFORE they enter the buffer, so (by induction from a cleared start)
+//     back-side pixels stay zero and there is nothing to bleed through the planet at composite time.
+//   • ADD:     this frame's particles, AdditiveBlending, depth-tested against that globe depth.
+// Then to screen: a fresh opaque globe, and the trail buffer composited ADDITIVELY over it (One+One).
+// Additive accumulation sidesteps premultiplied-alpha fringing and IS the ocean glow; decay<1 caps it.
+// The rotation trap (a screen-space buffer smears when the projection moves): while a DRAG is active we set
+// decay=0 — no history is laid down, so trails pause to a clean fade during rotation and resume when still.
+const RELAY_FS = `precision highp float;
+uniform sampler2D uPrev; uniform float uDecay; varying vec2 vUv;
+void main() { gl_FragColor = texture2D(uPrev, vUv) * uDecay; }`;
+const COMPOSITE_FS = `precision highp float;
+uniform sampler2D uTrail; varying vec2 vUv;
+void main() { gl_FragColor = vec4(texture2D(uTrail, vUv).rgb, 1.0); }`;   // added over the globe (One+One)
+
+function buildTrails() {
+  // gate the new fullscreen shaders against the live context (three logs but does not throw on a link
+  // failure) and degrade to the plain single-pass render on any miss — the same discipline as the
+  // advection path, so a trail bug can never blank the globe, only drop back to the O3a/O3c look.
+  if (!compileOK(QUAD_VS, RELAY_FS).ok || !compileOK(QUAD_VS, COMPOSITE_FS).ok) {
+    console.warn("[flow-globe] trail shaders rejected — trails off (plain render)"); return;
+  }
+  const dpr = renderer.getPixelRatio();
+  const tw = () => Math.max(1, Math.floor((stage.clientWidth || W) * dpr));
+  const th = () => Math.max(1, Math.floor((stage.clientHeight || H) * dpr));
+  const rtOpts = { type: T.UnsignedByteType, format: T.RGBAFormat, minFilter: T.NearestFilter,
+                   magFilter: T.NearestFilter, depthBuffer: true, stencilBuffer: false };
+  let trailCur, trailNext;
+  try {
+    trailCur = new T.WebGLRenderTarget(tw(), th(), rtOpts);
+    trailNext = new T.WebGLRenderTarget(tw(), th(), rtOpts);
+  } catch (e) { console.warn("[flow-globe] trail targets failed — trails off:", e && e.message); return; }
+  renderer.setRenderTarget(trailCur); renderer.setClearColor(0x000000, 0.0); renderer.clear();
+  renderer.setRenderTarget(trailNext); renderer.clear();
+  renderer.setRenderTarget(null);
+
+  const quadCam2 = new T.Camera();
+  const relayScene = new T.Scene();
+  const relayMat = new T.RawShaderMaterial({ uniforms: { uPrev: { value: null }, uDecay: { value: trailDecay } },
+    vertexShader: QUAD_VS, fragmentShader: RELAY_FS, depthTest: false, depthWrite: false, blending: T.NoBlending });
+  const relayQuad = new T.Mesh(new T.PlaneGeometry(2, 2), relayMat); relayQuad.frustumCulled = false;
+  relayScene.add(relayQuad);
+  const compScene = new T.Scene();
+  const compMat = new T.RawShaderMaterial({ uniforms: { uTrail: { value: null } },
+    vertexShader: QUAD_VS, fragmentShader: COMPOSITE_FS, depthTest: false, depthWrite: false, transparent: true,
+    blending: T.CustomBlending, blendEquation: T.AddEquation, blendSrc: T.OneFactor, blendDst: T.OneFactor });
+  const compQuad = new T.Mesh(new T.PlaneGeometry(2, 2), compMat); compQuad.frustumCulled = false;
+  compScene.add(compQuad);
+  // the depth-only globe occluder (colour off) — its whole job is to write the near-face depth so the
+  // ADD pass discards back-hemisphere particles. A dedicated scene avoids touching the on-screen globe.
+  const occScene = new T.Scene();
+  occScene.add(new T.Mesh(new T.SphereGeometry(1.0, 48, 32), new T.MeshBasicMaterial({ colorWrite: false })));
+
+  // move the particles out of the on-screen scene into a points-only scene: on screen we now draw the
+  // globe alone (the particles arrive via the composite), and into the trail buffer we draw points alone.
+  scene.remove(gpuPointsRef);
+  const pointsScene = new T.Scene(); pointsScene.add(gpuPointsRef);
+  gpuPointsRef.material.blending = T.AdditiveBlending; gpuPointsRef.material.needsUpdate = true;
+
+  trailResize = () => { trailCur.setSize(tw(), th()); trailNext.setSize(tw(), th()); };   // screen-sized → realloc
+  applyTrail = (v) => { trailDecay = v; };                                                // the trail-length knob
+
+  renderFrame = function () {
+    const decay = drag ? 0.0 : trailDecay;      // pause accumulation while rotating (the smear fix)
+    renderer.autoClear = false;
+    // pass 1 — trailNext = decay·trailCur + this frame's (globe-occluded) particles
+    renderer.setRenderTarget(trailNext);
+    renderer.setClearColor(0x000000, 0.0); renderer.clear(true, true, true);   // clear COLOUR (history is in trailCur)
+    relayMat.uniforms.uPrev.value = trailCur.texture; relayMat.uniforms.uDecay.value = decay;
+    renderer.render(relayScene, quadCam2);      // lay faded history (NoBlending, leaves depth cleared)
+    renderer.render(occScene, camera);          // globe depth only (colour off) → occlusion
+    renderer.render(pointsScene, camera);       // particles ADD, depth-tested against the globe
+    // pass 2 — to screen: fresh opaque globe, then the trail buffer added over it
+    renderer.setRenderTarget(null);
+    renderer.setClearColor(0x0b1020, 1.0); renderer.clear(true, true, true);
+    renderer.render(scene, camera);             // globe + graticule (the points live in pointsScene now)
+    compMat.uniforms.uTrail.value = trailNext.texture;
+    renderer.render(compScene, quadCam2);       // additive glow over the globe
+    renderer.autoClear = true;
+    const swap = trailCur; trailCur = trailNext; trailNext = swap;   // ping-pong
+  };
+  console.log("[flow-globe] motion trails active");
 }
 
 // ===== CPU advection (the fallback) ================================================================ #
@@ -737,6 +832,9 @@ else {
 if (useGPU) { try { buildGPU(); } catch (e) { useGPU = false; why = "GPU init threw: " + (e && e.message); console.warn("[flow-globe]", e); } }
 if (useGPU) console.log("[flow-globe] GPU ping-pong advection active");
 else { buildCPU(); console.warn("[flow-globe] CPU advection fallback active — " + why); }
+// O3b trails ride ON TOP of the GPU advection (never the CPU fallback, which stays fade-only); any miss
+// leaves renderFrame the plain single-pass, so the globe still shows the O3a/O3c look.
+if (useGPU && TRAILS) { try { buildTrails(); } catch (e) { console.warn("[flow-globe] trails init threw — plain render:", e && e.message); } }
 
 // --- hand-rolled spherical orbit camera (drag → azimuth/elevation, wheel → radius) --- #
 let az = D.center_lon * RAD, el = D.center_lat * RAD, radius = 3.0;
@@ -764,6 +862,7 @@ canvas.addEventListener("wheel", (e) => {
 window.addEventListener("resize", () => {
   [W, H] = size(); renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix();
   if (onResizeHook) onResizeHook();                       // the GPU draw needs its point-size scale refreshed
+  if (trailResize) trailResize();                         // the screen-sized trail targets must track the canvas
 });
 
 // --- live controls: size + opacity + edge sharpness + DENSITY (§9.5, the O3c unlock). Each dispatches to
@@ -778,11 +877,13 @@ if (sizeR) sizeR.addEventListener("input", () => applySize(parseFloat(sizeR.valu
 if (opacR) opacR.addEventListener("input", () => applyOpacity(parseFloat(opacR.value)));
 if (sharpR) sharpR.addEventListener("input", () => applySharp(parseFloat(sharpR.value)));
 if (densR) densR.addEventListener("input", () => applyDensity(parseFloat(densR.value)));
+const trailR = document.getElementById("trailRange");   // present only when trails are on (GPU); no-op otherwise
+if (trailR) trailR.addEventListener("input", () => { if (applyTrail) applyTrail(parseFloat(trailR.value)); });
 
 let last = performance.now();
 function loop(now) {
   let dt = (now - last) / 1000; last = now; if (dt > 0.1) dt = 0.1;
-  tick(dt); renderer.render(scene, camera); requestAnimationFrame(loop);
+  tick(dt); renderFrame(); requestAnimationFrame(loop);   // renderFrame = plain single-pass, or the O3b trail multi-pass
 }
 requestAnimationFrame(loop);
 """
@@ -796,7 +897,8 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
                     particle_opacity: float = DEFAULT_PARTICLE_OPACITY,
                     particle_sharpness: float = DEFAULT_PARTICLE_SHARPNESS,
                     crossing_seconds: float = _BAND_CROSSING_SECONDS,
-                    colormap: str = "RdBu_r") -> str:
+                    colormap: str = "RdBu_r", trails: bool = False,
+                    trail_decay: float = 0.96) -> str:
     """Render ``field`` as one deterministic, self-contained three.js HTML page (data + three.js inlined).
 
     The disclaimer (``field.honesty``) is written into a **visible** ``<div class="disclaimer">`` in the
@@ -813,11 +915,16 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
     signed θ field) or ``"speed"`` (a **sequential** blue→cyan→green→yellow for a 0→max speed field — a
     diverging map bleaches mid-speed, so a speed scalar wants its own monotone ramp). It sets the shipped
     default only; ``FlowField`` is untouched (the §9.3 win) and the ocean demo opts in (§9.6 O3c).
+    ``trails`` (default off) enables the §9.6 O3b **accumulate-and-fade** feedback buffer — the signature
+    *Perpetual-Ocean* motion-trail look — on the GPU advection path only (the CPU fallback keeps today's
+    per-particle fade). It is default-off for the same reason as ``colormap``: no WebGL CI means the ocean
+    globe you eyeball is the first thing to exercise it, and the shipped eddy artifact can't silently
+    regress. ``trail_decay`` (per-frame history retention, ~0.90–0.985) sets the trail-length slider's start.
     """
     sequential = colormap == "speed"
     data_json = json.dumps(
         _build_data(field, n_particles, particle_size, particle_opacity, particle_sharpness,
-                    crossing_seconds, sequential),
+                    crossing_seconds, sequential, trails, trail_decay),
         separators=(",", ":"), ensure_ascii=False)
     disclaimer = html.escape(field.honesty)
     return (
@@ -839,7 +946,9 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
         f"step=\"0.05\" value=\"{particle_sharpness}\"></label>\n"
         f"    <label>Density<input id=\"densityRange\" type=\"range\" min=\"0.1\" max=\"1\" "
         f"step=\"0.05\" value=\"1\"></label>\n"
-        "  </div>\n"
+        + (f"    <label>Trail length<input id=\"trailRange\" type=\"range\" min=\"0.85\" max=\"0.985\" "
+           f"step=\"0.005\" value=\"{trail_decay}\"></label>\n" if trails else "")
+        + "  </div>\n"
         f"  <div class=\"disclaimer\" id=\"disclaimer\"><strong>Illustrative showcase — read this.</strong> "
         f"{disclaimer}</div>\n"
         "</div>\n"
