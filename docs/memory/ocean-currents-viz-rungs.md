@@ -1,6 +1,6 @@
 ---
 name: ocean-currents-viz-rungs
-description: Ocean-currents showcase rungs O1–O5 (plan §9.6) — O1 mask + O2 OSCAR producer + O3 beauty pass BUILT 2026-07-06; O4 seasonal frames (time axis) CODE-BUILT 2026-07-06 but animation UNVERIFIED (GLSL never compiled — token + browser eyeball owed); O5 QG producer next; §11.4 fork retargeted viz-half-only
+description: Ocean-currents showcase rungs O1–O5 (plan §9.6) — O1 mask + O2 OSCAR producer + O3 beauty pass + O4 seasonal frames (time axis) all BUILT + BANKED 2026-07-06 (O4 browser-verified: month badge cycles, particles stream, GPU crossfade ran — no CPU fallback); O5 QG producer next; §11.4 fork retargeted viz-half-only
 metadata:
   type: project
 ---
@@ -60,7 +60,7 @@ narrows** to ECCO-as-validation-anchor-for-S3). The §11.2 "never ships an ocean
   (decay). Verified on the committed **5° OSCAR fixture** (masked pipeline, node-`--check` clean), gate
   **538 green**. The 0.5° banked ocean artifact re-bank needs `EARTHDATA_TOKEN` (user hand-off; code +
   fixture prove it). Advisor's 3 load-bearing calls (occluder-prepass / additive / respawn-not-seed) all in.
-- **O4 — frames time axis: CODE-BUILT 2026-07-06 (animation UNVERIFIED — token + browser eyeball owed).**
+- **O4 — frames time axis: BUILT + VERIFIED + BANKED 2026-07-06.**
   All four pieces built, fast gate **552 pass/1 skip**, **default-off so pre-O4 is bit-for-bit** (single-snapshot
   shaders byte-untouched). **Contract** `FlowFrames` on `FlowField` (`u`/`v` `(nt,ny,nx)`+`labels`; `frames=None`
   = exact pre-O4 path — O1-mask/O3-trails discipline). **Producer** `flow_field_from_ocean_series`: rewrap→mask→fill
@@ -79,8 +79,12 @@ narrows** to ECCO-as-validation-anchor-for-S3). The §11.2 "never ships an ocean
   reads in a day-per-month series; label says exactly that). **The honesty gap (advisor):** `node --check` ≠ GLSL
   compile + no WebGL CI ⇒ the whole frames GPU path (crossfade shaders, stepSeason, badge, trails+frames) ran
   NOWHERE; a frames-shader compile error degrades **silently** to CPU fallback (static frame-0 = reads as "not
-  animating"). ⇒ **code-complete, animation-UNVERIFIED**; browser play-through owed (as O3). Seasonal demo
-  **NOT catalogued yet** (artifact unbanked — no dangling landing-page link; catalogue+page land WITH the artifact).
+  animating"). ⇒ **that gap is CLOSED by the owed browser play-through (user 2026-07-06, PASS): month badge
+  cycles Jan→Dec, particles stream, Somali reversal reads — GPU crossfade compiled + ran, no CPU fallback.**
+  Artifact **banked** `docs/figures/planet-ocean-currents-seasonal.html` (**4.23 MB**, real 2020 OSCAR series:
+  52% valid-in-every-frame ocean, |current| max 2.83 m/s, round-trip identity OK); demo **catalogued**
+  (`ocean_seasonal`, "Interactive globes") + on the landing page (`python -m planet site` regen). Rung-B/C
+  eddy-band animation back-port = deferred-not-owed.
 - **O5 — QG producer** `flow_field_from_qg` (independent): second EMERGENT producer, box coverage no mask;
   a third producer re-trips §9.4 rule-of-three for the two-consumer geometry helpers.
 

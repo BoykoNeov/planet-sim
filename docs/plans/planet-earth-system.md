@@ -960,7 +960,7 @@ the user (acceptance unchanged; **"frozen particles" now has a second GPU cause*
 visible in the read-back log — and GPU vs CPU default point size may differ by up to the pixel-ratio, ≤2×, which
 is slider-correctable, not a bug).
 
-### 9.6 Beautiful ocean currents — the real-data showcase rungs O1–O5 (scoped 2026-07-06; **O1 + O2 + O3 built 2026-07-06; O4 code-built 2026-07-06 (animation unverified — token + browser eyeball pending)**, O5 not built)
+### 9.6 Beautiful ocean currents — the real-data showcase rungs O1–O5 (scoped 2026-07-06; **O1 + O2 + O3 + O4 built + banked 2026-07-06 (O4 browser-verified, artifact banked + catalogued)**, O5 not built)
 
 **The ask (user, 2026-07-06): "visualize beautiful ocean currents."** The project already owns both halves
 of the machinery: the Rung-C particle globe (`flow_globe.py` — GPU-advected by default, honest-by-disclosure)
@@ -1134,7 +1134,7 @@ rule each rung is provisional until its predecessor lands; the `Retarget-when-do
     visually dominate the way they physically do.
   - The §9.5 **control-surface seam unlocks**: the ocean producer is the named "second consumer," so
     **trail length + particle density** become the first two knobs (colour ramps / shape menus stay named).
-- **O4 — frames: the time axis (seasonal currents). CODE-BUILT 2026-07-06 (animation unverified).** The
+- **O4 — frames: the time axis (seasonal currents). BUILT + VERIFIED + BANKED 2026-07-06.** The
   R1-deferred schema increment, all four pieces built and fast-gate-green (552 pass/1 skip), **default-off so
   every pre-O4 producer/consumer is bit-for-bit** and the single-snapshot shaders are byte-untouched.
   **Contract:** `FlowFrames` side-channel on `FlowField` (`u`/`v` `(nt, ny, nx)` + `labels`; optional per-frame
@@ -1165,11 +1165,13 @@ rule each rung is provisional until its predecessor lands; the `Retarget-when-do
   validates the JS template syntax but **not GLSL**, and there is no WebGL CI — so the *entire frames GPU path*
   (the crossfade shaders, `stepSeason`, the badge, trails+frames composition) **has compiled/run nowhere**; a
   frames-shader compile error degrades **silently** to the CPU fallback (static frame-0, which reads as "just
-  not animating"). O4 is therefore **code-complete, animation-UNVERIFIED** — the browser play-through is the
-  hand-off boundary (as O3), and it is **owed** before O4 is banked. The seasonal demo is **deliberately NOT
-  catalogued yet** (its artifact isn't banked — the landing page must not link a missing file); the catalogue +
-  landing-page entry land *with* the artifact. *Retarget-when-done:* whether frames also back-port to the eddy
-  band (Rung B/C animation parity) is still decided when banked, not promised now.
+  not animating"). That gap is now **closed by the owed browser play-through (user, 2026-07-06, PASS):** the
+  gold month badge cycles Jan→Dec and the particles stream — the GPU crossfade path compiled and ran, no CPU
+  fallback. The 12-frame artifact is **banked** (`docs/figures/planet-ocean-currents-seasonal.html`, **4.23 MB**,
+  ~5 MB as predicted) off a real 2020 OSCAR series (52% valid-in-every-frame ocean, |current| max 2.83 m/s,
+  round-trip identity OK), the demo is now **catalogued** (`ocean_seasonal`, "Interactive globes") and on the
+  landing page. *Retarget-when-done:* whether frames also back-port to the eddy band (Rung B/C animation parity)
+  is still decided now-that-it's-banked, not promised — deferred, not owed.
 - **O5 — the QG producer (independent bonus, does not gate O1–O4).** `flow_field_from_qg`: the rung-3
   two-layer QG condensate — vortex filaments streaming in a box — as a **second emergent** producer.
   Cheap (`(u, v) = (−∂ψ/∂y, ∂ψ/∂x)` is already recoverable from the spectral state), needs no mask (box
