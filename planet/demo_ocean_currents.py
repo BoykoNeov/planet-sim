@@ -112,7 +112,8 @@ def save_globe(field) -> Path:
     """Write the O2 showcase HTML (docs + outputs copies). Returns the docs path."""
     for target in (DOCS_FIGURE, OUTPUT_FIGURE):
         save_flow_globe_html(field, target, title=TITLE, subtitle=SUBTITLE,
-                             n_particles=N_PARTICLES, crossing_seconds=CROSSING_SECONDS)
+                             n_particles=N_PARTICLES, crossing_seconds=CROSSING_SECONDS,
+                             colormap="speed")     # ocean speed is a 0→max field → the sequential ramp (§9.6 O3c)
     return DOCS_FIGURE
 
 

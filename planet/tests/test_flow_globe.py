@@ -183,9 +183,10 @@ def test_particles_reject_masked_cells_in_both_advection_paths():
     # same style as the GPU/CPU-fallback test above (we cannot run WebGL here).
     html = fg.flow_globe_html(_masked_field())
     assert "toHalf(MASK ? MASK[k] : 1)" in html                       # the mask IS the 4th texture channel
-    assert html.count("texture2D(uVel, velUV(lon, lat)).w < 0.5") == 2  # GPU: advection kill + respawn reject
+    assert "texture2D(uVel, velUV(lon, lat)).w < 0.5" in html          # GPU: advection kill on a masked texel
+    assert "if (rv.w < 0.5) age = life + 1.0;" in html                # GPU: respawn rejects a masked texel (O3c refactor)
     assert "function validAt(" in html                                # CPU: the shared validity sampler…
-    assert "if (validAt(pLat[i], pLon[i])) break;" in html            # …rejection-sampled at spawn…
+    assert "if (!validAt(pLat[i], pLon[i])) continue;" in html        # …rejection-sampled at spawn (O3c)…
     assert "!validAt(pLat[i], pLon[i]);     // drifted onto a masked (land) cell" in html  # …and in step()
     assert '"mask":[' in html                                         # the mask data actually shipped
 
@@ -204,6 +205,44 @@ def test_land_ocean_base_layer_is_mask_driven_and_alignment_is_by_construction()
     # the base only lights up where there IS a mask: a mask-less field (the eddy band) ships mask:null, so
     # buildBase() takes the solidBase() branch at runtime (same static app, the DATA is what differs).
     assert fg._build_data(fg.flow_field_from_eddy(_synthetic_eddy()), 100, 0.03, 0.9, 0.5)["mask"] is None
+
+
+def test_speed_colormap_is_an_opt_in_default_leaving_flowfield_untouched():
+    # §9.6 O3c: a diverging RdBu_r bleaches a 0→max speed field, so the speed scalar gets a SEQUENTIAL ramp
+    # — but only as an opt-in default via the flow_globe_html kwarg (FlowField stays untouched, the §9.3
+    # win). RdBu_r stays the default (θ is a signed field). The choice rides the payload as a `sequential`
+    # flag both cmaps branch on.
+    field = _masked_field()
+    assert '"sequential":true' in fg.flow_globe_html(field, colormap="speed")
+    assert '"sequential":false' in fg.flow_globe_html(field)                 # default = diverging RdBu_r
+    # both cmap implementations (JS + GLSL) carry the two ramps and branch on the flag.
+    html = fg.flow_globe_html(field, colormap="speed")
+    assert "if (SEQ)" in html                                                # JS cmap branch
+    assert "vec3 cmap(float t, float seq)" in html                          # GLSL cmap takes the flag
+
+
+def test_speed_weighted_seeding_lives_in_the_respawn_path_in_both_advection_paths():
+    # §9.6 O3c: particles respawn with acceptance ∝ |u,v|/speed_max so fast western-boundary currents
+    # dominate. It MUST live in the RESPAWN path (weighting only the initial seed relaxes back to uniform as
+    # particles age out), floored so calm water keeps an ambient fill, and it composes with the O1 mask
+    # reject via the same invisible-retry idiom. Structural pins (no WebGL here), both paths.
+    html = fg.flow_globe_html(_masked_field())
+    assert '"speed_max":' in html                                           # the normaliser rides the payload
+    # GPU respawn: land rejected outright, THEN valid cells accepted ∝ speed (both inside the age>life branch).
+    assert "length(rv.xy) / max(1e-6, uSpeedMax)" in html
+    assert "uSeedFloor" in html                                             # the calm-water floor
+    # CPU respawn: the same two criteria in spawn() — reject land, then accept ∝ speed.
+    assert "if (rnd() < Math.max(SEED_FLOOR, spd / SPEEDMAX)) break;" in html
+
+
+def test_density_knob_is_wired_in_both_paths():
+    # §9.5 unlock (the O3c deliverable): the ocean producer is the "second consumer," so particle density
+    # becomes a live control knob. GPU cuts by a per-particle rank uniform; CPU hides the tail in tick.
+    html = fg.flow_globe_html(_masked_field())
+    assert 'id="densityRange"' in html                                      # the slider is in the DOM
+    assert "aSeq > uDensity" in html                                        # GPU: rank-cut discard
+    assert "if (i >= nActive) alpha = 0;" in html                           # CPU: tail hidden
+    assert "applyDensity" in html                                           # dispatched to the active path
 
 
 @pytest.mark.slow

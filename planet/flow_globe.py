@@ -169,7 +169,8 @@ def _three_js() -> str:
 
 def _build_data(field: FlowField, n_particles: int, particle_size: float,
                 particle_opacity: float, particle_sharpness: float,
-                crossing_seconds: float = _BAND_CROSSING_SECONDS) -> dict:
+                crossing_seconds: float = _BAND_CROSSING_SECONDS,
+                sequential: bool = False) -> dict:
     """Pack a :class:`FlowField` into the JSON the in-browser renderer consumes (compact, rounded)."""
     lat = np.asarray(field.lat, dtype=float)
     lon = np.asarray(field.lon, dtype=float)
@@ -182,6 +183,10 @@ def _build_data(field: FlowField, n_particles: int, particle_size: float,
     center_lon = float(lon.mean())
     span_lon = float(lon.max() - lon.min()) or 1.0
     umax = float(np.max(np.abs(u))) or 1.0
+    # the field's peak *speed* — the normaliser for speed-weighted seeding (§9.6 O3c): particles respawn
+    # with acceptance ∝ |u,v|/speed_max so the fast western-boundary currents visually dominate the way
+    # they physically do. Independent of the `scalar` (which may be θ, not speed), so it is always honest.
+    speed_max = float(np.max(np.hypot(u, v))) or 1.0
     # `accel` (model-seconds per wall-clock second) is auto-scaled so the *fastest* particle crosses the
     # field's longitude width in ~`crossing_seconds` — readable streaming regardless of the field's
     # actual speeds. In-browser step: Δλ_deg = deg(u/(a·cosφ)) · accel · dt_real (the honest metric × a
@@ -204,6 +209,8 @@ def _build_data(field: FlowField, n_particles: int, particle_size: float,
         "scalar_label": field.scalar_label,
         "radius_m": field.radius_m,
         "accel": accel,
+        "speed_max": round(speed_max, 4),           # normaliser for speed-weighted seeding (§9.6 O3c)
+        "sequential": bool(sequential),             # True → the sequential speed ramp (else diverging RdBu_r)
         "coverage": {
             "lat_min": round(float(field.coverage.lat_min), 4),
             "lat_max": round(float(field.coverage.lat_max), 4),
@@ -258,6 +265,10 @@ const U = D.u, V = D.v, S = D.scalar, smin = D.scalar_min, smax = D.scalar_max;
 const MASK = D.mask;   // per-cell validity, 1 = data / 0 = land or unobserved (null = every cell valid)
 const A = D.radius_m, ACCEL = D.accel, cov = D.coverage;
 const DEG = 180 / Math.PI, RAD = Math.PI / 180;
+const SEQ = !!D.sequential;            // §9.6 O3c: sequential speed ramp (ocean) vs diverging RdBu_r (θ)
+const SPEEDMAX = D.speed_max || 1.0;   // peak |u,v| — the speed-weighted-seeding normaliser
+const SEED_FLOOR = 0.08;               // min respawn acceptance so calm regions keep a light ambient fill
+let density = 1.0;                      // the §9.5 density knob (fraction of particles drawn; 1 = all)
 
 const stage = document.getElementById("stage");
 const canvas = document.getElementById("globe");
@@ -378,11 +389,19 @@ function sample(F, latd, lond) {
 // within half a source cell). No mask → everywhere valid → the exact pre-mask behaviour.
 function validAt(latd, lond) { return !MASK || sample(MASK, latd, lond) >= 0.5; }
 
-// RdBu_r colour ramp: 0 = cool blue, 1 = warm red (matches the Rung-A/B theta scale).
+function mix3(a, b, s) { return [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, a[2] + (b[2] - a[2]) * s]; }
+// Two ramps (§9.6 O3c). SEQ=false → RdBu_r, a DIVERGING blue→white→red for a signed θ field (Rung A/B).
+// SEQ=true → a SEQUENTIAL blue→cyan→green→yellow speed ramp: a diverging map bleaches mid-speed and is
+// semantically wrong for a 0→max field, so ocean speed gets its own monotone ramp (the demo opts in).
 function cmap(t) {
+  if (SEQ) {
+    const s0 = [0.16, 0.34, 0.60], s1 = [0.24, 0.63, 0.75], s2 = [0.55, 0.86, 0.60], s3 = [0.98, 0.95, 0.55];
+    if (t < 0.4) return mix3(s0, s1, t / 0.4);
+    if (t < 0.75) return mix3(s1, s2, (t - 0.4) / 0.35);
+    return mix3(s2, s3, (t - 0.75) / 0.25);
+  }
   const lo = [0.23, 0.31, 0.75], mid = [0.96, 0.96, 0.96], hi = [0.79, 0.16, 0.18];
-  if (t < 0.5) { const s = t / 0.5; return [lo[0] + (mid[0] - lo[0]) * s, lo[1] + (mid[1] - lo[1]) * s, lo[2] + (mid[2] - lo[2]) * s]; }
-  const s = (t - 0.5) / 0.5; return [mid[0] + (hi[0] - mid[0]) * s, mid[1] + (hi[1] - mid[1]) * s, mid[2] + (hi[2] - mid[2]) * s];
+  return t < 0.5 ? mix3(lo, mid, t / 0.5) : mix3(mid, hi, (t - 0.5) / 0.5);
 }
 
 // --------------------------------------------------------------------------------------------------- #
@@ -393,7 +412,7 @@ function cmap(t) {
 // per-frame update is bound to `tick`; the appearance sliders to `applySize`/`applyOpacity`/`applySharp`.
 // --------------------------------------------------------------------------------------------------- #
 const N = D.n_particles;
-let tick = null, applySize = null, applyOpacity = null, applySharp = null, onResizeHook = null;
+let tick = null, applySize = null, applyOpacity = null, applySharp = null, applyDensity = null, onResizeHook = null;
 
 // a deterministic, fixed-seed LCG → a reproducible *initial* state for either path (the motion is then
 // stochastic, which the honest-by-disclosure carve-out permits — there is no byte-golden on this figure).
@@ -420,7 +439,7 @@ void main() { gl_FragColor = texture2D(uSeed, vUv); }`;
 
 const UPDATE_FS = `precision highp float;
 uniform sampler2D uState, uVel;
-uniform float uDt, uAccel, uRadius, uRandom;
+uniform float uDt, uAccel, uRadius, uRandom, uSpeedMax, uSeedFloor;
 uniform vec2 uLonRange, uLatRange, uVelGrid;
 varying vec2 vUv;
 const float DEG = 57.29577951308232, RAD = 0.017453292519943295;
@@ -445,10 +464,16 @@ void main() {
     lat = uLatRange.x + hash(vUv + vec2(uRandom, 0.123)) * (uLatRange.y - uLatRange.x);
     lon = uLonRange.x + hash(vUv + vec2(0.456, uRandom)) * (uLonRange.y - uLonRange.x);
     age = 0.0; life = 2.0 + hash(vUv * 1.7 + uRandom) * 4.0;
-    // a draw that landed on a masked texel is kept INVISIBLE (age past life ⇒ zero fade in DRAW_VS) and
-    // re-rolled next frame with a fresh uRandom — a shader cannot loop a rejection sample, so this is the
-    // GPU idiom for "seed only valid cells" (converges in ~2 frames even at OSCAR's 44% land).
-    if (texture2D(uVel, velUV(lon, lat)).w < 0.5) age = life + 1.0;
+    // a draw that landed on a masked texel — OR one rejected by the speed weighting — is kept INVISIBLE
+    // (age past life ⇒ zero fade in DRAW_VS) and re-rolled next frame with a fresh uRandom. A shader cannot
+    // loop a rejection sample, so this invisible-retry idiom is the GPU form of BOTH "seed only valid cells"
+    // (converges in ~2 frames even at OSCAR's 44% land) and "seed ∝ speed" (§9.6 O3c) — the two criteria
+    // compose: land is rejected outright, then valid cells are accepted with probability |u,v|/speed_max
+    // (floored so calm water still gets a light ambient fill), concentrating particles in the fast currents.
+    vec4 rv = texture2D(uVel, velUV(lon, lat));
+    if (rv.w < 0.5) age = life + 1.0;                       // masked (land) → invisible, re-roll
+    else if (hash(vUv * 2.3 + vec2(uRandom, uRandom * 1.7))
+             > max(uSeedFloor, length(rv.xy) / max(1e-6, uSpeedMax))) age = life + 1.0;   // speed-weighted reject
   }
   gl_FragColor = vec4(lon, lat, age, life);
 }`;
@@ -456,9 +481,10 @@ void main() {
 const DRAW_VS = `precision highp float;
 uniform mat4 modelViewMatrix, projectionMatrix;
 uniform sampler2D uState, uVel;
-uniform float uSize, uScale, uRadius, uHasScalar;
+uniform float uSize, uScale, uRadius, uHasScalar, uSeq, uDensity;
 uniform vec2 uLonRange, uLatRange, uVelGrid, uScalarRange;
 attribute vec3 position;                 // .xy = this particle's texel-centre UV into uState
+attribute float aSeq;                    // this particle's index / N ∈ [0,1] — the density-knob cut
 varying vec3 vColor; varying float vFade;
 const float RAD = 0.017453292519943295;
 vec2 velUV(float lon, float lat) {
@@ -467,11 +493,18 @@ vec2 velUV(float lon, float lat) {
   return vec2((gx * (uVelGrid.x - 1.0) + 0.5) / uVelGrid.x,
               (gy * (uVelGrid.y - 1.0) + 0.5) / uVelGrid.y);
 }
-vec3 cmap(float t) {                      // RdBu_r: 0 = cool blue, 1 = warm red (matches Rung A/B θ)
+vec3 cmap(float t, float seq) {           // seq=0 → RdBu_r (θ); seq=1 → sequential speed ramp (§9.6 O3c)
+  if (seq > 0.5) {
+    vec3 s0 = vec3(0.16, 0.34, 0.60), s1 = vec3(0.24, 0.63, 0.75), s2 = vec3(0.55, 0.86, 0.60), s3 = vec3(0.98, 0.95, 0.55);
+    if (t < 0.4) return mix(s0, s1, t / 0.4);
+    if (t < 0.75) return mix(s1, s2, (t - 0.4) / 0.35);
+    return mix(s2, s3, (t - 0.75) / 0.25);
+  }
   vec3 lo = vec3(0.23, 0.31, 0.75), mid = vec3(0.96, 0.96, 0.96), hi = vec3(0.79, 0.16, 0.18);
   return t < 0.5 ? mix(lo, mid, t / 0.5) : mix(mid, hi, (t - 0.5) / 0.5);
 }
 void main() {
+  if (aSeq > uDensity) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; vFade = 0.0; vColor = vec3(0.0); return; }
   vec4 st = texture2D(uState, position.xy);
   float lon = st.x, lat = st.y, age = st.z, life = st.w;
   float p = lat * RAD, l = lon * RAD;
@@ -484,7 +517,7 @@ void main() {
     float theta = texture2D(uVel, velUV(lon, lat)).z;
     t = clamp((theta - uScalarRange.x) / max(1e-6, uScalarRange.y - uScalarRange.x), 0.0, 1.0);
   }
-  vColor = cmap(t);
+  vColor = cmap(t, uSeq);
   vFade = min(1.0, age / 0.3) * min(1.0, (life - age) / 0.5);   // fade in from spawn, out toward death
 }`;
 
@@ -541,7 +574,8 @@ function buildGPU() {
   quadScene.add(quad);
   const updateMat = new T.RawShaderMaterial({
     uniforms: { uState: { value: null }, uVel: { value: velTex }, uDt: { value: 0 }, uAccel: { value: ACCEL },
-                uRadius: { value: A }, uRandom: { value: 0 },
+                uRadius: { value: A }, uRandom: { value: 0 }, uSpeedMax: { value: SPEEDMAX },
+                uSeedFloor: { value: SEED_FLOOR },
                 uLonRange: { value: new T.Vector2(cov.lon_min, cov.lon_max) },
                 uLatRange: { value: new T.Vector2(cov.lat_min, cov.lat_max) },
                 uVelGrid: { value: new T.Vector2(nx, ny) } },
@@ -565,16 +599,19 @@ function buildGPU() {
   // the visible Points: each vertex's `position.xy` is its texel-centre UV; DRAW_VS reads the particle's
   // (lon, lat) from the state texture. Bounds live in the texture, so the CPU bounding sphere is
   // meaningless → disable frustum culling (else three culls the whole cloud at most camera angles).
-  const refs = new Float32Array(M * 3);
+  const refs = new Float32Array(M * 3), seqs = new Float32Array(M);
   for (let i = 0; i < M; i++) {
     refs[i * 3] = ((i % texSize) + 0.5) / texSize; refs[i * 3 + 1] = (Math.floor(i / texSize) + 0.5) / texSize;
+    seqs[i] = (i + 0.5) / M;                              // stable [0,1] rank → the density-knob cut
   }
   const gpuGeo = new T.BufferGeometry();
   gpuGeo.setAttribute("position", new T.BufferAttribute(refs, 3));
+  gpuGeo.setAttribute("aSeq", new T.BufferAttribute(seqs, 1));
   const drawMat = new T.RawShaderMaterial({
     uniforms: { uState: { value: rtCur.texture }, uVel: { value: velTex }, uSize: { value: D.particle_size },
                 uScale: { value: 0.5 * (renderer.domElement.height || H) }, uOpacity: { value: D.particle_opacity },
                 uSharp: { value: D.particle_sharpness }, uRadius: { value: A }, uHasScalar: { value: S ? 1 : 0 },
+                uSeq: { value: SEQ ? 1 : 0 }, uDensity: { value: density },
                 uLonRange: { value: new T.Vector2(cov.lon_min, cov.lon_max) },
                 uLatRange: { value: new T.Vector2(cov.lat_min, cov.lat_max) },
                 uVelGrid: { value: new T.Vector2(nx, ny) }, uScalarRange: { value: new T.Vector2(smin, smax) } },
@@ -593,6 +630,7 @@ function buildGPU() {
   applySize = (v) => { drawMat.uniforms.uSize.value = v; };
   applyOpacity = (v) => { drawMat.uniforms.uOpacity.value = v; };
   applySharp = (v) => { drawMat.uniforms.uSharp.value = v; };
+  applyDensity = (v) => { density = v; drawMat.uniforms.uDensity.value = v; };   // the §9.5 density knob
   onResizeHook = () => { drawMat.uniforms.uScale.value = 0.5 * (renderer.domElement.height || H); };
 }
 
@@ -603,10 +641,12 @@ function buildGPU() {
 const pos = new Float32Array(N * 3), col = new Float32Array(N * 4);   // colour is RGBA — alpha carries the fade
 const pLat = new Float32Array(N), pLon = new Float32Array(N), pAge = new Float32Array(N), pLife = new Float32Array(N);
 function spawn(i) {
-  for (let tries = 0; tries < 40; tries++) {       // rejection-sample: seed only VALID (unmasked) cells
-    pLat[i] = cov.lat_min + rnd() * (cov.lat_max - cov.lat_min);
+  for (let tries = 0; tries < 40; tries++) {       // reject land, THEN accept ∝ speed — the same two
+    pLat[i] = cov.lat_min + rnd() * (cov.lat_max - cov.lat_min);   // criteria the GPU respawn composes
     pLon[i] = cov.lon_min + rnd() * (cov.lon_max - cov.lon_min);
-    if (validAt(pLat[i], pLon[i])) break;          // ~2 tries at OSCAR's 44% land; 40 is effectively certain
+    if (!validAt(pLat[i], pLon[i])) continue;      // masked (land) → re-roll (~2 tries at OSCAR's 44% land)
+    const spd = Math.hypot(sample(U, pLat[i], pLon[i]), sample(V, pLat[i], pLon[i]));
+    if (rnd() < Math.max(SEED_FLOOR, spd / SPEEDMAX)) break;   // speed-weighted accept → fast currents dominate
   }
   pAge[i] = 0; pLife[i] = 2.0 + rnd() * 4.0;       // seconds before respawn (staggered so trails don't blink together)
   // a near-all-masked field can exhaust the tries: keep the particle invisible (age past life ⇒ zero
@@ -637,6 +677,7 @@ function buildCPU() {
   scene.add(new T.Points(geo, pmat));
   for (let i = 0; i < N; i++) spawn(i);
   tick = function (dt) {
+    const nActive = Math.floor(N * density);            // the §5 density knob: draw the first `nActive`
     for (let i = 0; i < N; i++) {
       const la = pLat[i], lo = pLon[i];
       const uu = sample(U, la, lo), vv = sample(V, la, lo);
@@ -653,7 +694,8 @@ function buildCPU() {
       t = Math.max(0, Math.min(1, t));
       const c = cmap(t);                                 // full-brightness colour, ALWAYS (never dimmed toward black)
       // the fade lives in ALPHA, not RGB: a fresh particle fades in from transparent, a dying one fully out.
-      const alpha = Math.min(1, pAge[i] / 0.3) * Math.min(1, (pLife[i] - pAge[i]) / 0.5);
+      let alpha = Math.min(1, pAge[i] / 0.3) * Math.min(1, (pLife[i] - pAge[i]) / 0.5);
+      if (i >= nActive) alpha = 0;                       // density knob hides the tail (advection still runs)
       col[i * 4] = c[0]; col[i * 4 + 1] = c[1]; col[i * 4 + 2] = c[2]; col[i * 4 + 3] = alpha;
     }
     geo.attributes.position.needsUpdate = true;
@@ -662,6 +704,7 @@ function buildCPU() {
   applySize = (v) => { pmat.size = v; };
   applyOpacity = (v) => { pmat.opacity = v; };
   applySharp = (v) => { const old = pmat.map; pmat.map = particleSprite(v); pmat.needsUpdate = true; if (old) old.dispose(); };
+  applyDensity = (v) => { density = v; };               // the §5 density knob (CPU: hides the tail in tick)
 }
 
 // ===== pick the path: GPU if WebGL2 + float-render targets + the shaders compile; else CPU ========== #
@@ -723,16 +766,18 @@ window.addEventListener("resize", () => {
   if (onResizeHook) onResizeHook();                       // the GPU draw needs its point-size scale refreshed
 });
 
-// --- live appearance controls: size + opacity + edge sharpness. Each dispatches to the ACTIVE advection
-// path (GPU → a uniform; CPU → the material / a rebuilt sprite), so the sliders work the same whichever
-// path the browser picked. All three touch only appearance. The open-ended rest — colour ramps, particle
-// density, trail length, shape menus — is a deliberately deferred seam (speculative, no second consumer
-// yet, so still named-not-built). The GPU ping-pong advection itself is the seam this build closes. --- #
+// --- live controls: size + opacity + edge sharpness + DENSITY (§9.5, the O3c unlock). Each dispatches to
+// the ACTIVE advection path (GPU → a uniform; CPU → the material / a var), so the sliders work the same
+// whichever path the browser picked. Density is the second consumer's first real control knob — the ocean
+// producer is why §9.5's control-surface seam opened. Trail length arrives with the O3b trails; colour-ramp
+// *menus* and shape menus stay a deferred seam (the ramp DEFAULT is now producer-chosen, but its live UI is
+// not built — speculative, no consumer yet). --- #
 const sizeR = document.getElementById("sizeRange"), opacR = document.getElementById("opacityRange");
-const sharpR = document.getElementById("sharpRange");
+const sharpR = document.getElementById("sharpRange"), densR = document.getElementById("densityRange");
 if (sizeR) sizeR.addEventListener("input", () => applySize(parseFloat(sizeR.value)));
 if (opacR) opacR.addEventListener("input", () => applyOpacity(parseFloat(opacR.value)));
 if (sharpR) sharpR.addEventListener("input", () => applySharp(parseFloat(sharpR.value)));
+if (densR) densR.addEventListener("input", () => applyDensity(parseFloat(densR.value)));
 
 let last = performance.now();
 function loop(now) {
@@ -750,7 +795,8 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
                     particle_size: float = DEFAULT_PARTICLE_SIZE,
                     particle_opacity: float = DEFAULT_PARTICLE_OPACITY,
                     particle_sharpness: float = DEFAULT_PARTICLE_SHARPNESS,
-                    crossing_seconds: float = _BAND_CROSSING_SECONDS) -> str:
+                    crossing_seconds: float = _BAND_CROSSING_SECONDS,
+                    colormap: str = "RdBu_r") -> str:
     """Render ``field`` as one deterministic, self-contained three.js HTML page (data + three.js inlined).
 
     The disclaimer (``field.honesty``) is written into a **visible** ``<div class="disclaimer">`` in the
@@ -763,10 +809,15 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
     defaults. Sharpness ∈ [0,1] is the sprite's opaque-core radius (0 = soft bloom, 1 = near-hard disc).
     ``crossing_seconds`` sets the visual pace (wall-clock seconds for the fastest particle to cross the
     field's longitude span); the default is the eddy band's tuning, so pre-O2 artifacts are unchanged.
+    ``colormap`` picks the particle ramp: ``"RdBu_r"`` (default, a **diverging** blue→white→red for a
+    signed θ field) or ``"speed"`` (a **sequential** blue→cyan→green→yellow for a 0→max speed field — a
+    diverging map bleaches mid-speed, so a speed scalar wants its own monotone ramp). It sets the shipped
+    default only; ``FlowField`` is untouched (the §9.3 win) and the ocean demo opts in (§9.6 O3c).
     """
+    sequential = colormap == "speed"
     data_json = json.dumps(
         _build_data(field, n_particles, particle_size, particle_opacity, particle_sharpness,
-                    crossing_seconds),
+                    crossing_seconds, sequential),
         separators=(",", ":"), ensure_ascii=False)
     disclaimer = html.escape(field.honesty)
     return (
@@ -786,6 +837,8 @@ def flow_globe_html(field: FlowField, *, title: str = "planet-sim — eddy flow-
         f"step=\"0.05\" value=\"{particle_opacity}\"></label>\n"
         f"    <label>Edge sharpness<input id=\"sharpRange\" type=\"range\" min=\"0\" max=\"1\" "
         f"step=\"0.05\" value=\"{particle_sharpness}\"></label>\n"
+        f"    <label>Density<input id=\"densityRange\" type=\"range\" min=\"0.1\" max=\"1\" "
+        f"step=\"0.05\" value=\"1\"></label>\n"
         "  </div>\n"
         f"  <div class=\"disclaimer\" id=\"disclaimer\"><strong>Illustrative showcase — read this.</strong> "
         f"{disclaimer}</div>\n"
