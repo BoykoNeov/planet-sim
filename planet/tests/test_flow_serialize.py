@@ -241,7 +241,107 @@ def test_saved_html_carries_the_honest_caption_not_the_zonal_mean_one(tmp_path):
 
 
 # --------------------------------------------------------------------------- #
-# 6. The real, live eddy producer end-to-end (slow — runs the short sim)
+# 6. The O1 mask increment — per-cell validity inside the coverage box (§9.6)
+# --------------------------------------------------------------------------- #
+def _masked_global_flow_field() -> fg.FlowField:
+    """An OSCAR-*shaped* global field (no real data): cell-centred lat that stops short of the poles,
+    a "continent" strip of invalid cells inside the box, uniform flow everywhere else — the shape the
+    O2 spike pinned (44% NaN land; grid −89.75…89.75 never reaching ±90)."""
+    lat = np.linspace(-87.5, 87.5, 36)                           # cell-centred: NO ±90 rows, like OSCAR
+    lon = np.linspace(-177.5, 177.5, 72)
+    ny, nx = lat.size, lon.size
+    u = np.full((ny, nx), 1.0)
+    v = np.full((ny, nx), 0.5)
+    scalar = np.tile(np.cos(np.radians(lat))[:, None], (1, nx))
+    mask = np.ones((ny, nx), dtype=bool)
+    mask[:, (lon >= 0.0) & (lon <= 60.0)] = False                # a meridional "continent" strip
+    cov = fg.Coverage(-90.0, 90.0, -180.0, 180.0, is_global=True)
+    return fg.FlowField(lat=lat, lon=lon, u=u, v=v, coverage=cov,
+                        honesty="a synthetic masked global field — an O1 mask probe, not data",
+                        scalar=scalar, scalar_label="probe", radius_m=6.371e6, mask=mask)
+
+
+def test_round_trip_identity_with_a_mask(tmp_path):
+    # The R1 proof extends to the grown schema: a masked field's spec round-trips ==, mask layer included.
+    spec = fs.vector_spec_from_flow_field(_masked_global_flow_field(), provenance="masked probe")
+    ps.save(spec, tmp_path / "masked")
+    assert ps.load(tmp_path / "masked") == spec
+    assert any(ly.name == fs.MASK_LAYER for ly in spec.layers)
+
+
+def test_mask_layer_is_additive_absent_when_all_valid():
+    # The schema is ADDITIVE: a no-mask field (every producer before O1) registers NO mask layer, so
+    # every pre-O1 spec keeps its exact layer list — the default-off discipline.
+    band = fs.vector_view_from_flow_field(_band_flow_field(), provenance=PROV_EDDY)
+    syn = fs.vector_view_from_flow_field(fs.synthetic_flow_field(), provenance=PROV_SYN)
+    assert all(ly.name != fs.MASK_LAYER for ly in band.layers)
+    assert all(ly.name != fs.MASK_LAYER for ly in syn.layers)
+    masked = fs.vector_view_from_flow_field(_masked_global_flow_field(), provenance="masked probe")
+    assert any(ly.name == fs.MASK_LAYER for ly in masked.layers)
+
+
+def test_masked_cells_carry_no_flow_and_no_scalar():
+    # The mask is APPLIED, not just carried: an invalid cell reads zero (u, v) and NaN scalar — a
+    # filled-zero land cell can never come back as "measured zero current" (the O2-spike retarget).
+    view = fs.vector_view_from_flow_field(_masked_global_flow_field(), provenance="masked probe")
+    u, v = view.layer(fs.VECTOR_LAYER).data
+    scalar = view.layer(fs.SCALAR_LAYER).data
+    m = view.layer(fs.MASK_LAYER).data.astype(bool)
+    assert np.all(u[~m] == 0.0) and np.all(v[~m] == 0.0)
+    assert np.all(np.isnan(scalar[~m]))
+    assert np.all(np.hypot(u, v)[m] > 0.0)                       # …but real flow on every valid cell
+    # the continent strip actually landed: cells well inside it are invalid, well outside valid.
+    grid = view.grid
+    inside = (grid.lon >= 10.0) & (grid.lon <= 50.0)
+    outside = (grid.lon <= -20.0)
+    mid = np.abs(grid.lat) < 60.0
+    assert not m[np.ix_(mid, inside)].any()
+    assert m[np.ix_(mid, outside)].all()
+
+
+def test_poles_come_out_masked_not_extrapolated():
+    # The pole honesty (O2-spike retarget): the source grid is cell-centred and never reaches ±90, so the
+    # interchange's pole-inclusive rows must come out MASKED with zero flow — not edge-clamp-extrapolated
+    # into "measured" polar ocean (np.interp would happily clamp the last row outward).
+    view = fs.vector_view_from_flow_field(_masked_global_flow_field(), provenance="masked probe")
+    u, v = view.layer(fs.VECTOR_LAYER).data
+    m = view.layer(fs.MASK_LAYER).data.astype(bool)
+    beyond = np.abs(view.grid.lat) > 87.5                        # rows beyond the source's lat range
+    assert beyond.any()                                          # the ±90/±88 rows exist on the 2° grid
+    assert not m[beyond, :].any()
+    assert np.all(u[beyond, :] == 0.0) and np.all(v[beyond, :] == 0.0)
+
+
+def test_nearest_mask_is_nearest_neighbour_and_boolean():
+    # The resample rule itself: nearest-neighbour (never bilinear — a thresholded interpolated mask
+    # smears the coastline by a cell), output boolean, out-of-lat-range rows False, and the longitude
+    # edge CLAMPED to the nearest cell (periodic axis — the edge cell is the honest neighbour), not masked.
+    src_lat = np.array([-30.0, 0.0, 30.0])
+    src_lon = np.array([-90.0, 0.0, 90.0])                       # the lon=0 column is "land" (invalid)
+    mask = np.tile(np.array([True, False, True]), (3, 1))
+    dst_lat = np.array([-90.0, -40.0, -10.0, 10.0, 40.0, 90.0])
+    dst_lon = np.array([-180.0, -50.0, 40.0, 130.0])
+    out = fs._nearest_mask(src_lat, src_lon, mask, dst_lat, dst_lon)
+    assert out.dtype == bool
+    # every dst latitude beyond the source's [-30, 30] range is no-data (the pole rule): ±40 and ±90.
+    assert not out[[0, 1, 4, 5], :].any()
+    # the two in-range rows follow nearest lon: -180 → src -90 (True, lon edge-clamps open), -50 → src
+    # -90 (True), 40 → src 0 (the land column, False), 130 → src 90 (True).
+    assert (out[[2, 3], :] == np.array([[True, True, False, True],
+                                        [True, True, False, True]])).all()
+
+
+def test_mask_layer_renders_as_a_categorical_coverage_globe():
+    # The bonus the categorical style buys: render(active="mask") paints an honest data-coverage globe
+    # through the UNCHANGED renderer (no per-layer special-casing — the recurring §9.3 win).
+    pytest.importorskip("plotly")
+    view = fs.vector_view_from_flow_field(_masked_global_flow_field(), provenance="masked probe")
+    fig = pm.render(view, active=fs.MASK_LAYER, caption="coverage test")
+    assert fig is not None and len(fig.data) >= 1
+
+
+# --------------------------------------------------------------------------- #
+# 7. The real, live eddy producer end-to-end (slow — runs the short sim)
 # --------------------------------------------------------------------------- #
 @pytest.mark.slow
 def test_live_eddy_band_serializes_and_round_trips(tmp_path):

@@ -95,6 +95,13 @@ class FlowField:
     honest-by-disclosure carve-out. ``scalar`` (ny, nx) an optional field that colours the particles,
     ``scalar_label`` its name; ``radius_m`` the planet radius used by the lat/lon advection metric
     (``dλ/dt = u/(a cosφ)``, ``dφ/dt = v/a``).
+
+    ``mask`` (ny, nx, bool) is the **per-cell validity mask** (§9.6 O1 — the first contract growth past
+    R1): ``True`` = a valid data cell, ``False`` = no data there (land, or an unobserved cell of a real
+    ocean product). :class:`Coverage` stays the *bounding box*; the mask is validity *inside* it — an
+    ocean field's land is inside its box, so a box alone cannot carry it. Particles are seeded and kept
+    **only in valid cells** (the R1 band-zeros honesty style: where-the-data-is is carried in the data,
+    not a caption). ``None`` = all cells valid = the exact pre-mask behaviour (default-off discipline).
     """
 
     lat: np.ndarray
@@ -106,6 +113,7 @@ class FlowField:
     scalar: Optional[np.ndarray] = None
     scalar_label: str = ""
     radius_m: float = 6.371e6
+    mask: Optional[np.ndarray] = None
 
 
 def flow_field_from_eddy(eddy) -> FlowField:
@@ -167,6 +175,7 @@ def _build_data(field: FlowField, n_particles: int, particle_size: float,
     u = np.asarray(field.u, dtype=float)
     v = np.asarray(field.v, dtype=float)
     scalar = None if field.scalar is None else np.asarray(field.scalar, dtype=float)
+    mask = None if field.mask is None else np.asarray(field.mask, dtype=bool)
 
     center_lat = float(lat.mean())
     center_lon = float(lon.mean())
@@ -185,6 +194,7 @@ def _build_data(field: FlowField, n_particles: int, particle_size: float,
     return {
         "lat": flat(lat, 4), "lon": flat(lon, 4),
         "u": flat(u, 3), "v": flat(v, 3),
+        "mask": ([int(x) for x in mask.ravel(order="C")] if mask is not None else None),
         "scalar": (flat(scalar, 3) if scalar is not None else None),
         "scalar_min": round(float(scalar.min()), 3) if scalar is not None else 0.0,
         "scalar_max": round(float(scalar.max()), 3) if scalar is not None else 1.0,
@@ -242,6 +252,7 @@ _APP_JS = r"""
 const D = window.FLOW_DATA, T = window.THREE;
 const lat = D.lat, lon = D.lon, ny = lat.length, nx = lon.length;
 const U = D.u, V = D.v, S = D.scalar, smin = D.scalar_min, smax = D.scalar_max;
+const MASK = D.mask;   // per-cell validity, 1 = data / 0 = land or unobserved (null = every cell valid)
 const A = D.radius_m, ACCEL = D.accel, cov = D.coverage;
 const DEG = 180 / Math.PI, RAD = Math.PI / 180;
 
@@ -299,6 +310,11 @@ function sample(F, latd, lond) {
   return (a * (1 - dj) + b * dj) * (1 - di) + (c * (1 - dj) + e * dj) * di;
 }
 
+// per-cell validity (the O1 mask): bilinearly sampled 0/1 against a 0.5 threshold — the SAME rule the
+// GPU path applies to the linear-filtered mask channel, so the two paths agree at the coastline (to
+// within half a source cell). No mask → everywhere valid → the exact pre-mask behaviour.
+function validAt(latd, lond) { return !MASK || sample(MASK, latd, lond) >= 0.5; }
+
 // RdBu_r colour ramp: 0 = cool blue, 1 = warm red (matches the Rung-A/B theta scale).
 function cmap(t) {
   const lo = [0.23, 0.31, 0.75], mid = [0.96, 0.96, 0.96], hi = [0.79, 0.16, 0.18];
@@ -326,8 +342,10 @@ function rnd() { seed = (1103515245 * seed + 12345) % 2147483648; return seed / 
 // off-screen fragment shader (UPDATE_FS) reads the current state texture, advects every particle by the
 // same metric the CPU path uses, and writes the next state into a second target; the two targets
 // ping-pong. A Points cloud then draws the particles, its vertex shader (DRAW_VS) reading each particle's
-// position straight from the state texture. The velocity (+θ) field rides along as a half-float
-// DataTexture, RGBA = (u, v, θ, 0). All shaders are GLSL1 (texture2D / attribute / varying) on
+// position straight from the state texture. The velocity (+θ +mask) field rides along as a half-float
+// DataTexture, RGBA = (u, v, θ, mask) — the O1 validity mask on the formerly-free 4th channel, so the
+// respawn/advection logic rejects land texels with NO new texture. All shaders are GLSL1 (texture2D /
+// attribute / varying) on
 // RawShaderMaterial, so the source we hand three is exactly what we can validate against the live context.
 const QUAD_VS = `precision highp float;
 attribute vec3 position; attribute vec2 uv; varying vec2 vUv;
@@ -358,11 +376,16 @@ void main() {
   lon += DEG * (vel.x / (uRadius * cosp)) * uAccel * uDt;   // dλ/dt = u/(a cosφ)
   lat += DEG * (vel.y / uRadius) * uAccel * uDt;            // dφ/dt = v/a
   age += uDt;
-  bool gone = lon < uLonRange.x || lon > uLonRange.y || lat < uLatRange.x || lat > uLatRange.y;
+  bool gone = lon < uLonRange.x || lon > uLonRange.y || lat < uLatRange.x || lat > uLatRange.y
+           || texture2D(uVel, velUV(lon, lat)).w < 0.5;     // drifted onto a masked (land) texel → recycle
   if (age > life || gone) {                                 // respawn inside coverage (never paints bare globe)
     lat = uLatRange.x + hash(vUv + vec2(uRandom, 0.123)) * (uLatRange.y - uLatRange.x);
     lon = uLonRange.x + hash(vUv + vec2(0.456, uRandom)) * (uLonRange.y - uLonRange.x);
     age = 0.0; life = 2.0 + hash(vUv * 1.7 + uRandom) * 4.0;
+    // a draw that landed on a masked texel is kept INVISIBLE (age past life ⇒ zero fade in DRAW_VS) and
+    // re-rolled next frame with a fresh uRandom — a shader cannot loop a rejection sample, so this is the
+    // GPU idiom for "seed only valid cells" (converges in ~2 frames even at OSCAR's 44% land).
+    if (texture2D(uVel, velUV(lon, lat)).w < 0.5) age = life + 1.0;
   }
   gl_FragColor = vec4(lon, lat, age, life);
 }`;
@@ -415,13 +438,14 @@ void main() {
 }`;
 
 function buildGPU() {
-  // velocity (+θ) as a linear-filtered half-float texture: RGBA = (u, v, θ, 0). Half precision is ample
-  // for a few-m/s velocity and a colour channel, and linear-filtering half-float is core in WebGL2.
+  // velocity (+θ +mask) as a linear-filtered half-float texture: RGBA = (u, v, θ, mask). Half precision
+  // is ample for a few-m/s velocity, a colour channel, and a 0/1 validity flag (linear filtering blends
+  // the flag near coasts; the 0.5 threshold in the shaders keeps the boundary to half a texel).
   const toHalf = T.DataUtils.toHalfFloat;
   const velData = new Uint16Array(nx * ny * 4);
   for (let k = 0; k < nx * ny; k++) {
     velData[k * 4] = toHalf(U[k]); velData[k * 4 + 1] = toHalf(V[k]);
-    velData[k * 4 + 2] = toHalf(S ? S[k] : 0); velData[k * 4 + 3] = 0;
+    velData[k * 4 + 2] = toHalf(S ? S[k] : 0); velData[k * 4 + 3] = toHalf(MASK ? MASK[k] : 1);
   }
   const velTex = new T.DataTexture(velData, nx, ny, T.RGBAFormat, T.HalfFloatType);
   velTex.minFilter = velTex.magFilter = T.LinearFilter;
@@ -516,9 +540,15 @@ function buildGPU() {
 const pos = new Float32Array(N * 3), col = new Float32Array(N * 4);   // colour is RGBA — alpha carries the fade
 const pLat = new Float32Array(N), pLon = new Float32Array(N), pAge = new Float32Array(N), pLife = new Float32Array(N);
 function spawn(i) {
-  pLat[i] = cov.lat_min + rnd() * (cov.lat_max - cov.lat_min);
-  pLon[i] = cov.lon_min + rnd() * (cov.lon_max - cov.lon_min);
+  for (let tries = 0; tries < 40; tries++) {       // rejection-sample: seed only VALID (unmasked) cells
+    pLat[i] = cov.lat_min + rnd() * (cov.lat_max - cov.lat_min);
+    pLon[i] = cov.lon_min + rnd() * (cov.lon_max - cov.lon_min);
+    if (validAt(pLat[i], pLon[i])) break;          // ~2 tries at OSCAR's 44% land; 40 is effectively certain
+  }
   pAge[i] = 0; pLife[i] = 2.0 + rnd() * 4.0;       // seconds before respawn (staggered so trails don't blink together)
+  // a near-all-masked field can exhaust the tries: keep the particle invisible (age past life ⇒ zero
+  // alpha in tick) and re-roll next frame — the same idiom as the GPU respawn's masked-texel branch.
+  if (!validAt(pLat[i], pLon[i])) pAge[i] = pLife[i] + 1;
 }
 // a ROUND particle sprite (a radial alpha falloff): a square GL point is the amateur tell. The sprite is
 // white, so the per-vertex temperature colour survives; `sharp` ∈ [0,1] sets the opaque-core radius
@@ -551,7 +581,8 @@ function buildCPU() {
       pLon[i] += DEG * (uu / (A * cosp)) * ACCEL * dt;   // dλ/dt = u/(a cosφ)
       pLat[i] += DEG * (vv / A) * ACCEL * dt;            // dφ/dt = v/a
       pAge[i] += dt;
-      const gone = pLat[i] < cov.lat_min || pLat[i] > cov.lat_max || pLon[i] < cov.lon_min || pLon[i] > cov.lon_max;
+      const gone = pLat[i] < cov.lat_min || pLat[i] > cov.lat_max || pLon[i] < cov.lon_min || pLon[i] > cov.lon_max
+                || !validAt(pLat[i], pLon[i]);     // drifted onto a masked (land) cell → recycle
       if (pAge[i] > pLife[i] || gone) spawn(i);
       const xyz = sph(pLat[i], pLon[i], 1.012);
       pos[i * 3] = xyz[0]; pos[i * 3 + 1] = xyz[1]; pos[i * 3 + 2] = xyz[2];

@@ -153,6 +153,43 @@ def test_emitted_app_js_parses(tmp_path):
     assert r.returncode == 0, f"emitted app JS failed to parse:\n{r.stderr}"
 
 
+def _masked_field() -> fg.FlowField:
+    """A tiny FlowField carrying an O1 validity mask (True = data) — a land strip inside the box."""
+    lat = np.linspace(-40.0, 40.0, 9)
+    lon = np.linspace(-60.0, 60.0, 13)
+    ny, nx = lat.size, lon.size
+    mask = np.ones((ny, nx), dtype=bool)
+    mask[:, (lon >= 0.0) & (lon <= 30.0)] = False
+    cov = fg.Coverage(-40.0, 40.0, -60.0, 60.0, is_global=False)
+    return fg.FlowField(lat=lat, lon=lon, u=np.ones((ny, nx)), v=np.zeros((ny, nx)), coverage=cov,
+                        honesty="a masked probe field — illustrative test data, one band, "
+                                "not a planet-wide flow; reversible-flux clause n/a", mask=mask)
+
+
+def test_mask_packs_into_the_data_and_none_stays_null():
+    # The O1 mask rides the payload as flat 0/1 (row-major, like u/v) — and a mask-less field ships
+    # `mask: null`, keeping every pre-O1 producer's payload semantics unchanged (default-off).
+    d = fg._build_data(_masked_field(), 100, 0.03, 0.9, 0.5)
+    assert d["mask"] is not None and len(d["mask"]) == 9 * 13
+    assert set(d["mask"]) == {0, 1}
+    eddy = fg._build_data(fg.flow_field_from_eddy(_synthetic_eddy()), 100, 0.03, 0.9, 0.5)
+    assert eddy["mask"] is None
+
+
+def test_particles_reject_masked_cells_in_both_advection_paths():
+    # The renderer hook (§9.6 O1): the mask rides the velocity texture's formerly-free 4th channel, so
+    # BOTH paths reject land — the GPU shader recycles a particle that drifts onto (or respawns on) a
+    # masked texel, and the CPU path rejection-samples spawns + recycles in step(). Structural pins, the
+    # same style as the GPU/CPU-fallback test above (we cannot run WebGL here).
+    html = fg.flow_globe_html(_masked_field())
+    assert "toHalf(MASK ? MASK[k] : 1)" in html                       # the mask IS the 4th texture channel
+    assert html.count("texture2D(uVel, velUV(lon, lat)).w < 0.5") == 2  # GPU: advection kill + respawn reject
+    assert "function validAt(" in html                                # CPU: the shared validity sampler…
+    assert "if (validAt(pLat[i], pLon[i])) break;" in html            # …rejection-sampled at spawn…
+    assert "!validAt(pLat[i], pLon[i]);     // drifted onto a masked (land) cell" in html  # …and in step()
+    assert '"mask":[' in html                                         # the mask data actually shipped
+
+
 @pytest.mark.slow
 def test_demo_eddy_particles_banks_the_artifact(tmp_path):
     # ADR 0002: an execution smoke-test, not a physics check (test_eddy_flux validates the numbers). Runs

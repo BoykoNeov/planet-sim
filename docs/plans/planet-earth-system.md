@@ -960,7 +960,7 @@ the user (acceptance unchanged; **"frozen particles" now has a second GPU cause*
 visible in the read-back log — and GPU vs CPU default point size may differ by up to the pixel-ratio, ≤2×, which
 is slider-correctable, not a bug).
 
-### 9.6 Beautiful ocean currents — the real-data showcase rungs O1–O5 (scoped 2026-07-06; **not built**)
+### 9.6 Beautiful ocean currents — the real-data showcase rungs O1–O5 (scoped 2026-07-06; **O1 built 2026-07-06**, O2–O5 not built)
 
 **The ask (user, 2026-07-06): "visualize beautiful ocean currents."** The project already owns both halves
 of the machinery: the Rung-C particle globe (`flow_globe.py` — GPU-advected by default, honest-by-disclosure)
@@ -1005,7 +1005,24 @@ rule each rung is provisional until its predecessor lands; the `Retarget-when-do
   cell-centered (`-89.75…89.75`, 719 rows) and does **not** reach the true poles, while the interchange's
   `_globe_grid` is pole-inclusive (`-90…90` exactly) — for an `is_global=True` field the poles must come
   out masked (`mask=False`), not edge-clamp-extrapolated open ocean, or the render paints current at a
-  point the source never measured.
+  point the source never measured. **BUILT 2026-07-06, all three spike retargets in.** Contract:
+  `FlowField.mask` (`True` = valid cell; `None` = all-valid — every pre-O1 producer/spec byte-unchanged,
+  the default-off discipline). Renderer (`flow_globe.py`): the mask rides the velocity `DataTexture`'s
+  formerly-free 4th channel `(u, v, θ, mask)` — no new texture; the GPU update shader recycles a particle
+  that drifts onto (or respawns on) a masked texel via the *invisible-retry* idiom (age set past life ⇒
+  zero fade, re-rolled next frame — a fragment shader cannot loop a rejection sample; converges in ~2
+  frames at OSCAR's 44% land), while the CPU fallback rejection-samples spawns (40 tries) and recycles in
+  `step()`; both paths share the bilinear-sample-vs-0.5-threshold rule so they agree at the coastline to
+  half a source cell. Serialization (`flow_serialize.py`): `_nearest_mask` resamples the mask
+  **nearest-neighbour** (boolean-preserving, coastline-crisp), destination latitudes beyond the source's
+  range come out `False` (the pole honesty; longitude edge-clamps instead — periodic axis), and the mask
+  is **applied** to the embedded arrays (zero `(u, v)`, NaN scalar on invalid cells) so filled-zero land
+  can never read back as measured zero current; it rides as one more *additive* categorical 0/1 `mask`
+  layer in the same `.npz` (bonus: `render(active="mask")` paints an honest data-coverage globe through
+  the unchanged renderer). Round-trip `==` extended to a masked, OSCAR-shaped probe (cell-centred lat
+  stopping short of ±90, a continent strip inside a global box); the NaN→0 fill-before-resample stays
+  **O2's producer job** (`flow_field_from_ocean` — an O1 probe's velocities are already finite). Tests:
+  6 new in `test_flow_serialize.py` (§6 mask block) + 2 in `test_flow_globe.py`; full fast gate green.
 - **O2 — the real-ocean producer (the deliverable, and the S1 de-risk).** Ingest one **OSCAR** global
   surface-current snapshot (0.25°, NASA PO.DAAC; ECCO acceptable if friction is lower) →
   `flow_field_from_ocean(...)`: full-globe grid (**`is_global=True` — the contract's first true-global

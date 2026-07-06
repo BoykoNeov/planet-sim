@@ -1,11 +1,11 @@
 ---
 name: ocean-currents-viz-rungs
-description: Ocean-currents showcase rungs O1–O5 scoped 2026-07-06 (plan §9.6, NOT built) — real OSCAR/ECCO currents through the R1 seam onto the Rung-C globe; §11.4 fork retargeted viz-half-only; O2 data spike DONE 2026-07-06 (auth+format settled, O1 retargeted concrete)
+description: Ocean-currents showcase rungs O1–O5 (plan §9.6) — O1 mask BUILT 2026-07-06 (contract+renderer+serialize, all O2-spike retargets in); O2 producer next (data spike DONE, auth+format settled); real OSCAR/ECCO currents through the R1 seam onto the Rung-C globe; §11.4 fork retargeted viz-half-only
 metadata:
   type: project
 ---
 
-**Scoped 2026-07-06 (NOT built) — plan §9.6 is the record.** The user's "visualize beautiful ocean
+**Scoped 2026-07-06; O1 BUILT 2026-07-06 (see below) — plan §9.6 is the record.** The user's "visualize beautiful ocean
 currents" ask exercised §11.4's *named alternative* under the living-staircase rule: real-data ocean
 ingest-for-**display** moves INTO planet-sim (the renderer + seam live here), while the engine/forcing
 half of the spin-out boundary is unmoved (no ocean physics here; ClimaOcean stays S2–S5; spin-out **S1
@@ -13,9 +13,15 @@ narrows** to ECCO-as-validation-anchor-for-S3). The §11.2 "never ships an ocean
 (visual yes, engine never); status notes threaded at §11.2/§11.3-S1/§11.4 + backlog §12.3.
 
 **The ladder (order O1→O2→O3→O4; O5 independent):**
-- **O1 — mask increment**: `FlowField.mask` per-cell validity (land), `None`=all-valid=bit-for-bit;
-  Coverage stays the bounding box; seed only masked cells (band-zeros honesty style); mask rides the
-  velocity texture's free 4th channel `(u,v,θ,mask)`; round-trip `==` extended.
+- **O1 — mask increment: BUILT 2026-07-06** (all three spike retargets in). `FlowField.mask` (True=valid,
+  `None`=all-valid=pre-O1-unchanged); Coverage stays the bounding box. Renderer: mask on the velocity
+  texture's free 4th channel `(u,v,θ,mask)` — GPU recycles land-drifting/land-respawned particles via
+  the *invisible-retry* idiom (shader can't loop a rejection sample; ~2 frames at 44% land), CPU
+  rejection-samples spawns + recycles in step(); both share the bilinear+0.5-threshold coastline rule.
+  Serialize: `_nearest_mask` = nearest-neighbor (boolean, coastline-crisp) + lat-beyond-source→False
+  (pole honesty; lon edge-clamps, periodic) + mask **applied** (zero u,v / NaN scalar on invalid cells);
+  rides as an additive categorical 0/1 `mask` layer in the same `.npz` (`render(active="mask")` = a free
+  coverage globe). Round-trip `==` extended to an OSCAR-shaped masked probe. NaN→0 fill = O2's job.
 - **O2 — real-ocean producer** (the deliverable + S1 de-risk): one OSCAR 0.25° snapshot (PO.DAAC) →
   `flow_field_from_ocean` → full-globe `is_global=True` (first true-global consumer) → serialize (round-trip
   on REAL data) → unchanged Rung-C globe → `docs/figures/planet-ocean-currents.html`. Honesty flips class:

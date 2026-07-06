@@ -38,6 +38,18 @@ field, so it is laid down **NH-only, in its true ~55° longitude sector only, ze
 never mirrored to the southern hemisphere, never wrapped around the globe. Mirroring or wrapping it
 would fabricate flow the model never produced (the honesty edge the eddy memories police).
 
+The mask increment (§9.6 O1) — validity inside the box
+-------------------------------------------------------
+:class:`Coverage` is a bounding *box*; a real ocean field has no-data cells **inside** it (land, and the
+unobserved poles of a cell-centred product). O1 grows the contract once: ``FlowField.mask`` (``True`` =
+valid; ``None`` = all-valid = the exact pre-mask path). Three resample rules come straight from the O2
+OSCAR spike (plan §9.6): the mask resamples **nearest-neighbour**, never bilinearly (a thresholded
+interpolated mask smears the coastline); destination latitudes **beyond the source's range come out
+masked** (OSCAR stops at ±89.75° — extrapolated poles would be fabricated ocean); and the mask is
+**applied** to the embedded arrays (zero ``(u, v)``, NaN scalar on invalid cells), so filled-zero land
+can never read back as measured zero current. Serialized, the mask is one more (categorical 0/1) layer
+in the same ``.npz`` — schema-additive, so a no-mask spec loads exactly as before.
+
 Frames — a named, deferred increment
 ------------------------------------
 The plan's R1 list names *frames* (a time axis of ``(u, v, scalar)``). R1 serializes a single
@@ -66,6 +78,7 @@ GLOBE_N_LON = 181                # −180 … +180 inclusive (2° spacing)
 VECTOR_LAYER = "circulation"     # the VECTOR_OVERLAY layer name (mirrors planetmap.circulation_layer)
 SPEED_LAYER = "speed"            # the universal scalar: |(u, v)| — present for EVERY producer
 SCALAR_LAYER = "scalar"          # the field's own optional scalar (θ for the eddy band; absent for synthetic)
+MASK_LAYER = "mask"              # the optional per-cell validity mask (§9.6 O1) — absent when all-valid
 
 
 def _globe_grid(n_lat: int = GLOBE_N_LAT, n_lon: int = GLOBE_N_LON) -> Grid:
@@ -92,18 +105,47 @@ def _bilinear(src_lat: np.ndarray, src_lon: np.ndarray, f: np.ndarray,
     return out
 
 
+def _nearest_mask(src_lat: np.ndarray, src_lon: np.ndarray, mask: np.ndarray,
+                  dst_lat: np.ndarray, dst_lon: np.ndarray) -> np.ndarray:
+    """Nearest-neighbour resample of the boolean validity ``mask`` onto ``dst_lat`` × ``dst_lon``.
+
+    Deliberately **not** :func:`_bilinear` (the §9.6 O2-spike retarget): interpolating a 0/1 mask makes
+    fractional coastline values, and thresholding those smears the land/ocean boundary by a source cell.
+    Nearest-neighbour keeps the mask boolean and the coastline crisp.
+
+    **Pole honesty** rides here too: destination *latitudes beyond the source's range* come out
+    ``False`` — a cell-centred real product (OSCAR stops at ±89.75°) must not be edge-clamp-extrapolated
+    into "measured" polar ocean. Longitude is periodic, so there the nearest edge cell is the honest
+    neighbour (at worst half a source cell away) and stays open.
+    """
+    src_lat = np.asarray(src_lat, dtype=float)
+    src_lon = np.asarray(src_lon, dtype=float)
+    i = np.abs(dst_lat[:, None] - src_lat[None, :]).argmin(axis=1)
+    j = np.abs(dst_lon[:, None] - src_lon[None, :]).argmin(axis=1)
+    out = np.asarray(mask, dtype=bool)[np.ix_(i, j)]
+    in_lat = (dst_lat >= src_lat.min()) & (dst_lat <= src_lat.max())
+    return out & in_lat[:, None]
+
+
 def _embed_on_globe(field: FlowField, grid: Grid):
     """Lay a :class:`FlowField` onto the full-globe ``grid`` — zeros outside its coverage box.
 
-    Returns ``(u, v, scalar)`` each ``(n_lat, n_lon)`` on the globe grid (``scalar`` is ``None`` if the
-    field carries none). A **non-global** field is masked to zero outside its coverage box — the band's
-    own NH sector — so nothing is painted where the model resolves nothing (the honesty edge). A global
-    field fills the whole grid.
+    Returns ``(u, v, scalar, mask)`` each ``(n_lat, n_lon)`` on the globe grid (``scalar``/``mask`` are
+    ``None`` if the field carries none). A **non-global** field is masked to zero outside its coverage
+    box — the band's own NH sector — so nothing is painted where the model resolves nothing (the honesty
+    edge). A global field fills the whole grid.
+
+    A field with a **validity mask** (§9.6 O1) gets it resampled nearest-neighbour (:func:`_nearest_mask`
+    — boolean-preserving, coastline-crisp, poles-beyond-the-source masked) and then **applied**: an
+    invalid cell carries zero ``(u, v)`` and NaN ``scalar``, so a filled-zero land cell in the source can
+    never read back as "measured zero current" — the mask travels beside the data *and* the data agrees
+    with it.
     """
     dst_lat, dst_lon = np.asarray(grid.lat, dtype=float), np.asarray(grid.lon, dtype=float)
     u = _bilinear(field.lat, field.lon, field.u, dst_lat, dst_lon)
     v = _bilinear(field.lat, field.lon, field.v, dst_lat, dst_lon)
     scalar = None if field.scalar is None else _bilinear(field.lat, field.lon, field.scalar, dst_lat, dst_lon)
+    mask = None if field.mask is None else _nearest_mask(field.lat, field.lon, field.mask, dst_lat, dst_lon)
 
     if not field.coverage.is_global:
         cov = field.coverage
@@ -113,7 +155,15 @@ def _embed_on_globe(field: FlowField, grid: Grid):
         v = np.where(inbox, v, 0.0)
         if scalar is not None:
             scalar = np.where(inbox, scalar, np.nan)      # NaN, not 0 — "no data here", not "θ = 0 °C"
-    return u, v, scalar
+        if mask is not None:
+            mask = mask & inbox                           # outside the box is by definition not valid data
+
+    if mask is not None:
+        u = np.where(mask, u, 0.0)                        # no flow on invalid cells — zeros, like the box edge
+        v = np.where(mask, v, 0.0)
+        if scalar is not None:
+            scalar = np.where(mask, scalar, np.nan)       # "no data", not "scalar = 0"
+    return u, v, scalar, mask
 
 
 def _coverage_style(cov: Coverage) -> dict:
@@ -136,13 +186,17 @@ def vector_view_from_flow_field(field: FlowField, *, provenance: str,
       the **coverage-extent**, the **provenance**, the planet ``radius_m``, and the field's **honesty**
       string in its JSON-safe ``style`` (all cast native so the round-trip ``==`` holds);
     * the field's own **scalar** ``SCALAR_FIELD`` (e.g. θ for the eddy band), *if* it carries one — NaN
-      outside the coverage box ("no data", not "θ = 0").
+      outside the coverage box ("no data", not "θ = 0");
+    * the **mask** ``SCALAR_FIELD`` (§9.6 O1), *if* the field carries a validity mask — the 0/1
+      per-cell "is there data here" map (categorical style, so ``render(active="mask")`` paints an
+      honest coverage globe). It is one more array in the same ``.npz`` — the schema is **additive**:
+      a no-mask spec has no such layer and loads exactly as before.
 
     Both producers (the real eddy band, a synthetic global field) flow through this one function, so the
     serialized artifact and the rendered globe are identical in structure regardless of origin.
     """
     grid = _globe_grid(n_lat, n_lon)
-    u, v, scalar = _embed_on_globe(field, grid)
+    u, v, scalar, mask = _embed_on_globe(field, grid)
     speed = np.hypot(u, v)
 
     cov = field.coverage
@@ -168,6 +222,14 @@ def vector_view_from_flow_field(field: FlowField, *, provenance: str,
         layers.insert(1, Layer(SCALAR_LAYER, LayerKind.SCALAR_FIELD, scalar, "",
                                style={"colorscale": "RdBu_r",
                                       "colorbar_title": str(field.scalar_label or "scalar")}, z_order=1))
+    if mask is not None:
+        # 0/1 int (not bool) — the delta_view precedent: Plotly's categorical surface path wants codes.
+        # The unit slot is honest ("" — a validity flag has no unit); the names spell the semantics out.
+        layers.append(Layer(MASK_LAYER, LayerKind.SCALAR_FIELD, mask.astype(int), "",
+                            style={"categorical": True, "colorbar_title": "data coverage",
+                                   "colors": {"0": "#4a4a52", "1": "#2e6fba"},
+                                   "names": {"0": "no data (land / unobserved)", "1": "valid cell"}},
+                            z_order=3))
     return PlanetView(grid=grid, layers=tuple(layers))
 
 
