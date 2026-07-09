@@ -229,6 +229,78 @@ def biomes_figure(state: ClimateState, precip_cm: np.ndarray, codes: np.ndarray)
 
 
 # --------------------------------------------------------------------------- #
+# Rung 5A.2 — the orographic rain shadow placed on the sphere (the first step off the zonal mean).
+# --------------------------------------------------------------------------- #
+def orographic_scene_figure(scene):
+    """The Rung-5A.2 regional scene: a rain shadow behind a mountain range under the westerly jet.
+
+    Four panels on the scene's fine regional patch (:class:`planet.orographic_scene.OrographicScene`):
+    the **terrain** with the prescribed cross-mountain wind arrow; the **orographic bonus** (the S&B
+    windward rain + lee shadow); the **biome map** the enhancement re-classifies (the payoff — the
+    mountain finally *changes the map*); and a mid-latitude **cross-section** of the zonal-mean baseline
+    vs the enhanced total, over the elevation, that shows windward-wet / lee-dry directly. This is the
+    honest deliverable: a *2-D precipitation* driven by geography, over a temperature climate that is
+    still zonal-mean (:mod:`planet.orographic_scene`). Requires the ``viz`` extra.
+    """
+    lon, lat = scene.lon_deg, scene.lat_deg
+    mid = scene.precip_cm.shape[0] // 2
+    u_dir = "→ E (westerly)" if scene.wind_direction_deg == 270.0 else "← W (easterly)"
+
+    fig, axd = plt.subplot_mosaic(
+        [["terrain", "bonus"], ["biome", "section"]], figsize=(13, 9), constrained_layout=True,
+    )
+
+    # Terrain + the prescribed wind.
+    ax = axd["terrain"]
+    im = ax.pcolormesh(lon, lat, scene.elevation_m, cmap="terrain", shading="auto")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="elevation (m)")
+    ax.set_title(f"terrain + prescribed wind ({scene.wind_speed:.0f} m/s {u_dir})", fontsize=9)
+    ax.annotate("", xy=(0.72, 0.5), xytext=(0.28, 0.5), xycoords="axes fraction",
+                arrowprops=dict(arrowstyle="-|>", color="#c0392b", lw=2.2))
+
+    # The orographic bonus (windward rain + lee shadow).
+    ax = axd["bonus"]
+    im = ax.pcolormesh(lon, lat, scene.orographic_precip_cm, cmap="GnBu", shading="auto")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="orographic bonus (cm/yr)")
+    ax.set_title("Smith–Barstad orographic precip — windward wet, lee shadow", fontsize=9)
+
+    # The biome map the enhancement produces (the payoff), with baseline-changed cells outlined.
+    ax = axd["biome"]
+    cmap, norm = _biome_cmap_norm()
+    ax.pcolormesh(lon, lat, scene.biome_codes, cmap=cmap, norm=norm, shading="auto")
+    changed = scene.biome_codes != scene.baseline_biome_codes
+    ax.contour(lon, lat, changed.astype(float), levels=[0.5], colors="#c0392b", linewidths=1.2)
+    ax.set_title(f"biome map (payoff: {100 * scene.biome_changed_fraction:.0f}% of cells re-classified)",
+                 fontsize=9)
+    _biome_legend_inset(ax, scene.biome_codes)
+
+    # Cross-section: baseline vs enhanced total precip, over the elevation.
+    ax = axd["section"]
+    ax.plot(lon, scene.baseline_precip_cm[mid, :], color="#7f8c8d", lw=1.6, ls="--",
+            label="zonal-mean baseline")
+    ax.plot(lon, scene.precip_cm[mid, :], color=PRECIP_COLOR, lw=2.0, label="enhanced total")
+    ax.set_ylabel("precipitation (cm/yr)")
+    ax.set_title("cross-section — windward rain, lee shadow", fontsize=9)
+    ax.legend(fontsize=8, loc="upper left")
+    axe = ax.twinx()
+    axe.fill_between(lon, 0, scene.elevation_m[mid, :], color="#c8b28a", alpha=0.45, zorder=0)
+    axe.set_ylabel("elevation (m)", color="#8a6d3b")
+
+    for key in ("terrain", "bonus", "biome"):
+        axd[key].set_xlabel("longitude (°)"); axd[key].set_ylabel("latitude (°)")
+    axd["section"].set_xlabel("longitude (°)")
+    fig.suptitle("Planet Rung 5A.2 — the orographic rain shadow, placed on the sphere", fontsize=13)
+    return fig
+
+
+def _biome_legend_inset(ax, codes) -> None:
+    """A compact in-axes biome legend for the regional biome panel (only the biomes present)."""
+    present = sorted(set(int(c) for c in np.asarray(codes).ravel()))
+    handles = [Patch(facecolor=BIOME_COLORS[c], edgecolor="#444444", label=BIOME_NAMES[c]) for c in present]
+    ax.legend(handles=handles, fontsize=6.5, loc="lower right", frameon=True, framealpha=0.85, ncols=1)
+
+
+# --------------------------------------------------------------------------- #
 # Phase 3 — the shallow-water engine: geostrophic adjustment + a westward Rossby wave.
 # --------------------------------------------------------------------------- #
 def adjustment_axes(ax_init, ax_bal, adj) -> None:

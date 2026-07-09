@@ -374,6 +374,27 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   the rungs as built, and §3's two "named gaps" (band migration, the energy-constrained rate) point at
   the modules that closed them. The browser what-if (`docs/interactive/index.html`) header was updated
   for the now-shipped ocean knob. This rung log extended through rung 4.
+- **Rung 5A (linear orographic precipitation) — BUILT** (2026-07-09). `planet/orographic.py`: the
+  **Smith & Barstad (2004)** linear theory — a *diagnostic* wavenumber-space transfer function (one FFT)
+  on a **prescribed** uniform wind over a 2-D terrain → windward rain + a lee **rain shadow**. The first
+  step off the zonal mean toward the "north star" (regional climate from geography); it **wakes the
+  dormant elevation seam** (carried inert since v1). Tight anchor = convergence to the closed-form
+  **triangle-ridge** solution (which pins the *reduced* transfer function; the `sgn(σ)` vertical-wavenumber
+  branch is guarded *solely* by the rain-shadow **direction** test). **Honest scope: a *trade*, not the
+  engine leaving the zonal mean** — the *precipitation* goes 2-D, the *temperature* stays zonal-mean.
+  `tests/test_orographic.py`.
+- **Rung 5A.2 (placed on the sphere + into the biome map) — BUILT** (2026-07-10).
+  `planet/orographic_scene.py` + `plots.orographic_scene_figure`: the integration layer — a tangent-plane
+  **patch metric** (`dx = R·cos φ·Δλ`), the **cross-mountain wind read off the emergent zonal jet**
+  (prescribed, not emergent — zero outside the westerly band), an **mm/hr → cm/yr** conversion through a
+  named loose-magnitude knob (`OROGRAPHIC_HOURS_PER_YEAR` — an effective uplift duration, *not* a naive
+  ×8766-h annualisation), **enhancement-only** combination (`total = baseline + bonus`) and biome
+  re-classification, and **serialization** for free through the grid-agnostic `planet_spec` schema.
+  **Payoff: the mountain finally changes the biome map** (~40 % of a Cascades-scale patch re-classified —
+  windward → temperate rain forest). A weak **downstream secondary rain band** (the propagating-mode
+  phase — verified real to the model, not FFT wrap/pad, by a `H_w=0`+domain-doubling discriminator; not
+  a trapped lee wave). Named+deferred: *background depletion* (the lee-drying moisture budget, a future
+  5A.3). `tests/test_orographic_scene.py`.
 
 ## Test runner (tiered gate, ADR 0003)
 

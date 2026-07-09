@@ -2739,9 +2739,31 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
     a wind-reversal *reflection*-symmetry check (not a branch test), flat-ground null. Constants cited
     ([[smith-barstad-orographic-source]]). **Honest scope: a *trade*, not the engine leaving the zonal
     mean** — the *precipitation* becomes 2-D, the *temperature* climate stays zonal-mean (the Phase-2
-    diagnostic-precip precedent, one rung out). **[→ 5A.2]** = sphere placement of the patch, where the
-    cross-mountain wind comes from on a zonal-jet globe (prescribed, not emergent — the named caveat),
-    the cm/yr↔mm/hr + lat×lon integration, serialization, and the demo/figure. See [[planet-rung5a-orographic]].
+    diagnostic-precip precedent, one rung out). See [[planet-rung5a-orographic]].
+  - **Rung 5A.2 — the integration + demo · BUILT 2026-07-10** (`planet/orographic_scene.py`,
+    `test_orographic_scene.py`, `plots.orographic_scene_figure`). The five named 5A.2 pieces, all
+    shipped: **sphere placement** (`patch_spacings` — the tangent-plane metric `dx = R·cos φ·Δλ`,
+    `dy = R·Δφ`); **the cross-mountain wind sourced from the emergent zonal jet** (`wind_from_jet` —
+    the westerly sampled at the patch latitude, **prescribed, not emergent**, the Rung-5A caveat, zero
+    outside the westerly band); **units + combination** — mm/hr → cm/yr through a named loose-magnitude
+    knob `OROGRAPHIC_HOURS_PER_YEAR` (an *effective annual duration of uplift* — **not** a naive
+    ×8766-h/yr annualisation, which overstates the bonus ~10× and swamps the classifier), combined
+    **enhancement-only** (`P_total = zonal_baseline + orographic_bonus`) and re-classified into biomes;
+    **serialization** (the regional scene is a `Grid` + `Layer` stack → rides the grid-agnostic
+    `planet_spec` schema for free); and **the demo/figure** (a rain shadow behind a meridional ridge
+    under the westerlies — Cascades/Andes/NZ, ranges that *sit under the annual-mean zonal jet*). **The
+    payoff: the mountain finally changes the biome map** (~40 % of the patch re-classified — the
+    windward side to temperate rain forest). **Honest scope (advisor-caught):** (i) Smith & Barstad is
+    *enhancement* physics — it lifts the windward and leaves a *dry immediate lee at* the baseline; it
+    does **not** model *background depletion* (the windward rainout drying the lee below baseline, the
+    real Columbia-Basin mechanism) — that is named+deferred (a future 5A.3 moisture budget); (ii) the
+    full model has a weak **downstream secondary rain band** from the **propagating-mode phase** (verified
+    by discriminator — vanishes at `H_w=0`, holds its physical downwind distance under domain-doubling →
+    real to the model, not FFT wrap / pad artifact; *not* a trapped lee wave), non-negative so
+    enhancement-only still holds; (iii) the "zonal ridge casts no shadow" idealisation does **not**
+    hold on the finite zero-padded engine (the pad localises a lon-uniform ridge into a responding
+    block), so the pad-safe placement anchor is a **compact hill's latitude-symmetry** (shadow in lon,
+    ~symmetric in lat → pins `lon → x`). See [[planet-rung5a-orographic]].
 
 ### 12.6 Spin-outs — separate repos, not upgrades of this one
 
