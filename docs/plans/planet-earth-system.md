@@ -2724,7 +2724,22 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
   continentality need a seasonal cycle first. **[named, not built — the §3 scope edge]** → §9.3.
 - **True 2-D longitudinal geography** · regional climate, orographic precip, rain shadows (the north
   star) — new transport that **leaves the 1-D engine** = the rung-5 exit from the zonal-mean planet.
+  Literal rung 5 (a full idealized GCM) is infeasible-tier ("leaves the laptop", §5), so it is climbed
+  as a **spike-first sub-ladder of reduced laptop models**, each banking an analytic anchor — the same
+  decomposition the gas-giant sketch uses beneath its infeasible deep-shell ceiling (§5).
   **[→ rung 5]** → §5.
+  - **Rung 5A — linear orographic precipitation · BUILT 2026-07-09** (`planet/orographic.py`,
+    `test_orographic.py`). Smith & Barstad (2004) linear theory: a **diagnostic** on a *prescribed*
+    uniform wind over a 2-D terrain → a wavenumber-space transfer function (one FFT) → windward rain +
+    a lee **rain shadow**. **Wakes the dormant elevation seam** (§9.3 — carried inert since v1). Tight
+    anchor = convergence to the **closed-form triangle-ridge solution** (pins the transfer function, the
+    `sgn(σ)` vertical-wavenumber branch, and the windward-wet/lee-dry shape at once); plus the upslope
+    limit `C_w·max(0,U·∇h)`, wind-reversal mirror symmetry, flat-ground null. Constants cited
+    ([[smith-barstad-orographic-source]]). **Honest scope: a *trade*, not the engine leaving the zonal
+    mean** — the *precipitation* becomes 2-D, the *temperature* climate stays zonal-mean (the Phase-2
+    diagnostic-precip precedent, one rung out). **[→ 5A.2]** = sphere placement of the patch, where the
+    cross-mountain wind comes from on a zonal-jet globe (prescribed, not emergent — the named caveat),
+    the cm/yr↔mm/hr + lat×lon integration, serialization, and the demo/figure. See [[planet-rung5a-orographic]].
 
 ### 12.6 Spin-outs — separate repos, not upgrades of this one
 
