@@ -2,10 +2,13 @@
 
 The rain-shadow half of the "north star" (regional climate from geography). What is asserted **tight**
 is *exact* and *structural*: the model converges to the **closed-form triangle-ridge solution** (which
-pins the transfer function, the vertical-wavenumber branch, and the windward-wet / lee-dry shape at
-once), recovers the **upslope limit** to the analytic terrain gradient, is **mirror-symmetric** under
-wind reversal, and vanishes over flat ground. What is **loose** is the absolute mm/hr magnitude — set
-by the cited Smith & Barstad constants ([[smith-barstad-orographic-source]]).
+pins the *reduced* transfer function — the ``C_w`` scaling, the upslope gradient ``iσ``, the fallout
+``τ_f``; in that limit ``H_w`` and the vertical-wavenumber **branch** drop out), recovers the
+**upslope limit** to the analytic terrain gradient, and vanishes over flat ground. The ``sgn(σ)``
+branch is guarded *only* by the **rain-shadow direction** test (windward wetter than lee, peak upwind);
+the wind-reversal test is a reflection self-consistency check, not a branch test. What is **loose** is
+the absolute mm/hr magnitude — set by the cited Smith & Barstad constants
+([[smith-barstad-orographic-source]]).
 
 Scope (the honesty flag): a *diagnostic* on a *prescribed* uniform wind over a *regional Cartesian
 patch* — it makes the *precipitation* 2-D, not the engine. Sphere placement, jet wiring and
@@ -94,24 +97,29 @@ def test_upslope_limit_recovers_Cw_U_grad_h():
 
 
 # --------------------------------------------------------------------------- #
-# Structural (tight): the rain shadow — windward wet, lee dry, peak upwind of the crest
+# Structural (tight): the rain shadow — the SOLE guard on the sgn(σ) vertical-wavenumber branch.
+# In the triangle-ridge anchor above (H_w = 0) the branch drops out of the transfer function, so it is
+# *not* validated there; nor by the wind-reversal mirror (invariant under a branch flip). This test is
+# the only thing that reddens if the branch sign is wrong (the shadow then flips to the windward side).
 # --------------------------------------------------------------------------- #
-def test_rain_shadow_windward_wet_lee_dry():
+def test_rain_shadow_windward_wet_lee_dry_is_the_branch_anchor():
     dx = 2e3
     x, _ = og.make_grid(half_width_m=200e3, dx=dx)
-    h1 = og.gaussian_ridge(x)                                  # crest at x = 0
+    h1 = og.gaussian_ridge(x)                                  # crest at x = 0, westerly wind → +x
     P = og.orographic_precip(_ridge_field(x, h1), dx, dx, speed=15.0, direction_deg=270.0)
     p = P[len(x) // 2, :]
     crest = len(x) // 2
     windward = p[:crest].sum()                                 # upwind of the crest (x < 0)
     lee = p[crest:].sum()                                      # downwind (x > 0)
-    assert windward > lee                                      # the rain shadow: drier in the lee
-    assert lee < 0.7 * windward                                # and materially so
-    assert x[int(np.argmax(p))] < 0.0                          # peak sits *upwind* of the crest (wave tilt)
+    # load-bearing branch assertions (a flipped branch drives windward ≪ lee and the peak into the lee):
+    assert lee < 0.5 * windward                                # the lee is materially drier — not just <
+    assert x[int(np.argmax(p))] <= -4e3                        # the peak sits several km *upwind* of the crest
 
 
-def test_wind_reversal_mirrors_the_pattern():
-    # reversing the wind (westerly 270° → easterly 90°) must mirror the precip in x — the branch test
+def test_wind_reversal_is_reflection_symmetry_not_a_branch_test():
+    # reversing the wind (westerly 270° → easterly 90°) must mirror the precip in x. This is a reflection
+    # self-consistency check (catches k-grid / fftfreq asymmetry); it holds for *either* branch sign, so
+    # it does NOT discriminate the sgn(σ) branch — that is the rain-shadow test's job.
     dx = 2e3
     x, _ = og.make_grid(half_width_m=200e3, dx=dx)
     oro = _ridge_field(x, og.gaussian_ridge(x))

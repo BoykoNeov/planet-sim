@@ -2732,9 +2732,11 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
     `test_orographic.py`). Smith & Barstad (2004) linear theory: a **diagnostic** on a *prescribed*
     uniform wind over a 2-D terrain → a wavenumber-space transfer function (one FFT) → windward rain +
     a lee **rain shadow**. **Wakes the dormant elevation seam** (§9.3 — carried inert since v1). Tight
-    anchor = convergence to the **closed-form triangle-ridge solution** (pins the transfer function, the
-    `sgn(σ)` vertical-wavenumber branch, and the windward-wet/lee-dry shape at once); plus the upslope
-    limit `C_w·max(0,U·∇h)`, wind-reversal mirror symmetry, flat-ground null. Constants cited
+    anchor = convergence to the **closed-form triangle-ridge solution** — but honestly scoped: in that
+    limit `(1 − i m H_w) → 1`, so it pins only the *reduced* transfer function (`C_w`, upslope `iσ`,
+    fallout `τ_f`); the `sgn(σ)` vertical-wavenumber **branch** is guarded *solely* by the rain-shadow
+    direction test (a branch flip reddens exactly that one). Plus the upslope limit `C_w·max(0,U·∇h)`,
+    a wind-reversal *reflection*-symmetry check (not a branch test), flat-ground null. Constants cited
     ([[smith-barstad-orographic-source]]). **Honest scope: a *trade*, not the engine leaving the zonal
     mean** — the *precipitation* becomes 2-D, the *temperature* climate stays zonal-mean (the Phase-2
     diagnostic-precip precedent, one rung out). **[→ 5A.2]** = sphere placement of the patch, where the

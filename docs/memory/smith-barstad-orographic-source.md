@@ -42,5 +42,8 @@ wind → +x): for a triangle ridge `h = A·max(0, 1 − |x|/d)`, with `C = C_w·
 The FFT model converges to this ~O(dx²) **once truncated** (untruncated it has a −C-scale "anti-rain"
 spike at the downwind kink `x = d` that dominates max-error until clipped). At dx = 1 km on A = 500 m,
 d = 50 km, U = 15 m/s: peak ≈ 4.32 mm/hr = `C·(1 − e^{−d/Uτ})` (NOT the asymptotic `C ≈ 4.48` — finite
-fallout advection reduces the crest), rel error < 0.1 %. This one anchor pins the transfer function, the
-branch, and the windward-wet/lee-dry shape together. See [[planet-rung5a-orographic]].
+fallout advection reduces the crest), rel error < 0.1 %. **Scope of this anchor (do not overclaim):**
+in the limit `H_w = 0` the factor `(1 − i·m·H_w) → 1`, so `m` and its `sgn(σ)` branch DROP OUT — the
+triangle anchor pins only the *reduced* response `C_w·iσ/(1 + iσ·τ_f)` (the `C_w` scaling, upslope `iσ`,
+fallout `τ_f`), NOT the branch or `H_w`. The branch's sole validator is the rain-shadow *direction*
+check (a branch flip reddens only that). See [[planet-rung5a-orographic]].

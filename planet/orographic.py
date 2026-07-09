@@ -42,11 +42,19 @@ Validation triad (plan §3) — what is asserted tight vs loose
   (no airborne-water advection), the model has a **closed-form** solution
   (:func:`triangle_ridge_exact`): a windward exponential rise to the crest and an exponential decay
   into the **lee** cut off at ``x_c`` — the rain shadow, analytically. The FFT model converges to it
-  as the grid refines (:mod:`planet.tests.test_orographic`). This one anchor validates the transfer
-  function, the vertical-wavenumber **branch**, and the windward-wet / lee-dry structure at once.
+  as the grid refines (:mod:`planet.tests.test_orographic`). **Scope of this anchor (named honestly):**
+  in that limit ``(1 − i m H_w) → 1``, so ``m`` (and its branch) drops out — the triangle anchor pins
+  only the **reduced** transfer function ``C_w·iσ/(1 + iσ τ_f)`` (the ``C_w`` scaling, the upslope
+  gradient ``iσ``, the fallout advection ``τ_f``). The ``H_w`` / vertical-wavenumber / **branch** path
+  is *not* exercised by it — that is pinned only *qualitatively*, by the rain-shadow directional test
+  below (a branch flip reddens exactly that one test).
 * **Structural (tight).** The **upslope limit** ``H_w = τ_c = τ_f = 0`` recovers the classic upslope
-  model ``P = C_w·max(0, U·∂h/∂x)`` to machine precision; reversing the wind **mirrors** the pattern;
-  flat terrain gives zero orographic anomaly; precipitation is non-negative.
+  model ``P = C_w·max(0, U·∂h/∂x)`` to machine precision. The **rain-shadow direction** (windward
+  wetter than lee, peak *upwind* of the crest) is the sole guard on the ``sgn(σ)`` vertical-wavenumber
+  **branch** — get the branch wrong and the shadow flips to the windward side. The **wind-reversal
+  mirror** ``P(x; +U) = P(−x; −U)`` is a *reflection self-consistency* check (it catches ``k``-grid /
+  ``fftfreq`` asymmetry bugs) — note it holds for *either* branch sign, so it does **not** discriminate
+  the branch. Flat terrain gives zero orographic anomaly; precipitation is non-negative.
 * **Benchmark / magnitude (loose).** The pinned constants (``C_w``, ``H_w``, ``N_m``, ``τ_c``, ``τ_f``,
   ``U``) are the cited Smith & Barstad values ([[smith-barstad-orographic-source]]); absolute
   mm/hr amplitudes move only in loose bands, exactly as :mod:`planet.precip`'s band amplitudes do.
@@ -125,7 +133,7 @@ def orographic_precip(orography: np.ndarray, dx: float, dy: float, *,
     (``speed``/``direction_deg``). ``orography`` is indexed ``[y, x]`` (rows = latitude/northward,
     columns = longitude/eastward), matching the map grid.
 
-    The transfer function (Smith & Barstad 2004, eq. 49)::
+    The transfer function (Smith & Barstad 2004)::
 
         P̂(k, l) = C_w · i σ · ĥ(k, l)
                   ───────────────────────────────────────────────

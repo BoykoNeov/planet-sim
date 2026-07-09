@@ -23,10 +23,14 @@ fast lane). **Smith & Barstad (2004) linear theory of orographic precipitation:*
 - **Wakes the dormant elevation seam.** Since v1 `planet_spec` carried an `elevation` layer tagged
   `inert=True` (carried/displayed/round-tripped, climate-inert; §9.3). This is the module the plan
   named as the one that finally makes elevation *do something*.
-- **Tight anchor = convergence to the closed-form triangle-ridge solution** — pins the transfer
-  function, the `sgn(σ)` vertical-wavenumber branch (the rain-shadow *sign*), and the
-  windward-wet/lee-dry shape at once. Plus: upslope limit `C_w·max(0,U·∇h)` recovered to the analytic
-  Gaussian gradient; wind-reversal **mirror symmetry** to machine precision (1.8e-15); flat-ground null.
+- **Tight anchor = convergence to the closed-form triangle-ridge solution** — but honestly scoped
+  (advisor-caught): in that limit `(1 − i·m·H_w) → 1`, so `m` and its `sgn(σ)` branch DROP OUT — the
+  triangle anchor pins only the *reduced* transfer function (`C_w` scaling, upslope `iσ`, fallout
+  `τ_f`), NOT the branch or `H_w`. **The branch is guarded by exactly one test — the rain-shadow
+  direction** (windward wetter than lee, peak upwind); empirically, flipping the branch sign reddens
+  *only* that test (shadow flips to the windward side). The wind-reversal **mirror** (machine precision,
+  1.8e-15) is a *reflection self-consistency* check — invariant under a branch flip, so NOT a branch
+  test. Plus: upslope limit `C_w·max(0,U·∇h)` to the analytic Gaussian gradient; flat-ground null.
 
 **The honesty flag (a TRADE, not a win — do not overclaim):** it makes the **precipitation** 2-D, NOT
 the engine. The **temperature** climate underneath stays **zonal-mean** (the EBM). So Rung 5A does
@@ -34,10 +38,11 @@ the engine. The **temperature** climate underneath stays **zonal-mean** (the EBM
 uniform prescribed wind; cross-mountain flow is **prescribed, not emergent**.
 
 **Advisor-caught traps (all now handled):** (1) the upslope limit is `H_w=τ_c=τ_f=0`, NOT `U→∞`
-(large U drives precip to *zero* via the τ factors); (2) the `sgn(σ)` branch is the #1 bug — rain-shadow
-+ wind-reversal tests are its validators; (3) zero the `σ=0` locus explicitly; (4) zero-pad the FFT so
-lee drying doesn't wrap. Also: compare the **truncated** model to the exact solution (untruncated has a
-−C anti-rain spike at the downwind kink).
+(large U drives precip to *zero* via the τ factors); (2) the `sgn(σ)` branch is the #1 bug — its ONLY
+validator is the **rain-shadow direction** test (NOT the triangle anchor, where the branch drops out;
+NOT wind-reversal, which is branch-flip-invariant); (3) zero the `σ=0` locus explicitly; (4) zero-pad
+the FFT so lee drying doesn't wrap. Also: compare the **truncated** model to the exact solution
+(untruncated has a −C anti-rain spike at the downwind kink).
 
 **5A.2 — DEFERRED + named** (the integration + beauty pass): sphere placement of the patch; **where the
 cross-mountain wind comes from on a zonal-jet globe** ([[planet-phase4-coupler]] gives a purely zonal
