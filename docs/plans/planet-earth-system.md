@@ -2823,12 +2823,47 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
       (exact reduction; seasonal ice-albedo + its small-ice-cap instability are the marcher's future),
       uniform land fraction (constant `C_a`, exact conservation). Sources ([[seasonal-ebm-source]]). See
       [[planet-rung5b-seasonal]].
-    - **Rung 5B.2 — the true 2-D `T(φ, λ, t)` land–sea map · NAMED, not built.** Add the longitude
-      axis: 2-D transport (an ADI/operator-split *reuses* the 1-D tridiagonal solver along each sweep —
-      a bounded engine step, not a rewrite; the wrinkle is meridian convergence at the poles), a real
-      land mask, continental interiors showing the large seasonal range as a *map* (the NMS83 model).
-      The 5B.1 zonal two-tile reduction becomes the resolved 2-D diffusion of a single field with a
-      spatially-varying `C(φ, λ)`. → [[planet-rung5b-seasonal]].
+    - **Rung 5B.2 — the true 2-D `T(φ, λ, t)` land–sea map · BUILT 2026-07-10** (`planet/seasonal_map.py`,
+      `test_seasonal_map.py`, `demo_seasonal_map.py`, `plots.seasonal_map_figure`). The longitude axis
+      added: a **single** field `T(φ, λ, t)` on `x = sin φ ∈ [−1,1] × λ ∈ [0,2π)`, a mask-set heat
+      capacity `C(φ, λ)` (5B.1's `land_heat_capacity`/`ocean_heat_capacity` reused), marched under the
+      seasons to a limit cycle by an **ADI operator-split** — `½ radiation → meridional sweep → zonal
+      sweep → ½ radiation` (the split ordered to match 5B.1, so the reductions are exact). The **method**
+      turns each 2-D step into 1-D implicit sweeps: the meridional sweep **reconstructs** the engine's
+      *exact* harmonic-mean-face transport tridiagonal `Lₓ` (as `sphere_ebm`/`seasonal` already do) and
+      adds the per-cell `C/Δt` diagonal — the varying-`C` mask means the engine's *uniform-*`C` `step()`
+      can't be called directly, so we assemble the operator and solve it with a batched Thomas sweep; the
+      **zonal sweep** is the *periodic* counterpart (the wrap couples last↔first longitude → a **cyclic**
+      tridiagonal, `solve_banded`'s banded structure broken), solved by a batched Sherman–Morrison of the
+      same Thomas kernel. So "reuses the 1-D solver" is honestly **reuses the engine's tridiagonal
+      *assembly*, hand-rolls the batched solves** (varying `C` + periodicity are the two reasons the engine
+      `step()` itself can't serve) — the sibling-reconstruction pattern, ADR 0005, not spine surgery. The
+      **meridian-convergence** wrinkle (zonal coefficient `D/(1−x²)` → ∞ at the poles) is handled by the
+      cell-centered grid (no cell *at* a pole → large-but-finite) + the unconditionally-stable backward-
+      Euler sweep (it just relaxes each polar ring to its zonal mean, which is physically right). **PAYOFF:**
+      continentality becomes a **map** — on a coarse idealized-Earth mask (land fraction 0.29), at 45°N the
+      broad-continent **interior** swings ~40 K, its **coast** ~21 K (the adjacent ocean moderates it by
+      diffusion), the **open ocean** ~7 K: continentality now varies *within* a latitude. **Tight anchors:**
+      the **per-cell 0-D slab** (`D=0` → every cell its own `slab_amplitude_lag(C_cell)`, machine); **zonal
+      invariance** (a zonally-uniform mask keeps the field λ-flat to 1e-11 — the zonal sweep is the identity
+      on it) and the **bit-for-bit reduction to 5B.1** (all-land ≡ `land_fraction=1`, all-ocean ≡ `0`, to
+      1e-9 — inheriting 5B.1's spectral-validated anti-damping for the meridional+time integration); the
+      **cyclic solver** reproduces circulant eigenvectors `cos mλ` exactly (machine — the one new numerical
+      object), and `_thomas_columns` is pinned against `solve_banded` with a **varying** diagonal (machine);
+      the **annual-mean reduction** (the NMS83 headline) — `⟨T⟩` is **zonally flat *for any mask*** and
+      equals the 1-D parent `SphereEBM.steady_linear` (the `(D∇²−B)` operator has trivial kernel for `B>0`,
+      so the λ-independent-forcing annual mean is *uniquely* the flat parent — 5B.1's `⟨T_L⟩=⟨T_O⟩`
+      generalized: **the land/sea contrast is entirely in the seasonal amplitude, the annual mean is blind
+      to the mask**), to the marcher's convergence (~0.2 K split residual, machine-tight in the all-land
+      case); **hemispheric antisymmetry** with a symmetric mask. **Conservation:** global+annual net TOA
+      ≈ 6e-7 (each backward-Euler sweep conserves `∫C T dA` — FV operators telescope to 0, equal-area
+      `x`-cells + uniform Δλ make the area weighting factor out). **Loose (calibrated):** the interior/coast/
+      ocean magnitudes ride the 5B.1 heat capacities; direction banked. **Named scope (from 5B.1):** fixed
+      ice-free albedo identical over land/sea (continentality is *pure* heat capacity), **diffusive**
+      continentality only (interior extremes + coastal moderation, no downwind wind-driven tilt), prescribed
+      geography. **Deferred:** a 2-D frequency-domain solver (would make the annual-mean reduction
+      machine-tight, like 5B.1's spectral did — the marcher's structural anchors already pin every piece of
+      the numerics). → [[planet-rung5b-seasonal]], [[seasonal-ebm-source]].
 
 ### 12.6 Spin-outs — separate repos, not upgrades of this one
 

@@ -892,3 +892,83 @@ def seasonal_figure(result):
     fig.suptitle("Planet Rung 5B.1 — the seasonal cycle wakes heat capacity, casting continentality",
                  fontsize=13)
     return fig
+
+
+# --------------------------------------------------------------------------- #
+# Rung 5B.2 — the 2-D map: continentality resolved in longitude.
+# --------------------------------------------------------------------------- #
+def seasonal_map_figure(result):
+    """The Rung-5B.2 payoff: continentality as a MAP (:mod:`planet.seasonal_map`, NMS83).
+
+    Four panels off the converged 2-D annual limit cycle. **The seasonal-range map** (top-left): peak-to-
+    peak seasonal range over the globe, coastlines overlaid — continental interiors blaze with tens of
+    kelvin while the oceans stay maritime-cool, the interior/coast/ocean sample points marked. **The
+    annual-mean map** (top-right): the *same* field averaged over the year — visibly **zonally flat**, the
+    mask invisible (average over the year and ``C`` cancels; the land/sea signal is *all* seasonal
+    amplitude). **The cross-section** (bottom-left): seasonal range vs longitude along the midlatitude
+    band, land shaded — the range peaks deep in the continent and is drawn down over the sea, the coast
+    moderated between. **The cycle** (bottom-right): the seasonal temperature cycle at the interior, coast,
+    and ocean points — the interior swings hard and prompt, the ocean barely moves and lags. Requires the
+    ``viz`` extra.
+    """
+    m, c = result.model, result.climate
+    lat, lon = c.latitude_deg(), c.longitude_deg()
+    months = c.days / (365.25 / 12.0)
+    i = result.band_index()
+    interior, coast, ocean = result.sample_columns()
+    rng = c.seasonal_range()
+    amean = c.annual_mean()
+    mask = c.land_mask.astype(float)
+    sample_colors = (SEASON_LAND, "#7a4bd0", SEASON_OCEAN)   # interior / coast / ocean
+
+    fig, axd = plt.subplot_mosaic(
+        [["range", "amean"], ["cross", "cycle"]], figsize=(13.5, 8.5), constrained_layout=True,
+    )
+
+    # -- the seasonal-range map (the headline) -------------------------------- #
+    ax = axd["range"]
+    im = ax.pcolormesh(lon, lat, rng, cmap="inferno", shading="auto")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="seasonal range (K)")
+    ax.contour(lon, lat, mask, levels=[0.5], colors="w", linewidths=0.7, alpha=0.8)
+    for k, col in zip((interior, coast, ocean), sample_colors):
+        ax.plot(lon[k], lat[i], "o", mfc=col, mec="w", mew=1.2, ms=8)
+    ax.set_title("seasonal range — continental interiors blaze, oceans stay maritime", fontsize=9)
+    ax.set_ylabel("latitude (°)")
+
+    # -- the annual-mean map (zonally flat — the NMS headline) ---------------- #
+    ax = axd["amean"]
+    vlim = np.max(np.abs(amean))
+    im = ax.pcolormesh(lon, lat, amean, cmap="RdBu_r", vmin=-vlim, vmax=vlim, shading="auto")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="annual-mean T (°C)")
+    ax.contour(lon, lat, mask, levels=[0.5], colors="k", linewidths=0.7, alpha=0.5)
+    spread = float(np.max(amean.max(axis=1) - amean.min(axis=1)))
+    ax.set_title(f"annual mean — zonally FLAT (east–west spread {spread:.2f} K): the mask is invisible",
+                 fontsize=9)
+
+    # -- the cross-section: range vs longitude at the band ------------------- #
+    ax = axd["cross"]
+    ax.plot(lon, rng[i], color="#333333", lw=2.0)
+    ax.fill_between(lon, 0, rng[i].max() * 1.05, where=c.land_mask[i], color=SEASON_LAND,
+                    alpha=0.12, step="mid", label="land")
+    for k, col, name in zip((interior, coast, ocean), sample_colors, ("interior", "coast", "ocean")):
+        ax.plot(lon[k], rng[i, k], "o", mfc=col, mec="k", mew=0.8, ms=9, label=name)
+    ax.set_ylim(0, rng[i].max() * 1.05)
+    ax.set_xlim(0, 360)
+    ax.set_xlabel("longitude (°)"); ax.set_ylabel("seasonal range (K)")
+    ax.set_title(f"at {abs(lat[i]):.0f}°{'N' if lat[i] >= 0 else 'S'} — the range peaks in the interior, "
+                 f"drops over the sea", fontsize=9)
+    ax.legend(fontsize=8, loc="upper right")
+
+    # -- the seasonal cycle at the three points ------------------------------ #
+    ax = axd["cycle"]
+    for k, col, name in zip((interior, coast, ocean), sample_colors, ("interior", "coast", "ocean")):
+        ax.plot(months, c.T[i, k], color=col, lw=2.0,
+                label=f"{name} (range {rng[i, k]:.0f} K)")
+    ax.set_xlim(0, 12); ax.set_xticks(range(0, 13, 2))
+    ax.set_xlabel("month of year"); ax.set_ylabel("surface temperature (°C)")
+    ax.set_title("the cycle — interior swings hard and prompt, ocean barely moves and lags", fontsize=9)
+    ax.legend(fontsize=8, loc="upper left")
+
+    fig.suptitle("Planet Rung 5B.2 — seasons meet continents: continentality becomes a map (NMS83)",
+                 fontsize=13)
+    return fig
