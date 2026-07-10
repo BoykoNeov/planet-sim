@@ -54,6 +54,33 @@ rung adds ITCZ **position**; the Hadley moisture-convergence fix (the backwards-
 2026-06-14 as an opt-in mean-circulation term → [[planet-rung2-hadley-fix]].
 Other edges: asymmetry **imposed** (Q-flux/albedo, not an ocean); annual-mean (no seasonal migration).
 
+**THE ITCZ-SENSITIVITY "TIGHTENING" — RESOLVED 2026-07-10 as a RADIATION LIMIT (a negative + an identity, NOT a tightening).**
+The §12.2 backlog line ("re-derive `D` to land the sensitivity within factor-1 of observed; it *rides* the calibrated `D`")
+rested on the naive `∝1/D` premise **this very build already overturned** to `∝(6+B/D)` — so it was self-contradictory with
+the code's own tests. Chasing it (advisor-caught) surfaced the real structure: at the symmetric steady state the **equatorial
+energy balance pins `D·T̄ₓₓ(0) = −NEI(0)`** (the transport divergence at `x=0`, where `∂ₓT̄=0`, collapses to `D·T̄ₓₓ(0)`, and
+steady state sets it to minus the net radiative input). So the sensitivity is **identically `δ/AHT = −1/(2π a² NEI(0))`** —
+the **Bischoff & Schneider 2014** `δ ≈ −AHT/NEI` (already in the sources; now the EBM's sensitivity *is* that formula). It is a
+**radiation** quantity that `D` **cancels out of** → **no transport tightens it**. Turning `D` up only slides the equatorial
+`T` (hence `NEI(0)`) along one curve: `D→0` radiative-equilibrium limit (`NEI→0`, infinite sens) up to the **isothermal
+ceiling** `D→∞` (`NEI≈57 W/m²`, floor **`−3.9 deg/PW`**; the `6` in `∝(6+B/D)` = the untunable `P₂` eigenvalue `n(n+1)=2·3`).
+Observed `−3` needs `NEI(0)≈75 W/m²` — **above the ceiling** ⟹ unreachable by *any* transport; the lever is a stronger
+equatorial radiative surplus (**rung 4**) or GMS dynamics (rung 3+). **Upgrades loose→tight**: the functional form is now the
+cited machine-checkable identity (the `NEI` form matches the *measured* migration tighter than the curvature fit), not "factor
+~2 corroborates `D`". `∝1/D` doc-fix in `sphere_ebm.py`/tests (added `itcz_sensitivity_from_nei`, `net_radiative_input_equator`,
+`efe_from_transport`; +2 tight tests).
+
+**Then the user chose to ALSO try the moist/MSE build** (hypothesis: observed `AHT` is *moist* static energy, ~`(1+β)`× the
+sensible energy/degree at the warm equator → smaller deg/PW). BUILT **`planet/sphere_moist_ebm.py`** (`SphereMoistEBM` — a
+SIBLING composing rung-2.5's `D_eff(T)` MSE diffusion, [[planet-rung25-mse-diffusion]], onto the rung-2.x full sphere; dt-free
+Picard; `RH=0`+`D_s=0.555` ⟹ `steady_linear` **bit-for-bit** 2.8e-13; `test_sphere_moist_ebm.py` 10 tests). **ALSO a negative,
+and the identity says why:** recalibrated to the dry contrast (`D_s≈0.28`), moist moves `−6.3`→`−5.7` only ~10 %, **saturating
+across RH** — because `D_eff(0)` rises (×1.67) but `T̄ₓₓ(0)` flattens in lockstep (×0.66), so the product `D_eff·T̄ₓₓ = −NEI(0)`
+is pinned (two faces of the *same* equatorial moisture amplification). The **entire** moist effect is the ~1.7 K cooler moist
+equator shifting `NEI(0)` by *exactly* `−B·ΔT_eq` (machine-tight `1e-6`) — a radiation nudge, not transport. Demo
+**`planet/demo_itcz_radiation_limit.py`** → `docs/figures/planet-itcz-radiation-limit.png` (master curve `deg/PW` vs `NEI(0)`
+with the transport-reachable band + the dry/moist/floor/observed markers; + the cancellation bars), slow-guarded.
+
 **Demo banked + CI-guarded:** `planet/demo_sphere_itcz.py` → `docs/figures/planet-sphere-itcz.png` (H(x)+EFE;
 φ_EFE vs imposed AHT on the closed-form line beside observed ~3; the relocated rain band); the `slow`
 `test_demo_reproduces_the_banked_headline` pins it. Tests `planet/tests/test_sphere_ebm.py` (15: tight/unlock/

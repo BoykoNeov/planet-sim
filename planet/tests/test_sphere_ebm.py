@@ -3,9 +3,12 @@
 *Tight* = the North two-mode on the full sphere (splitting-free direct solve) + the **reduction** to the
 hemisphere ``ebm.py`` climate under symmetric forcing + the closed form ``δ/AHT = 1/(2π a² D T̄ₓₓ(0))``
 reproduced by the engine + EFE ``= 0`` for symmetric forcing. *Real-but-loose (the unlock, lower altitude)*
-= the ITCZ sensitivity is of the observed order (~3 deg/PW, a factor ~1.5–2 high) and ``∝ 1/D`` — banked as
-a closed-form consequence of the calibrated ``D``, **not** an emergent prediction (the forcing-independence
-is a linear-operator identity, pinned by a test). *Plumbing* = the precip wiring reduces to rung-0 at
+= the ITCZ sensitivity is of the observed order (~3 deg/PW, a factor ~1.5–2 high) and is a pure function of
+the **equatorial radiative surplus** ``NEI(0)`` (the identity ``D·T̄ₓₓ(0) = −NEI(0)`` ⟹
+``δ/AHT = −1/(2π a² NEI(0))``; equivalently ``∝ (6 + B/D)``, **not** the naive ``∝ 1/D``) — banked as a
+closed-form consequence of radiation, **not** an emergent prediction, and radiatively floored at ``−3.9``
+*above* observed so no transport ``D`` reaches it (the forcing-independence is a linear-operator identity,
+pinned by a test). *Plumbing* = the precip wiring reduces to rung-0 at
 ``φ_EFE = 0`` and the imposed Q-flux shifts the ITCZ toward the warm hemisphere.
 """
 import numpy as np
@@ -84,6 +87,43 @@ def test_steady_linear_rejects_ice_feedback():
     m = se.SphereEBM(n_cells=180)
     with pytest.raises(ValueError, match="state-independent"):
         m.steady_linear(lambda x, T: absorbed_shortwave(x, T))
+
+
+def test_nei_identity_pins_the_sensitivity_denominator():
+    # THE TIGHT ANCHOR (upgraded loose→tight): at the symmetric steady state the equatorial energy balance
+    # pins D·T̄ₓₓ(0) = −NEI(0), so δ/AHT = −1/(2π a² NEI(0)) is IDENTICALLY the curvature closed form — the
+    # sensitivity is a RADIATION quantity (D cancelled), not a transport one. And the NEI form is the TIGHTER
+    # reading: it matches the engine's MEASURED migration slope, free of the curvature-fit error.
+    m = se.SphereEBM(n_cells=360)
+    c = m.steady_linear(_absorbed_const)                        # the symmetric base state
+    nei0 = m.net_radiative_input_equator(_absorbed_const, c.T)
+    # the identity D·T̄ₓₓ(0) = −NEI(0), machine-tight (the dry base is exactly P₂ ⟹ the polyfit is exact):
+    assert m.D * m.equatorial_curvature(c.T) == pytest.approx(-nei0, rel=1e-3)
+    # the two closed forms are the same number, and both equal the measured migration:
+    slope, closed_curv = m.itcz_sensitivity(_absorbed_const, linear=True)
+    assert se.itcz_sensitivity_from_nei(nei0) == pytest.approx(slope, rel=5e-3)
+    assert se.itcz_sensitivity_from_nei(nei0) == pytest.approx(closed_curv, rel=0.02)
+
+
+def test_sensitivity_is_radiatively_floored_above_observed():
+    # THE HANDOFF (why re-deriving D cannot tighten it): as D→∞ the equator cools to T̄ (isothermal), NEI(0)
+    # rises to its CEILING S(0)(1−α)−A−B·T̄, and the sensitivity bottoms out at ≈ −3.9 deg/PW — ABOVE observed
+    # −3. So no transport reaches observed; the lever is a stronger equatorial radiative surplus (rung 4).
+    m = se.SphereEBM(n_cells=360)
+    absorbed = _absorbed_const(m.x, np.zeros_like(m.x))
+    Tbar = (m.global_mean(absorbed) - m.A) / m.B                # the isothermal-limit temperature
+    absorbed0 = float(np.interp(0.0, m.x, absorbed))
+    nei_ceiling = absorbed0 - m.A - m.B * Tbar                  # NEI(0) at the isothermal (D→∞) limit
+    floor = se.itcz_sensitivity_from_nei(nei_ceiling)
+    assert floor == pytest.approx(-3.9, abs=0.2)               # the radiative floor
+    # a huge D nearly reaches it (confirms the floor is the D→∞ limit, not an asymptote we never approach):
+    big = se.SphereEBM(n_cells=360, D=100.0 * ebm.D_TRANSPORT)
+    slope_big, _ = big.itcz_sensitivity(_absorbed_const, linear=True)
+    assert slope_big == pytest.approx(floor, abs=0.1)
+    # observed −3 needs NEI(0) ABOVE the isothermal ceiling ⟹ unreachable by ANY transport:
+    nei_for_observed = -(180.0 / np.pi) * se.PW / (se.AREA_FACTOR * -3.0)
+    assert nei_for_observed > nei_ceiling                      # ~75 W/m² needed vs ~57 ceiling
+    assert abs(floor) > 3.0                                    # the floor magnitude sits above observed
 
 
 # --------------------------------------------------------------------------- #

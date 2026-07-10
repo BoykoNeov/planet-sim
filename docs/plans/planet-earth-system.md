@@ -2586,9 +2586,30 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
   and the geometric-not-`q` negative. Genuinely-new emergent content is **modest** (2.x × Hadley recombined
   into a conserving budget); the architectural win (budget-not-band) is the "what". **[named upgrade —
   BUILT]** → [[planet-rung2x-itcz]].
-- [ ] **Tighten the ITCZ-migration sensitivity** · *deliverable:* re-derive `D` in `sphere_ebm.py` ·
-  *anchor:* the closed-form `δ/AHT` lands within ~factor-1 of observed (currently ~2× high, rides the
-  calibrated `D`) · *cost:* one re-derive. **[named refinement]** → [[planet-rung2x-itcz]].
+- [x] ~~**Tighten the ITCZ-migration sensitivity**~~ **RESOLVED 2026-07-10 — a NEGATIVE with an identity, not
+  a tightening.** The backlog premise ("re-derive `D` to land within factor-1 of observed; it rides the
+  calibrated `D`") was the naive `∝1/D` reasoning the rung-2.x build *already overturned* to `∝(6+B/D)`.
+  Chasing it surfaced the real structure (advisor-caught): at the symmetric steady state the **equatorial
+  energy balance pins `D·T̄ₓₓ(0) = −NEI(0)`**, so the sensitivity is *identically* **`δ/AHT = −1/(2π a²
+  NEI(0))`** — the **Bischoff & Schneider 2014** energetic-ITCZ result `δ ≈ −AHT/NEI` (already in the
+  sources), a **radiation** quantity the transport `D` *cancels out of*. So **no `D` tightens it**: turning
+  `D` up only slides the equatorial temperature (and `NEI(0)`) up one curve, from the radiative-equilibrium
+  limit (`D→0`, `NEI→0`) to the **isothermal ceiling** (`D→∞`, `NEI≈57 W/m²`, floor `≈−3.9 deg/PW`).
+  Observed `−3 deg/PW` needs `NEI(0)≈75 W/m²` — **above** even the ceiling — so it is unreachable by any
+  transport; the lever is a stronger equatorial radiative surplus (**rung 4**) or GMS dynamics (rung 3+).
+  The user then chose to also **try the moist/MSE build** (the "observed AHT is *moist* energy" hypothesis):
+  BUILT `planet/sphere_moist_ebm.py` (`SphereMoistEBM` — rung-2.5 `D_eff(T)` MSE diffusion on the rung-2.x
+  full sphere; `RH=0` reduces to `steady_linear` bit-for-bit; `test_sphere_moist_ebm.py`). **Also a
+  negative:** moist moves the dry `−6.3` only ~10 % (to `−5.7`), *saturating* across RH — because the
+  moisture-amplified `D_eff(0)` rises (×1.67) but the moisture-flattened `T̄ₓₓ(0)` shrinks in lockstep
+  (×0.66), so their product `D_eff·T̄ₓₓ = −NEI(0)` is pinned; the *entire* moist effect is the ~1.7 K cooler
+  equator shifting `NEI(0)` by exactly `−B·ΔT_eq` (machine-tight), a radiation nudge, not transport.
+  **Upgrades loose→tight:** the sensitivity's functional form is now the *cited* identity
+  `δ/AHT=−1/(2π a² NEI(0))` (machine-checkable, the `NEI` form matches the measured migration *tighter* than
+  the curvature fit), not a loose "factor ~2 corroborates `D`." Doc-fix: the stale `∝1/D` in
+  `sphere_ebm.py`/tests corrected. Demo `planet/demo_itcz_radiation_limit.py` →
+  `docs/figures/planet-itcz-radiation-limit.png` (the master curve + the cancellation), slow-guarded.
+  **[named refinement — RESOLVED as a radiation limit]** → [[planet-rung2x-itcz]].
 - [x] ~~**Recalibrate `D_s≈0.28` (rung 2.5)**~~ **ALREADY BUILT** — this backlog line was **stale**: the
   recalibration shipped *inside* the parent rung-2.5 build (`recalibrate_sensible_D` in `moist_ebm.py`,
   commit `e65f33c`) and was upgraded to the dt-free `moist_steady_direct` path in `be61dad`. Live values

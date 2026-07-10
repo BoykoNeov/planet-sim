@@ -45,23 +45,45 @@ that identification and named so the rung is not over-read:
   warm hemisphere is guaranteed by the sign of the response, not evidence of anything (the same
   "guaranteed result" the QG rung carried). The non-vacuous question is the *rate*.
 
-The sensitivity is a CLOSED FORM of the calibrated D — banked at that altitude
-------------------------------------------------------------------------------
+The sensitivity is a RADIATION quantity, not a transport one — the NEI identity
+-------------------------------------------------------------------------------
 For a small antisymmetric perturbation about the symmetric mean state, the EFE shift ``δ`` and the
 cross-equatorial transport ``AHT_eq = H(0)`` depend on the perturbation **only** through the equatorial
 temperature-gradient anomaly, so their ratio is the forcing-independent
 
     δ / AHT_eq = 1 / (2π a² · D · T̄ₓₓ(0))          (:func:`itcz_sensitivity_closed`)
 
-— a **near-algebraic consequence of the already-calibrated transport ``D`` and the mean-state curvature
-``T̄ₓₓ(0)``**, *not* an emergent prediction. The forcing-independence (a cross-equatorial Q-flux and an
-albedo asymmetry give the **same** number) is this linear-operator identity, not robustness. Evaluated:
-**≈ −6.3 deg/PW** (constant-albedo, the splitting-free :meth:`SphereEBM.steady_linear` value matching the
-closed form) and **≈ −4.9 deg/PW** (the present-day ice climate, a steeper equatorial curvature) — the
-**same order** as the observed ``~3 deg/PW`` (Donohoe et al. 2013) but a **factor ~1.5–2 high**, and
-``∝ 1/D``. So what is banked is *"the ITCZ sensitivity is a closed-form consequence of the calibrated D and
-the mean-state curvature, of the observed order"* — a low-degrees-of-freedom corroboration that ``D`` is
-realistic, **not** "the EBM predicts the observed ITCZ migration."
+— which *looks* like a transport quantity (``D`` times a curvature). It is not. At the symmetric base
+state the **equatorial energy balance** (steady state at ``x = 0``, where ``∂ₓT̄(0) = 0`` so the transport
+divergence collapses to exactly ``D·T̄ₓₓ(0)``) pins
+
+    D · T̄ₓₓ(0) = −(S(0)(1−α) − A − B·T(0)) = −NEI(0),
+
+the **net radiative input at the equator**. So the sensitivity is *identically*
+
+    δ / AHT_eq = −1 / (2π a² · NEI(0))          (:func:`itcz_sensitivity_from_nei`)
+
+— the Bischoff & Schneider (2014) energetic-ITCZ result ``δ ≈ −AHT / NEI`` (cited here for the framework;
+this makes the EBM's sensitivity *literally* that formula). ``D`` and ``T̄ₓₓ`` have cancelled: **the
+sensitivity does not know about the transport at all**, only about the equatorial radiative surplus, which
+for fixed ``(A, B, S)`` depends on the model **only through the equatorial temperature ``T(0)``**. This is
+why the backlog's "re-derive ``D`` to tighten it" *cannot work* — re-deriving ``D`` is a transport
+intervention, and the sensitivity is a radiation quantity (the same reason the moist-MSE upgrade barely
+moves it, :mod:`planet.sphere_moist_ebm`: more transport only cools the equator ~1.7 K, nudging ``NEI(0)``
+~10 %). Evaluated: **≈ −6.3 deg/PW** (constant-albedo, ``NEI(0) ≈ 36 W/m²``; the splitting-free
+:meth:`SphereEBM.steady_linear` value) and **≈ −4.9 deg/PW** (the present-day ice climate) — the **same
+order** as the observed ``~3 deg/PW`` (Donohoe et al. 2013) but a **factor ~1.5–2 high**.
+
+**The floor, with a mechanism, and why observed is unreachable by transport.** As ``D → ∞`` the equator
+cools to the global mean ``T̄`` (isothermal), so ``NEI(0)`` rises to its ceiling ``S(0)(1−α) − A − B·T̄ ≈
+57 W/m²`` → the sensitivity bottoms out at ``≈ −3.9 deg/PW`` (equivalently the ``deg/PW ∝ (6 + B/D)`` law
+below, whose ``6`` is the untunable ``P₂`` spherical-harmonic eigenvalue ``n(n+1) = 2·3``). Observed
+``−3 deg/PW`` needs ``NEI(0) ≈ 75 W/m²`` — **above** even the isothermal ceiling. **No transport ``D`` (and
+no diffusive-moist upgrade) can reach it**; the lever is a *stronger equatorial radiative surplus* — better
+radiation physics (rung 4), not transport. So what is banked is the **tight** structural statement
+``δ/AHT = −1/(2π a² NEI(0))`` (a cited identity, machine-checkable) and the **handoff**: the dry sphere
+corroborates ``NEI(0)`` is of the right order but is radiatively floored above observed — it does **not**
+"predict the ITCZ migration."
 
 The operator-splitting gotcha (spike-caught)
 --------------------------------------------
@@ -79,11 +101,13 @@ Validation triad (plan §3)
 --------------------------
 * **Tight (analytic/structural).** The North (1975) two-mode on the full sphere via :meth:`steady_linear`
   (constant albedo) at ~2nd order in Δx; the **reduction** to the hemisphere ``ebm.py`` climate (1e-9 under
-  symmetric forcing); the closed form ``δ/AHT = 1/(2π a² D T̄ₓₓ(0))`` reproduced by the engine to ~1 %; and
-  EFE ``= 0`` exactly for symmetric forcing.
+  symmetric forcing); the **NEI identity** ``D·T̄ₓₓ(0) = −NEI(0)`` and hence
+  ``δ/AHT = −1/(2π a² NEI(0))`` reproduced by the engine (the ``NEI`` form matches the measured migration
+  *tighter* than the curvature fit); and EFE ``= 0`` exactly for symmetric forcing.
 * **Real-but-loose (the unlock, banked at the lower altitude).** The ITCZ sensitivity ``≈ −5 deg/PW`` (ice)
-  / ``−6.3`` (no-ice) — same order as observed ``~3``, a factor ~1.5–2 high; ``∝ 1/D``; direction
-  by-construction.
+  / ``−6.3`` (no-ice) — same order as observed ``~3``, a factor ~1.5–2 high; a pure function of ``NEI(0)``
+  (equivalently ``deg/PW ∝ (6 + B/D)``, **not** the naive ``∝ 1/D`` — the curvature moves with ``D`` too),
+  radiatively floored at ``−3.9`` above observed; direction by-construction.
 * **Plumbing.** Symmetric forcing ⟹ EFE ``= 0``; the precip wiring reduces to the rung-0 ITCZ centre
   bit-for-bit when ``φ_EFE = 0``.
 
@@ -155,6 +179,43 @@ def itcz_sensitivity_closed(Txx0: float, D: float = D_TRANSPORT) -> float:
     banked quantity's altitude** — a property of the calibrated ``D`` and the mean state, not a prediction.
     """
     return (180.0 / math.pi) * PW / (AREA_FACTOR * float(D) * float(Txx0))
+
+
+def itcz_sensitivity_from_nei(nei0: float) -> float:
+    """The ITCZ sensitivity ``δ/AHT_eq = −1 / (2π a² · NEI(0))`` in **deg / PW** — the RADIATION form.
+
+    The same quantity as :func:`itcz_sensitivity_closed`, but written through the exact equatorial
+    energy-balance identity ``D·T̄ₓₓ(0) = −NEI(0)`` (module docstring): at the symmetric steady state the
+    transport divergence at the equator collapses to ``D·T̄ₓₓ(0)``, which the steady state pins to
+    ``−NEI(0)`` = minus the net radiative input ``S(0)(1−α) − A − B·T(0)``. This is the Bischoff & Schneider
+    (2014) energetic-ITCZ result ``δ ≈ −AHT/NEI``. **It is the tighter form** — free of the curvature-fit
+    error, it matches the engine's *measured* migration slope to ~3 digits — and it makes explicit that the
+    sensitivity is a property of the equatorial **radiative surplus**, not of the transport ``D`` (which has
+    cancelled). ``nei0`` in W m⁻²; a warm equatorial surplus (``NEI(0) > 0``) gives the negative deg/PW
+    (ITCZ toward the warm hemisphere).
+    """
+    return -(180.0 / math.pi) * PW / (AREA_FACTOR * float(nei0))
+
+
+def efe_from_transport(x: np.ndarray, H: np.ndarray) -> tuple[float, float]:
+    """``(φ_EFE, AHT_eq)`` from a transport profile ``H(x)`` (PW): the ITCZ latitude + ``H(0)``.
+
+    The energy-flux equator is the zero of ``H`` nearest the equator (linear-interpolated); ``AHT_eq =
+    H(0)`` the cross-equatorial transport. Factored out of :meth:`SphereEBM.energy_flux_equator` so the
+    moist sibling (:mod:`planet.sphere_moist_ebm`, whose ``H`` carries the moisture-amplified ``D_eff``)
+    locates its EFE by the identical rule.
+    """
+    x = np.asarray(x, dtype=float)
+    H = np.asarray(H, dtype=float)
+    band = np.abs(x) < 0.6                                   # tropical bracket
+    xb, Hb = x[band], H[band]
+    crossings = np.where(np.diff(np.sign(Hb)) != 0)[0]
+    aht_eq = float(np.interp(0.0, x, H))
+    if crossings.size == 0:
+        return float("nan"), aht_eq
+    i = crossings[np.argmin(np.abs(xb[crossings]))]          # crossing nearest the equator
+    x0 = xb[i] - Hb[i] * (xb[i + 1] - xb[i]) / (Hb[i + 1] - Hb[i])
+    return float(np.degrees(np.arcsin(np.clip(x0, -1.0, 1.0)))), aht_eq
 
 
 # --------------------------------------------------------------------------- #
@@ -277,22 +338,25 @@ class SphereEBM:
         cross-equatorial transport ``AHT_eq = H(0)`` is the energetic driver the ``deg/PW`` sensitivity is
         measured against. A symmetric climate gives ``φ_EFE = 0`` exactly (``H`` is odd ⟹ ``H(0) = 0``).
         """
-        H = self.atmospheric_transport(T)
-        x = self.x
-        band = np.abs(x) < 0.6                                   # tropical bracket
-        xb, Hb = x[band], H[band]
-        crossings = np.where(np.diff(np.sign(Hb)) != 0)[0]
-        aht_eq = float(np.interp(0.0, x, H))
-        if crossings.size == 0:
-            return float("nan"), aht_eq
-        i = crossings[np.argmin(np.abs(xb[crossings]))]          # crossing nearest the equator
-        x0 = xb[i] - Hb[i] * (xb[i + 1] - xb[i]) / (Hb[i + 1] - Hb[i])
-        return float(np.degrees(np.arcsin(np.clip(x0, -1.0, 1.0)))), aht_eq
+        return efe_from_transport(self.x, self.atmospheric_transport(T))
 
     def equatorial_curvature(self, T: np.ndarray, band: float = 0.15) -> float:
         """``T̄ₓₓ(0)`` (°C) — equatorial curvature from a degree-2 fit on ``|x| < band`` (the closed form's input)."""
         m = np.abs(self.x) < band
         return float(2.0 * np.polyfit(self.x[m], np.asarray(T, dtype=float)[m], 2)[0])
+
+    def net_radiative_input_equator(self, absorbed_fn, T: np.ndarray) -> float:
+        """``NEI(0) = S(0)(1−α) − A − B·T(0)`` (W m⁻²) — the net radiative input at the equator.
+
+        The equatorial radiative surplus that, via the steady-state identity ``D·T̄ₓₓ(0) = −NEI(0)`` (module
+        docstring), *is* the ITCZ sensitivity's denominator: ``δ/AHT = −1/(2π a² NEI(0))``
+        (:func:`itcz_sensitivity_from_nei`). Absorbed shortwave and ``T`` are interpolated to the exact
+        equator ``x = 0`` (the cell-centered grid straddles it). This is the tight, transport-free reading of
+        the sensitivity — evaluate it on the **symmetric** base state.
+        """
+        absorbed0 = float(np.interp(0.0, self.x, absorbed_fn(self.x, np.asarray(T, dtype=float))))
+        T0 = float(np.interp(0.0, self.x, np.asarray(T, dtype=float)))
+        return absorbed0 - self.A - self.B * T0
 
     def _result(self, T: np.ndarray, converged: bool, it: int) -> SphereClimate:
         phi_efe, aht_eq = self.energy_flux_equator(T)
