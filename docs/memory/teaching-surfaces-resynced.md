@@ -1,9 +1,29 @@
 ---
 name: teaching-surfaces-resynced
-description: notebook + README + interactive re-synced to rungs 1–4 (2026-06-15); the generated-HTML / big-notebook / DOCS_FIGURE gotchas
-metadata:
+description: "notebook §8 re-synced to rungs 1–4 (2026-06-15) then EXTENDED to 2.x/5A/5B (2026-07-10, now 7 sections); the generated-HTML / big-notebook / DOCS_FIGURE gotchas"
+metadata: 
+  node_type: memory
   type: project
+  originSessionId: 44ec96b4-30cb-4ab9-b968-c8dc0d64f3af
 ---
+
+**UPDATE 2026-07-10 — §8 extended from four showcase sections to SEVEN** (commit `feat(pedagogy)`):
+added **§8.3 rung 2.x** (energetic ITCZ + radiation-limit; `demo_sphere_itcz` + `demo_itcz_radiation_limit`,
+both live — fast), **§8.6 rung 5A** (orographic rain shadow; NEW `demo_orographic.py` module + banked
+`planet-orographic.png` + `test_demo_orographic.py` — embed-only in the notebook, the jet spin-up is ~2 min),
+**§8.7 rung 5B** (continentality→ice→2-D map; `demo_seasonal` live, `demo_seasonal_ice`/`demo_seasonal_map`
+figures embed-only). Renumber shifted old rung-3/4 to §8.4/§8.5 (fix the two README `§8.N` cross-refs too).
+Gotchas that held: patch the JSON via a script (notebook too big for Read/NotebookEdit); bank new-cell
+outputs with a **surgical nbclient run of ONLY the new self-contained code cells** (`json.dump(indent=1,
+ensure_ascii=False)` reproduced the original formatting → diff stayed +248/−8, no reformat churn); the
+figure smoke test must render into a **tmp_path** (monkeypatch DOCS_FIGURE/OUTPUT_FIGURE) so the fast
+`use_jet=False` render never clobbers the committed emergent-jet figure. **Always re-run
+`test_planet_notebook.py` on the FINAL committed state** (advisor-caught: an intermediate bank had passed,
+the re-banked jet-figure state had not). NB: the README *rung log* was missing dedicated 5B.1+/5B.2 bullets
+(the 5B.1 bullet still framed 5B.2 as future) — folded a note into the new pedagogy bullet, did not backfill.
+
+---
+Original 2026-06-15 sync (rungs 1–4) below.
 
 **Teaching surfaces brought up to date with the built rungs, 2026-06-15.** Audit finding: the
 interactive what-if was current (4 knobs), but the **notebook + `planet/README.md` described built

@@ -18,7 +18,7 @@ One line per entry — the hook, not the record. Open the topic file for the ful
 - [Memory vendored in repo](memory-vendored-in-repo.md) — auto-memory lives in the repo at `docs/memory/` (committed), junctioned to the hardcoded global Claude path; on a fresh clone recreate the junction or recall misses this history
 - [Flatten repo-root gotcha](flatten-repo-root-gotcha.md) — post-flatten `parents[N]` off-by-one (fixed 2026-06-10); CI's `pip install -e` MASKS the bare-checkout failure → verify the suite without an editable install
 - [Engines are living contracts](engines-living-contracts.md) — freeze-before-reuse DROPPED 2026-06-10 (ADR 0005): extend engines directly + test + changelog, no re-seal; kept ADR-0001 array boundary + validation triad
-- [Teaching surfaces re-synced](teaching-surfaces-resynced.md) — notebook §8 "Up the staircase" + README rung log through rung 4 (2026-06-15); gotchas: `index.html` is GENERATED (byte-pinned by a slow test), `planet.ipynb` too big for Read (edit the JSON)
+- [Teaching surfaces re-synced](teaching-surfaces-resynced.md) — notebook §8 "Up the staircase" synced through rung 4 (2026-06-15), then EXTENDED to 7 sections (2.x/5A/5B, 2026-07-10, new `demo_orographic`); gotchas: `index.html` is GENERATED (byte-pinned by a slow test), `planet.ipynb` too big for Read (edit the JSON), surgical nbclient re-bank, tmp_path figure test, re-smoke-test the FINAL state
 
 ## Capstone (the 4 phases) + the interactive map
 - [Planet plan](planet-plan.md) — project #3 capstone plan (2026-06-09; ALL 4 phases + map + notebook BUILT = CAPSTONE COMPLETE): the 4 locked scope decisions, the GCM staircase documented; → [[planet-phase3-engine]] [[planet-phase4-coupler]]
