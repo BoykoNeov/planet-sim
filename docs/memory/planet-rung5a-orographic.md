@@ -1,6 +1,6 @@
 ---
 name: planet-rung5a-orographic
-description: "Rung 5A (first step off the zonal mean) BUILT 2026-07-09 (planet/orographic.py = Smith & Barstad linear orographic precip) + 5A.2 integration BUILT 2026-07-10 (planet/orographic_scene.py: tangent-plane patch + jet-sourced wind + mm/hr→cm/yr + enhancement-only biome re-map + serialization + demo figure) — PAYOFF: the mountain finally changes the biome map; enhancement-only, lee-depletion deferred to 5A.3"
+description: "Rung 5A (first step off the zonal mean) BUILT 2026-07-09 (planet/orographic.py = Smith & Barstad linear orographic precip) + 5A.2 integration BUILT 2026-07-10 (planet/orographic_scene.py: tangent-plane patch + jet-sourced wind + mm/hr→cm/yr + enhancement-only biome re-map + serialization + demo figure) + 5A.3 lee-depletion BUILT 2026-07-10 (planet/orographic_depletion.py: opt-in along-wind moisture budget draws the lee BELOW baseline = the real desert; drying-ratio-calibrated) — PAYOFF: the mountain changes the biome map AND casts a real rain-shadow desert"
 metadata:
   node_type: memory
   type: project
@@ -71,5 +71,41 @@ ridge's amplitude. (4) Coarse `N_LON=73` globe (~400 km/cell) would smear the ~2
 (5) Demo range must sit under the **annual-mean zonal westerlies** (Cascades/Andes/NZ); the Western Ghats
 (monsoon-driven) can't be driven by the zonal jet.
 
+**5A.3 — BUILT 2026-07-10** (`planet/orographic_depletion.py` + `test_orographic_depletion.py` (9
+anchors) + `build_scene(..., deplete=True)` + a depletion-aware demo figure). The one piece 5A.2 named
+and deferred: the real Columbia-Basin desert is **not** "no orographic bonus" but a lee baseline drawn
+**below** the zonal mean — the windward rainout drains the passing air — which enhancement-only 5A.2
+structurally cannot make. Built as an **opt-in** (default `deplete=False` keeps 5A.2 exactly; the
+`moist.py` opt-in precedent).
+
+**The model = a 1-D along-wind moisture-flux budget** (the wind is zonal → each lat row is an independent
+streamline): `d(U·W)/dx = P_base·(1−g) − P_oro`, for the dimensionless depletion factor `g = W/W₀`.
+Combination `P_total = g·P_base + P_oro` → the lee drops below baseline where `g < 1`.
+
+**Advisor's load-bearing correction (do not re-litigate):** the **refill** term `P_base·(1−g)` and the
+**depletion** term `−P_oro` are a *forced package* from the **same** premise (`S = P_base`, evaporation
+resupplies at baseline) — you cannot keep bonus-only depletion and separately "choose" to drop refill.
+The no-refill form `g = 1 − (1/U·W₀)∫P_oro` (cumulative, DOWNWIND) is the budget's **L→∞ limit**, honest
+**because** the *derived* evaporative-refill length `L = U·W₀/P_base` (~16 000 km) ≫ the ~450 km patch
+(verified numerically + a test). Frame it as the large-L limit, NOT "we chose no refill." The converse is
+the honest cost: the modelled desert does not relax back within the window (a real one does, over ~L).
+
+**Two traps the advisor flagged, both handled:** (1) **unit split** — the budget runs on the
+*instantaneous* mm/hr S&B rate (physical U, physical `PWV_IN_MM`) → a dimensionless `g` → applied to the
+*annual* cm/yr baseline; `OROGRAPHIC_HOURS_PER_YEAR` must NOT enter the budget. (2) **integration
+direction = the new `sgn(σ)`** — the cumulative integral runs downwind so the drain lands in the **lee,
+not windward**; the sole guard is a "depletion-in-the-lee" test (reverse the wind → the desert flips
+sides), the mirror of Rung 5A's rain-shadow-direction test.
+
+**Anchors:** tight/exact = conservation (water off the flux = orographic water rained → `DR = 1 − g_lee`
+identically) + reduction (`g ≡ 1` recovers 5A.2 bit-for-bit); tight/structural = monotone-`g`-downwind +
+depletion-in-lee; **directional payoff** = lee total below baseline; loose = the incoming column
+`PWV_IN_MM ≈ 30 mm` calibrated so the demo **drying ratio** `DR ≈ 0.47` sits in the cited observed band
+(~0.3–0.5; Smith 2003/2005, Kirshbaum & Smith 2008 — pinned in [[smith-barstad-orographic-source]]).
+**Payoff numbers:** Cascades lee ~90 → ~55 cm/yr, ~⅓ of the patch turns lee-desert, reclassified
+41 % → 56 % (windward temperate rain forest, lee woodland/shrubland). **Honest scope (named, not fixed):**
+per-streamline (zonal wind only); the S&B bonus is not itself depleted (simplest-first); no on-patch
+refill (the L→∞ cost).
+
 Then Rung 5B/5C = the 2-D EBM engine step (needs seasonality for continentality) / Charney–Eliassen
-stationary waves; 5A.3 = the lee-depletion moisture budget.
+stationary waves.

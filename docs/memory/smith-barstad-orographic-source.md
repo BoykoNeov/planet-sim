@@ -47,3 +47,14 @@ in the limit `H_w = 0` the factor `(1 − i·m·H_w) → 1`, so `m` and its `sgn
 triangle anchor pins only the *reduced* response `C_w·iσ/(1 + iσ·τ_f)` (the `C_w` scaling, upslope `iσ`,
 fallout `τ_f`), NOT the branch or `H_w`. The branch's sole validator is the rain-shadow *direction*
 check (a branch flip reddens only that). See [[planet-rung5a-orographic]].
+
+**Rung 5A.3 addendum — the drying-ratio calibration** (`planet/orographic_depletion.py`, built
+2026-07-10). The lee-depletion moisture budget is calibrated through the **orographic drying ratio**
+`DR ≡ ∫P_oro dx/(U·W₀)` (the fraction of the passing moisture flux that rains out crossing a range) — a
+standard *observed* quantity. Cited band **DR ≈ 0.3–0.5** across the Southern Alps of NZ and the coastal
+ranges of western N. America (**R. B. Smith et al. 2003** *J. Hydrometeorol.*; **Smith 2005**; **D. J.
+Kirshbaum & R. B. Smith 2008** *Tellus A* 60, 543–561). The one new knob is the incoming column
+precipitable water **`PWV_IN_MM ≈ 30 mm`** (≈ 3 cm, a typical mid-latitude column), tuned so the Cascades
+demo `DR ≈ 0.47` lands in-band. Also derived (not pinned): the evaporative refill length
+`L = U·W₀/P_base` (~16 000 km at Earthlike numbers) — the scale that makes the no-refill (`L→∞`) budget
+honest on a ~450 km patch. NOT from memory — cite at any reuse.

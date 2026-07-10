@@ -274,13 +274,19 @@ def orographic_scene_figure(scene):
                  fontsize=9)
     _biome_legend_inset(ax, scene.biome_codes)
 
-    # Cross-section: baseline vs enhanced total precip, over the elevation.
+    # Cross-section: baseline vs total precip, over the elevation. With Rung-5A.3 depletion on, the total
+    # dips BELOW the baseline in the lee — the desert is the shaded gap; without it the lee sits at baseline.
+    depleted = bool(np.any(scene.depletion_factor < 1.0 - 1e-9))
     ax = axd["section"]
-    ax.plot(lon, scene.baseline_precip_cm[mid, :], color="#7f8c8d", lw=1.6, ls="--",
-            label="zonal-mean baseline")
-    ax.plot(lon, scene.precip_cm[mid, :], color=PRECIP_COLOR, lw=2.0, label="enhanced total")
+    base_row, tot_row = scene.baseline_precip_cm[mid, :], scene.precip_cm[mid, :]
+    ax.plot(lon, base_row, color="#7f8c8d", lw=1.6, ls="--", label="zonal-mean baseline")
+    ax.plot(lon, tot_row, color=PRECIP_COLOR, lw=2.0, label="total")
+    if depleted:
+        ax.fill_between(lon, tot_row, base_row, where=tot_row < base_row, color="#c0392b", alpha=0.25,
+                        label="lee desert (below baseline)")
     ax.set_ylabel("precipitation (cm/yr)")
-    ax.set_title("cross-section — windward rain, lee shadow", fontsize=9)
+    ax.set_title("cross-section — windward rain, lee " + ("desert (depleted)" if depleted else "shadow"),
+                 fontsize=9)
     ax.legend(fontsize=8, loc="upper left")
     axe = ax.twinx()
     axe.fill_between(lon, 0, scene.elevation_m[mid, :], color="#c8b28a", alpha=0.45, zorder=0)
@@ -289,7 +295,8 @@ def orographic_scene_figure(scene):
     for key in ("terrain", "bonus", "biome"):
         axd[key].set_xlabel("longitude (°)"); axd[key].set_ylabel("latitude (°)")
     axd["section"].set_xlabel("longitude (°)")
-    fig.suptitle("Planet Rung 5A.2 — the orographic rain shadow, placed on the sphere", fontsize=13)
+    rung = "5A.3 — the rain-shadow desert" if depleted else "5A.2 — the orographic rain shadow"
+    fig.suptitle(f"Planet Rung {rung}, placed on the sphere", fontsize=13)
     return fig
 
 

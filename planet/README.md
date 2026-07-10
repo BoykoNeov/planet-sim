@@ -395,6 +395,18 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   phase — verified real to the model, not FFT wrap/pad, by a `H_w=0`+domain-doubling discriminator; not
   a trapped lee wave). Named+deferred: *background depletion* (the lee-drying moisture budget, a future
   5A.3). `tests/test_orographic_scene.py`.
+- **Rung 5A.3 (lee moisture depletion — the desert *below* baseline) — BUILT** (2026-07-10).
+  `planet/orographic_depletion.py` + `build_scene(..., deplete=True)`: the real Columbia-Basin desert is
+  a lee baseline drawn **below** the zonal mean (the windward rainout drains the passing air), which the
+  enhancement-only 5A.2 combination structurally cannot make. An **opt-in** 1-D along-wind **moisture-flux
+  budget** `d(U·W)/dx = P_base·(1−g) − P_oro` — whose refill and depletion terms are a *forced package*:
+  the no-refill `g = 1 − (1/U·W₀)∫P_oro` is its **L→∞ limit**, honest because the *derived* refill length
+  `L = U·W₀/P_base` (~16 000 km) ≫ the ~450 km patch. **Tight:** conservation (water off the flux =
+  orographic water rained, exact → `DR = 1 − g_lee`); reduction (`g ≡ 1` recovers 5A.2 bit-for-bit;
+  default off); the **depletion-in-the-lee-not-windward** direction guard (the new `sgn(σ)`). **Loose:**
+  the incoming column water `PWV_IN_MM ≈ 30 mm`, calibrated so the demo **drying ratio** `DR ≈ 0.47` sits
+  in the cited ~0.3–0.5 band. **Payoff:** the Cascades lee drops ~90 → ~55 cm/yr, ~⅓ of the patch turns
+  lee-desert, reclassified 41 % → 56 %. `tests/test_orographic_depletion.py`.
 
 ## Test runner (tiered gate, ADR 0003)
 

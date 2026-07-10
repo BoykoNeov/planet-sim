@@ -43,11 +43,15 @@ lee wave (that needs a stratification profile this model does not carry). It is 
 enhancement-only invariant ``P_total ≥ baseline`` still holds.) The biome payoff is therefore real and
 directional on the
 **windward** side (the extra rain shifts it toward forest / rain forest); a cell reads as a lee *desert*
-only where the zonal baseline was already marginal. **What this does NOT model** is *background
-depletion* — the windward rainout drying the air
-so the lee baseline itself drops (the mechanism behind the real Columbia-Basin desert *behind* the
-Cascades). That is an added moisture-budget assumption *beyond* Smith & Barstad, with its own honesty
-flag; it is **named and deferred** (a future 5A.3 / rung-5B moisture budget), not silently faked here.
+only where the zonal baseline was already marginal.
+
+*Background depletion* — the windward rainout drying the air so the lee baseline itself drops (the
+mechanism behind the real Columbia-Basin desert *behind* the Cascades) — is an added moisture-budget
+assumption *beyond* Smith & Barstad. It is built as the **opt-in Rung 5A.3** refinement
+(:mod:`planet.orographic_depletion`, ``build_scene(..., deplete=True)``): a 1-D along-wind flux budget
+that drains the advected column so the lee total drops *below* baseline. The default here stays
+**enhancement-only** (``deplete=False``) — the honest 5A.2 combination — so the invariant above holds
+unless depletion is explicitly turned on.
 
 The demo range must sit under the westerlies (advisor-caught)
 ------------------------------------------------------------
@@ -92,7 +96,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from planet import biomes, orographic as og
+from planet import biomes, orographic as og, orographic_depletion as ogd
 from planet.planetmap import Grid, Layer, LayerKind, _biome_style
 
 R_EARTH_M = 6.371e6              # m   — Earth's mean radius (the tangent-plane metric; matches circulation.R_EARTH)
@@ -248,7 +252,11 @@ class OrographicScene:
         — the climate underneath stays zonal-mean (the honest scope; only precipitation goes 2-D).
     baseline_precip_cm : the Phase-2 zonal-mean precip (cm/yr) sampled to the patch, broadcast in lon.
     orographic_precip_cm : the Smith & Barstad windward-enhancement bonus (cm/yr) on the patch.
-    precip_cm : ``baseline + orographic`` — the enhancement-only total (cm/yr).
+    depletion_factor : ``g ∈ (0, 1]`` — the along-wind lee moisture depletion (Rung 5A.3,
+        :mod:`planet.orographic_depletion`); ``g ≡ 1`` when depletion is off (the 5A.2 default). It
+        multiplies the baseline, so the lee baseline drops **below** the zonal mean where ``g < 1``.
+    precip_cm : ``depletion_factor·baseline + orographic`` — the total (cm/yr); enhancement-only reduces
+        to ``baseline + orographic`` when ``g ≡ 1``.
     biome_codes / baseline_biome_codes : Whittaker biomes for the total vs the baseline precip — their
         difference is the *payoff* (where the mountain changes the map).
     wind_speed / wind_direction_deg : the prescribed cross-mountain wind used (m/s; meteorological deg).
@@ -262,6 +270,7 @@ class OrographicScene:
     temperature_C: np.ndarray
     baseline_precip_cm: np.ndarray
     orographic_precip_cm: np.ndarray
+    depletion_factor: np.ndarray
     precip_cm: np.ndarray
     biome_codes: np.ndarray
     baseline_biome_codes: np.ndarray
@@ -275,10 +284,21 @@ class OrographicScene:
         """Fraction of patch cells whose biome differs from the zonal-mean baseline — the payoff metric."""
         return float(np.mean(self.biome_codes != self.baseline_biome_codes))
 
+    @property
+    def lee_desert_fraction(self) -> float:
+        """Fraction of cells whose total precip fell **below** the zonal-mean baseline — the 5A.3 payoff.
+
+        Zero under the enhancement-only 5A.2 default (``g ≡ 1``); positive only when lee-side moisture
+        depletion (:mod:`planet.orographic_depletion`) drains the baseline below the zonal mean — the
+        real rain-shadow *desert* enhancement-only structurally cannot make.
+        """
+        return float(np.mean(self.precip_cm < self.baseline_precip_cm - 1e-9))
+
 
 def build_scene(result, lat_deg: np.ndarray, lon_deg: np.ndarray, elevation_m: np.ndarray, *,
                 jet=None, speed: float = og.U_REF_M_S, direction_deg: float = og.DIRECTION_WESTERLY_DEG,
                 hours_per_year: float = OROGRAPHIC_HOURS_PER_YEAR,
+                deplete: bool = False, pwv_in_mm: float = ogd.PWV_IN_MM,
                 lat_ref_deg: float | None = None, **orographic_kwargs) -> OrographicScene:
     """Assemble an :class:`OrographicScene` — place the patch, source the wind, rain the shadow, re-map biomes.
 
@@ -298,12 +318,19 @@ def build_scene(result, lat_deg: np.ndarray, lon_deg: np.ndarray, elevation_m: n
     speed, direction_deg : the prescribed wind if no ``jet`` is given (default: the S&B reference
         westerly).
     hours_per_year : the mm/hr → cm/yr calibration (:data:`OROGRAPHIC_HOURS_PER_YEAR`).
+    deplete : opt-in Rung 5A.3 lee moisture depletion (:mod:`planet.orographic_depletion`). Default
+        ``False`` keeps the enhancement-only 5A.2 combination (``g ≡ 1``, lee left at the baseline). With
+        ``True`` the windward rainout drains the advected column, so the lee baseline drops **below** the
+        zonal mean — the real rain-shadow desert.
+    pwv_in_mm : the incoming column precipitable water ``W₀`` for the depletion budget
+        (:data:`planet.orographic_depletion.PWV_IN_MM`); only used when ``deplete=True``.
     lat_ref_deg : reference latitude for the tangent-plane metric + Coriolis ``f``; defaults to the
         patch's centre latitude.
     **orographic_kwargs : forwarded to :func:`planet.orographic.orographic_precip` (e.g. ``Cw``, ``Nm``).
 
-    Returns the fully-populated :class:`OrographicScene` (the *enhancement-only* combination — see the
-    module docstring for the honest scope: windward enhancement, lee left at the zonal baseline).
+    Returns the fully-populated :class:`OrographicScene`. With ``deplete=False`` this is the
+    *enhancement-only* combination (windward enhancement, lee at the zonal baseline); with ``deplete=True``
+    the lee is additionally drawn below baseline (see the module docstring's honest scope).
     """
     lat_deg = np.asarray(lat_deg, dtype=float)
     lon_deg = np.asarray(lon_deg, dtype=float)
@@ -325,6 +352,15 @@ def build_scene(result, lat_deg: np.ndarray, lon_deg: np.ndarray, elevation_m: n
                                    latitude_deg=ref, background_mm_hr=0.0, **orographic_kwargs)
     orographic_cm = mm_hr_to_cm_yr(p_mm_hr, hours_per_year)
 
+    # Lee moisture depletion (Rung 5A.3, opt-in): the along-wind budget runs on the *instantaneous* mm/hr
+    # rate (NOT the annualised cm/yr — the unit split), giving a dimensionless g that then multiplies the
+    # annual baseline. g ≡ 1 (default) reduces to the 5A.2 enhancement-only combination exactly.
+    if deplete:
+        u0, _ = og.wind_components(speed, direction_deg)    # sign of u sets the downwind integration
+        g = ogd.depletion_factor(p_mm_hr, dx, u0, pwv_in_mm=pwv_in_mm)
+    else:
+        g = np.ones_like(orographic_cm)
+
     # The zonal-mean climate sampled onto the patch (symmetric in |lat|), broadcast across longitude.
     state = result.state
     hemi_lat = state.latitude_deg()
@@ -333,14 +369,14 @@ def build_scene(result, lat_deg: np.ndarray, lon_deg: np.ndarray, elevation_m: n
     T_2d = np.repeat(T_1d[:, None], lon_deg.size, axis=1)
     baseline_cm = np.repeat(base_1d[:, None], lon_deg.size, axis=1)
 
-    precip_cm = baseline_cm + orographic_cm                 # enhancement-only (the honest combination)
+    precip_cm = g * baseline_cm + orographic_cm             # depleted baseline + windward enhancement
     biome_codes = biomes.classify_field(T_2d, precip_cm)
     baseline_biome = biomes.classify_field(T_2d, baseline_cm)
 
     return OrographicScene(
         lat_deg=lat_deg, lon_deg=lon_deg, elevation_m=elevation_m, temperature_C=T_2d,
-        baseline_precip_cm=baseline_cm, orographic_precip_cm=orographic_cm, precip_cm=precip_cm,
-        biome_codes=biome_codes, baseline_biome_codes=baseline_biome,
+        baseline_precip_cm=baseline_cm, orographic_precip_cm=orographic_cm, depletion_factor=g,
+        precip_cm=precip_cm, biome_codes=biome_codes, baseline_biome_codes=baseline_biome,
         wind_speed=float(speed), wind_direction_deg=float(direction_deg),
         lat_ref_deg=ref, hours_per_year=float(hours_per_year),
     )
@@ -390,13 +426,16 @@ def scene_to_view(scene: OrographicScene):
 # --------------------------------------------------------------------------- #
 def demo_scene(range_name: str = "cascades", *, n_lat: int = 41, n_lon: int = 161,
                lat_span_deg: float = 6.0, lon_span_deg: float = 6.0,
-               amplitude_m: float = 2500.0, use_jet: bool = True) -> OrographicScene:
+               amplitude_m: float = 2500.0, use_jet: bool = True,
+               deplete: bool = False) -> OrographicScene:
     """Build a demo :class:`OrographicScene`: a meridional ridge under the westerlies for a named range.
 
     Solves the present-day zonal-mean climate, (optionally) the emergent coupled jet, places a fine
     patch on the named :data:`DEMO_RANGES` entry with a north–south ridge, and returns the scene. With
     ``use_jet`` the cross-mountain wind is read off the emergent jet at that latitude; otherwise the S&B
-    reference westerly is used (a fallback that does not need the shallow-water spin-up).
+    reference westerly is used (a fallback that does not need the shallow-water spin-up). With
+    ``deplete`` the Rung-5A.3 lee moisture budget is turned on, drawing the lee below baseline (the real
+    rain-shadow desert); the default is the enhancement-only 5A.2 combination.
     """
     from planet import demo_biomes
 
@@ -413,4 +452,4 @@ def demo_scene(range_name: str = "cascades", *, n_lat: int = 41, n_lon: int = 16
         from planet import coupler
         jet = coupler.couple_jet(result.state)
 
-    return build_scene(result, lat, lon, elevation, jet=jet, lat_ref_deg=lat_c)
+    return build_scene(result, lat, lon, elevation, jet=jet, lat_ref_deg=lat_c, deplete=deplete)

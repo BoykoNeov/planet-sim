@@ -2764,6 +2764,24 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
     hold on the finite zero-padded engine (the pad localises a lon-uniform ridge into a responding
     block), so the pad-safe placement anchor is a **compact hill's latitude-symmetry** (shadow in lon,
     ~symmetric in lat → pins `lon → x`). See [[planet-rung5a-orographic]].
+  - **Rung 5A.3 — lee moisture depletion · BUILT 2026-07-10** (`planet/orographic_depletion.py`,
+    `test_orographic_depletion.py`, `build_scene(..., deplete=True)`). The one piece 5A.2 named+deferred:
+    the real Columbia-Basin desert is not "no orographic bonus" but a lee baseline drawn **below** the
+    zonal mean — the windward rainout drains the passing air. Modelled as an **opt-in** 1-D along-wind
+    **moisture-flux budget** `d(U·W)/dx = P_base·(1−g) − P_oro`, whose refill and depletion terms are a
+    *forced package* (same premise; advisor-caught): the no-refill form `g = 1 − (1/U·W₀)∫P_oro` is its
+    **L→∞ limit**, honest because the *derived* evaporative-refill length `L = U·W₀/P_base` (~16 000 km)
+    is ≫ the ~450 km patch. The depleted baseline `g·P_base + P_oro` drops the lee **below** baseline —
+    the real desert. **Tight anchors:** conservation (water off the flux = orographic water rained,
+    exact → `DR = 1 − g_lee`); reduction (`g ≡ 1` recovers 5A.2 bit-for-bit; default `deplete=False`);
+    monotone-`g`-downwind; the **depletion-in-the-lee-not-windward** integration-direction guard (the new
+    `sgn(σ)`). **Loose (calibrated):** the incoming column water `PWV_IN_MM ≈ 30 mm`, tuned so the demo
+    **drying ratio** `DR ≈ 0.47` lands in the cited observed band (~0.3–0.5; Smith 2003/2005, Kirshbaum &
+    Smith 2008 — [[smith-barstad-orographic-source]]). **Payoff:** the Cascades lee falls ~90 → ~55 cm/yr,
+    ~⅓ of the patch turns lee-desert, and the reclassified fraction rises 41 % → 56 % (windward temperate
+    rain forest, lee woodland/shrubland). **Honest scope (named):** per-streamline (valid only for the
+    zonal wind); the S&B bonus is not itself depleted; no on-patch refill (the L→∞ cost — the desert does
+    not relax back within the window, a real one does over ~L). See [[planet-rung5a-orographic]].
 
 ### 12.6 Spin-outs — separate repos, not upgrades of this one
 
