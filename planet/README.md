@@ -405,7 +405,8 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   orographic water rained, exact → `DR = 1 − g_lee`); reduction (`g ≡ 1` recovers 5A.2 bit-for-bit;
   default off); the **depletion-in-the-lee-not-windward** direction guard (the new `sgn(σ)`). **Loose:**
   the incoming column water `PWV_IN_MM ≈ 30 mm`, calibrated so the demo **drying ratio** `DR ≈ 0.47` sits
-  in the cited ~0.3–0.5 band. **Payoff:** the Cascades lee drops ~90 → ~55 cm/yr, ~⅓ of the patch turns
+  in the cited ~0.3–0.5 band (Roe 2005; Smith & Evans 2007). **Payoff:** the Cascades lee drops
+  ~90 → ~55 cm/yr, ~⅓ of the patch turns
   lee-desert, reclassified 41 % → 56 %. `tests/test_orographic_depletion.py`.
 
 ## Test runner (tiered gate, ADR 0003)

@@ -101,7 +101,8 @@ sides), the mirror of Rung 5A's rain-shadow-direction test.
 identically) + reduction (`g ≡ 1` recovers 5A.2 bit-for-bit); tight/structural = monotone-`g`-downwind +
 depletion-in-lee; **directional payoff** = lee total below baseline; loose = the incoming column
 `PWV_IN_MM ≈ 30 mm` calibrated so the demo **drying ratio** `DR ≈ 0.47` sits in the cited observed band
-(~0.3–0.5; Smith 2003/2005, Kirshbaum & Smith 2008 — pinned in [[smith-barstad-orographic-source]]).
+(~0.3–0.5, Sierra/Cascades 0.48±0.02; Roe 2005, Smith & Evans 2007 — pinned in
+[[smith-barstad-orographic-source]]; first-pass cites were fabricated, advisor+WebSearch-corrected).
 **Payoff numbers:** Cascades lee ~90 → ~55 cm/yr, ~⅓ of the patch turns lee-desert, reclassified
 41 % → 56 % (windward temperate rain forest, lee woodland/shrubland). **Honest scope (named, not fixed):**
 per-streamline (zonal wind only); the S&B bonus is not itself depleted (simplest-first); no on-patch

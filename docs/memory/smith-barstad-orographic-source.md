@@ -51,10 +51,17 @@ check (a branch flip reddens only that). See [[planet-rung5a-orographic]].
 **Rung 5A.3 addendum — the drying-ratio calibration** (`planet/orographic_depletion.py`, built
 2026-07-10). The lee-depletion moisture budget is calibrated through the **orographic drying ratio**
 `DR ≡ ∫P_oro dx/(U·W₀)` (the fraction of the passing moisture flux that rains out crossing a range) — a
-standard *observed* quantity. Cited band **DR ≈ 0.3–0.5** across the Southern Alps of NZ and the coastal
-ranges of western N. America (**R. B. Smith et al. 2003** *J. Hydrometeorol.*; **Smith 2005**; **D. J.
-Kirshbaum & R. B. Smith 2008** *Tellus A* 60, 543–561). The one new knob is the incoming column
-precipitable water **`PWV_IN_MM ≈ 30 mm`** (≈ 3 cm, a typical mid-latitude column), tuned so the Cascades
-demo `DR ≈ 0.47` lands in-band. Also derived (not pinned): the evaporative refill length
-`L = U·W₀/P_base` (~16 000 km at Earthlike numbers) — the scale that makes the no-refill (`L→∞`) budget
-honest on a ~450 km patch. NOT from memory — cite at any reuse.
+standard *observed* quantity. Cited band **DR ≈ 0.3–0.5** for mid-latitude ranges — the Sierra Nevada /
+Cascades constrained to **0.48 ± 0.02**, the Southern Alps of NZ and the southern Andes similar with more
+scatter. **Verified sources (WebSearch-checked 2026-07-10 — my first-pass citations were WRONG from
+memory, advisor-caught):** **G. H. Roe (2005)**, "Orographic Precipitation", *Annu. Rev. Earth Planet.
+Sci.* **33**, 645–671 (the review; drying-ratio concept + observed bands, incl. the upslope form
+`DR = 1 − e^{−h/H}`); **R. B. Smith & J. P. Evans (2007)**, "Orographic Precipitation and Water Vapor
+Fractionation over the Southern Andes", *J. Hydrometeorol.* **8**(1). (**Do NOT reuse the retracted
+first-pass cite** "Smith 2003 / Kirshbaum & Smith 2008 *Tellus A* 60, 543–561" — fabricated; the real
+Kirshbaum & Smith 2008 is *Q. J. R. Meteorol. Soc.* **134**, 1183–1199 on moist-stability effects, not a
+drying-ratio pin.) The one new knob is the incoming column precipitable water **`PWV_IN_MM ≈ 30 mm`**
+(≈ 3 cm, a typical mid-latitude column), tuned so the Cascades demo `DR ≈ 0.47` lands in-band. Also
+derived (not pinned): the evaporative refill length `L = U·W₀/P_base` (~16 000 km at Earthlike numbers) —
+the scale that makes the no-refill (`L→∞`) budget honest on a ~450 km patch. NOT from memory — cite at
+any reuse.

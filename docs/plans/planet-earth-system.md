@@ -2776,8 +2776,9 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
     exact → `DR = 1 − g_lee`); reduction (`g ≡ 1` recovers 5A.2 bit-for-bit; default `deplete=False`);
     monotone-`g`-downwind; the **depletion-in-the-lee-not-windward** integration-direction guard (the new
     `sgn(σ)`). **Loose (calibrated):** the incoming column water `PWV_IN_MM ≈ 30 mm`, tuned so the demo
-    **drying ratio** `DR ≈ 0.47` lands in the cited observed band (~0.3–0.5; Smith 2003/2005, Kirshbaum &
-    Smith 2008 — [[smith-barstad-orographic-source]]). **Payoff:** the Cascades lee falls ~90 → ~55 cm/yr,
+    **drying ratio** `DR ≈ 0.47` lands in the cited observed band (~0.3–0.5, the Sierra/Cascades at
+    0.48 ± 0.02; Roe 2005, Smith & Evans 2007 — [[smith-barstad-orographic-source]]). **Payoff:** the
+    Cascades lee falls ~90 → ~55 cm/yr,
     ~⅓ of the patch turns lee-desert, and the reclassified fraction rises 41 % → 56 % (windward temperate
     rain forest, lee woodland/shrubland). **Honest scope (named):** per-streamline (valid only for the
     zonal wind); the S&B bonus is not itself depleted; no on-patch refill (the L→∞ cost — the desert does

@@ -57,8 +57,9 @@ The lee depletion is set by one loose-magnitude knob, the incoming column water 
     ``DR ≡ ∫ P_orographic dx / (U·W₀) = 1 − g_lee``          (:func:`drying_ratio`)
 
 the fraction of the passing moisture flux that rains out crossing the range — a standard, *observed*
-orographic quantity (Smith et al. 2003/2005; Kirshbaum & Smith 2008 report ``DR ≈ 0.3–0.5`` across the
-Southern Alps of New Zealand and the coastal ranges of western North America). ``W₀`` is tuned so the
+orographic quantity. Reviews and isotope/water-vapour studies report ``DR ≈ 0.3–0.5`` for mid-latitude
+ranges (the Sierra Nevada / Cascades constrained to ``0.48 ± 0.02``; the Southern Alps of New Zealand and
+the southern Andes similar, with more scatter — Roe 2005; Smith & Evans 2007). ``W₀`` is tuned so the
 demo ``DR`` lands in that band; the absolute lee dryness stays in the **loose** validation tier, exactly
 as the S&B amplitudes and :data:`~planet.orographic_scene.OROGRAPHIC_HOURS_PER_YEAR` do.
 
@@ -98,8 +99,8 @@ from planet.orographic import SECONDS_PER_HOUR
 
 # The one loose-magnitude calibration knob (§3 / advisor-caught): the incoming column precipitable water
 # W₀ (kg/m² ≡ mm). Tuned so the demo drying ratio DR = ∫P_oro dx/(U·W₀) lands in the cited observed band
-# (~0.3–0.5; Smith et al. 2003/2005, Kirshbaum & Smith 2008). ~30 mm ≈ 3 cm is a typical mid-latitude
-# column water vapour; at the Cascades demo it gives DR ≈ 0.46. A calibration band, not a pinned constant.
+# (~0.3–0.5; Roe 2005, Smith & Evans 2007). ~30 mm ≈ 3 cm is a typical mid-latitude column water vapour;
+# at the Cascades demo it gives DR ≈ 0.47. A calibration band, not a pinned constant.
 PWV_IN_MM = 30.0                     # kg/m² ≡ mm — incoming column precipitable water W₀
 _MM_PER_CM = 10.0                    # mm per cm
 SECONDS_PER_YEAR = 3.156e7           # s/yr — for the refill-length P_base conversion (cm/yr → kg/m²/s)
