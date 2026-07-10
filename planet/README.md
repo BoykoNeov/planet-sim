@@ -360,14 +360,14 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   Tight leg: QG dispersion = analytic **Phillips** to 2e-15 + **Charney–Stern** `U_crit=β/F`. Banked
   **dimensionless + qualitative** (dimensional `κ` is box/drag/resolution-dependent). The free-surface
   SW route **outcropped** at saturation (`h→0` — the named wall that routed the build to QG). Showcased
-  in §8.3. `tests/test_baroclinic_qg.py` + `engines/fluid/tests/test_{layered,stability}.py`.
+  in §8.4. `tests/test_baroclinic_qg.py` + `engines/fluid/tests/test_{layered,stability}.py`.
 - **Rung 4 (spectral radiation column) — BUILT**. `planet/radiation.py` + `radiative_ebm.py`: the §1
   gray OLR offset `A` becomes a spectral column. **Headline = the logarithmic CO₂ law** — exponential
   band wings turn the gray *saturating* forcing into the **Myhre** `5.35·ln(C/C₀)` ≈ 3.7 W/m²/doubling
   (constant per doubling); flatten the wing and it saturates again (the wing is the whole ingredient).
   Form banked, magnitude order-calibrated. Also an emergent moist-adiabat **lapse-rate feedback**
   (**overturned** ~0.84 — it overshoots, named not banked). Reduces to the gray column. Showcased in
-  §8.4. `tests/test_radiation_lapse_rate.py`, `test_radiative_ebm.py`.
+  §8.5. `tests/test_radiation_lapse_rate.py`, `test_radiative_ebm.py`.
 - **Teaching surfaces re-synced to the rungs — BUILT** (2026-06-15). The notebook gained **§8 "Up the
   staircase"** (four showcase sections — rungs 2 / 2.5 / 3 / 4 — that run the cheap demos live and embed
   the banked figures), and its stale forward-looking prose was de-staled: §6 "what's next" now reports
@@ -432,6 +432,16 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   same albedo on both tiles (continentality is *pure* heat capacity), fixed albedo (exact reduction; ice
   is the marcher's future), uniform land fraction (exact energy conservation). The true `T(φ,λ,t)`
   land–sea *map* is rung 5B.2. `tests/test_seasonal.py`.
+- **Teaching notebook extended to the newer rungs — BUILT** (2026-07-10). §8 "Up the staircase" grew from
+  four showcase sections to **seven**: **§8.3 rung 2.x** (the energetic ITCZ at the energy-flux equator +
+  the radiation-limit resolution — both demos live, `demo_sphere_itcz` / `demo_itcz_radiation_limit`),
+  **§8.6 rung 5A** (the orographic rain shadow + the lee desert below baseline — a **new `demo_orographic`**
+  module + banked figure, embed-only as it couples the jet), and **§8.7 rung 5B** (continentality → seasonal
+  ice → the 2-D continentality map — continentality live, the ice/map figures banked). The renumber shifted
+  the old rung-3/4 sections to §8.4/§8.5; the summary table and the stale-forward intro prose were updated
+  to match. The new modules `orographic_scene` / `orographic_depletion` (rung 5A.2/5A.3), `seasonal`
+  ice-albedo (rung 5B.1+), and `seasonal_map` (rung 5B.2) are thus all showcased. `tests/test_demo_orographic.py`,
+  `test_planet_notebook.py`.
 
 ## Test runner (tiered gate, ADR 0003)
 
