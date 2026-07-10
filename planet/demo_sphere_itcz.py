@@ -8,6 +8,12 @@ consequence of the already-calibrated transport ``D`` and the mean-state curvatu
 prediction of the ITCZ. The shift *direction* (toward the warm hemisphere) is by-construction; the
 forcing-independence is a linear-operator identity.
 
+**Sharper framing (2026-07-10):** that "closed form of ``D``" is *identically* the RADIATION form
+``δ/AHT = −1/(2π a² NEI(0))`` (the equatorial energy balance pins ``D·T̄ₓₓ(0) = −NEI(0)``; Bischoff &
+Schneider 2014) — ``D`` **cancels**, so no transport (and no moist-MSE upgrade) tightens the number toward
+observed; it is radiatively floored above it. That is the real headline, banked in
+:mod:`planet.sphere_moist_ebm` / :mod:`planet.demo_itcz_radiation_limit`.
+
 Three panels:
   1. ``H(x)`` for a symmetric climate (EFE at the equator) and a climate with an imposed cross-equatorial
      Q-flux (EFE displaced into the warmed hemisphere) — the migration, made visible.
