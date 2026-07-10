@@ -1,6 +1,6 @@
 ---
 name: planet-rung5b-seasonal
-description: Rung 5B BUILT 2026-07-10 — 5B.1 seasonal zonal EBM (continentality from land/ocean C) + 5B.2 the full 2-D lat×lon map (NMS83); rung 5B COMPLETE
+description: Rung 5B BUILT 2026-07-10 — 5B.1 seasonal zonal EBM (continentality from land/ocean C) + 5B.1+ seasonal ice-albedo (migrating ice edge, ice asymmetry, bistability; SICI deferred) + 5B.2 the full 2-D lat×lon map (NMS83); rung 5B COMPLETE
 metadata:
   type: project
 ---
@@ -44,9 +44,31 @@ quiet amplitude-damping bug would ship un-caught); hemispheric antisymmetry `T(x
 annual+global energy balance. **Loose (calibrated):** amplitudes/lag ride the calibrated `C`; land runs
 high-end because damping is `B`-only (amp & lag tied through the single `C`).
 
-**Named scope:** same albedo both tiles (continentality = *pure* heat capacity); fixed albedo (exact
-reduction; seasonal ice-albedo + small-ice-cap instability are the marcher's future); uniform land fraction
-(exact conservation); `D` = atmospheric transport shared over both tiles (well-mixed-atmosphere closure).
+**Named scope:** same *ice-free* albedo both tiles (continentality = *pure* heat capacity); fixed albedo
+*for the spectral solve + tight reductions* (seasonal ice-albedo now BUILT as a marcher-only extension —
+5B.1+ below; small-ice-cap instability still deferred); uniform land fraction (exact conservation); `D` =
+atmospheric transport shared over both tiles (well-mixed-atmosphere closure).
+
+**Rung 5B.1+ — the seasonal ice-albedo feedback · BUILT 2026-07-10** (`seasonal.py` `ice_coalbedo` +
+`march(coalbedo_fn=…)`, `test_seasonal_ice.py`, `demo_seasonal_ice.py`, `plots.seasonal_ice_figure`). The
+fixed-albedo edge lifted **on the marcher only**: the rung-0 step-function ice-albedo (`albedo.planetary_albedo`,
+REUSED — Phase 1's Snowball nonlinearity) as `march`'s `coalbedo_fn`, re-frozen on **each tile's own T** every
+half-step (`absorbed_i = S(x,t)·(1−α(x,T_i))`) → land/ocean freeze *independently*. Marcher-only (state-dependent
+α ⟹ spectral solve can't carry it); opt-in (`coalbedo_fn=None` ⟹ fixed path **bit-identical**). **PAYOFF:** a
+**migrating seasonal ice edge** (forms in winter, melts in summer — impossible in any equilibrium EBM below);
+**continentality → an ice asymmetry** (Earth insol: land seasonal ice reaches ~33° vs ocean ~66°; land at 45°
+frozen ~60% of year, ocean 0%); and `C` decides whether ice MELTS — **land ice purely seasonal** (tiny-`C`
+climbs above freezing every summer, no year-round land ice) while **ocean ice ~perennial once formed** (huge-`C`
+barely warms). Restores **Phase-1 bistability inside the seasonal cycle**: warm seed ⟨T⟩≈+11 °C (finite ice) vs
+cold seed ⟨T⟩≈−40 °C (snowball, ice to equator), one sun. **Tight anchors:** warm-limit reduction (unreachable
+`Tf` never trips → bit-identical to fixed ice-free march, <1e-12) + frozen-limit (high `Tf` → const co-albedo →
+bit-identical to fixed-`a_ice` march); **ε=0 in-model self-consistency** — seasons off ⟹ steady fixed point of
+`L_T·T̄ + S(1−α(T)) − A − B·T = 0`, residual **O(dt)** (reads model vs ITSELF — the advisor's fix for two ghosts:
+no external insolation-truncation-match, no ice-branch-select). **Conservation:** global-annual net TOA w/
+*realized* co-albedo ≈0 (transport untouched). **Loose:** ice edges/fractions ride calibrated `C`+`Tf`/`a_ice`;
+direction banked. **Named-DEFERRED:** small-ice-cap instability (North&Coakley critical-cap-size / ice-edge jump)
+— the sweep this feedback *enables* but this build didn't attempt (plain reading = mechanism, not bifurcation).
+Advisor: design + scope-defer-SICI + all three anchor traps. → [[ebm-radiation-source]] (the reused α), [[planet-phase1]].
 
 **Rung 5B.2 — the true `T(φ,λ,t)` land–sea map · BUILT 2026-07-10** (`planet/seasonal_map.py`,
 `test_seasonal_map.py`, `demo_seasonal_map.py`, `plots.seasonal_map_figure`). North, Mengel & Short 1983.

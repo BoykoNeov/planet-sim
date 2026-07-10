@@ -78,15 +78,30 @@ Validation triad (plan §3)
   (land ≈ the atmospheric column ``c_p p_s/g``; ocean ``+`` a ~50 m seasonal mixed layer,
   [[seasonal-ebm-source]]) and is reported only in the observed ballpark, the way rung 0's ice line was.
 
+The seasonal ice-albedo feedback (the fixed-albedo edge, lifted)
+---------------------------------------------------------------
+The spectral solve and the tight reductions above all rest on a **fixed** albedo (a *linear* radiation
+sink). The **marcher** carries the nonlinear one: pass :func:`ice_coalbedo` as ``march``'s ``coalbedo_fn``
+and the co-albedo jumps to the high ice value wherever a tile freezes (``T < Tf``), re-frozen at each
+half-step per tile — the *identical* step-function feedback Phase 1's Snowball rides
+(:func:`planet.albedo.planetary_albedo`), now on the seasonal cycle. Because the small-``C`` land tile
+plunges below freezing over a wide winter band while the sluggish ocean tile does not, the land grows a
+**wide seasonal ice zone** the ocean lacks: **continentality expressed as an ice asymmetry**, and a
+**migrating seasonal ice edge** — ice that forms in winter and melts in summer, impossible in any
+equilibrium EBM below this rung. The feedback is **marcher-only** (state-dependent ⟹ the spectral solve
+does not apply) and **opt-in** (``coalbedo_fn=None`` leaves the fixed-albedo path bit-identical). It
+inherits Phase 1's bistability — a warm vs. cold seed lands on a finite-ice vs. a snowball climate at the
+same sun. *Named-deferred:* the **small-ice-cap instability** (North & Coakley's critical cap size / ice-
+edge jump) — a stability sweep this feedback enables but that this build does not attempt.
+
 Named scope edges
 -----------------
-Fixed (ice-free) albedo — so the reduction is *exact* and the spectral solve *applies*; the seasonal
-ice-albedo feedback (and its small-ice-cap instability) is the marcher's future, not built here. **Same
-albedo on both tiles** — so continentality is unambiguously a **heat-capacity** effect (land/ocean
-albedo contrast is an available knob, deliberately off). **Uniform land fraction** ``f_L`` (constant
-``C_a``, exact energy conservation) — the latitude-varying land mask and the true ``T(φ,λ)`` map are
-rung 5B.2. Transport ``D`` is the **atmospheric** heat transport shared over both tiles (the ocean's own
-circulation is elsewhere on the staircase); a well-mixed-atmosphere closure, named.
+**Same ice-free albedo on both tiles** — so continentality (and the ice asymmetry) is unambiguously a
+**heat-capacity** effect (a land/ocean albedo contrast is an available knob, deliberately off). **Uniform
+land fraction** ``f_L`` (constant ``C_a``, exact energy conservation) — the latitude-varying land mask and
+the true ``T(φ,λ)`` map are rung 5B.2. Transport ``D`` is the **atmospheric** heat transport shared over
+both tiles (the ocean's own circulation is elsewhere on the staircase); a well-mixed-atmosphere closure,
+named.
 
 Units — SI, climlab-conventional (W m⁻², °C, x = sin φ ∈ [−1, 1]); ``C`` in J m⁻² K⁻¹, time in seconds,
 reported in days/months; amplitude = half the peak-to-peak range (K), phase lag in days.
@@ -107,7 +122,7 @@ from scipy.linalg import solve_banded
 from engines.diffusion import Diffusion1D, grid_from_edges, Neumann
 from .ebm import (
     A_OLR, B_OLR, D_TRANSPORT, S0_EARTH, RHO_WATER, CW_WATER,
-    ALBEDO_A0, ALBEDO_A2, legendre_P2,
+    ALBEDO_A0, ALBEDO_A2, ALBEDO_ICE, T_FREEZE, legendre_P2,
 )
 from .obliquity import daily_mean_insolation, OBLIQUITY_EARTH
 
@@ -168,6 +183,52 @@ def slab_amplitude_lag(C: float, F1: float, B: float = B_OLR,
     return amplitude, lag_days
 
 
+# --------------------------------------------------------------------------- #
+# Seasonal ice-albedo — the marcher's nonlinear feedback (the fixed-albedo scope edge lifted).
+# --------------------------------------------------------------------------- #
+def ice_coalbedo(x, T, T_freeze: float = T_FREEZE, a0: float = ALBEDO_A0,
+                 a2: float = ALBEDO_A2, ai: float = ALBEDO_ICE) -> np.ndarray:
+    """Co-albedo ``1 − α(x, T)`` with the rung-0 **step-function ice-albedo** — the marcher's feedback.
+
+    Reuses the *identical* nonlinearity Phase 1's Snowball rides (:func:`planet.albedo.planetary_albedo`,
+    the climlab ``StepFunctionAlbedo``): ice-free ``α = a₀ + a₂·P₂(x)`` where the surface is unfrozen,
+    the high ice value ``a_ice`` wherever ``T < Tf``. Passed to :meth:`SeasonalEBM.march` as its
+    ``coalbedo_fn`` it is evaluated **per tile, per radiation half-step** on that tile's current ``T`` —
+    so the small-``C`` land tile (which dives below freezing over a wide winter band) grows a wide
+    seasonal ice zone while the sluggish ocean tile stays largely open: **continentality expressed as
+    an ice asymmetry.** Because the co-albedo is a **pointwise function of the state**, the spectral
+    solve cannot carry it (it needs a linear/fixed-albedo forcing) — this is a **marcher-only** path,
+    exactly as the fixed-albedo scope edge foretold. It reduces to the ice-free :meth:`SeasonalEBM.coalbedo`
+    wherever the tile is unfrozen, so a never-freezing planet is bit-identical to the fixed-albedo march.
+    """
+    from .albedo import planetary_albedo          # local import: albedo imports ebm (avoid a cycle)
+    return 1.0 - planetary_albedo(x, T, T_freeze, a0, a2, ai)
+
+
+def ice_edge_latitude(x: np.ndarray, T_series: np.ndarray, T_freeze: float = T_FREEZE,
+                      kind: str = "seasonal") -> float:
+    """Equatorward boundary of ice (``|lat|`` in degrees) over one converged year — the seasonal ice edge.
+
+    ``kind="seasonal"`` reads the **year-minimum** field ``min_t T(x,t)`` — the ice zone that forms at
+    *some* point in the year (seasonal + perennial ice); ``kind="perennial"`` reads the **year-maximum**
+    field ``max_t T(x,t)`` — ice that survives even the warmest month (a year-round cap). The full-sphere
+    seasonal cycle is hemispherically antisymmetric (``T(x,t)=T(−x,t+½yr)``) so both extremal profiles are
+    symmetric in ``x``; the northern half is folded out and the crossing read by the pinned rung-0
+    :func:`planet.ebm.ice_line_latitude` (returns 90° for an ice-free hemisphere, 0° for a frozen one).
+    The diagnostic the land/ocean asymmetry is banked on.
+    """
+    from .ebm import ice_line_latitude
+    if kind == "seasonal":
+        profile = np.asarray(T_series, dtype=float).min(axis=1)
+    elif kind == "perennial":
+        profile = np.asarray(T_series, dtype=float).max(axis=1)
+    else:
+        raise ValueError(f"kind must be 'seasonal' or 'perennial', got {kind!r}")
+    x = np.asarray(x, dtype=float)
+    nh = x >= 0.0
+    return ice_line_latitude(x[nh], profile[nh], T_freeze)
+
+
 @dataclass(frozen=True)
 class SeasonalClimate:
     """A converged annual limit cycle: land + ocean seasonal fields on ``(x, day)`` plus diagnostics.
@@ -202,6 +263,18 @@ class SeasonalClimate:
         """Seasonal amplitude ``(max − min)/2`` (K) per latitude — half the peak-to-peak swing."""
         arr = {"land": self.T_land, "ocean": self.T_ocean, "mean": self.T_mean}[field]
         return 0.5 * (arr.max(axis=1) - arr.min(axis=1))
+
+    def ice_fraction(self, field: str = "land", T_freeze: float = T_FREEZE) -> np.ndarray:
+        """Fraction of the year each latitude spends frozen (``T < Tf``) — the seasonal-ice diagnostic.
+
+        ``0`` = never freezes (open all year), ``1`` = frozen year-round (perennial ice), in between =
+        **seasonal ice** that comes and goes. Read the small-``C`` ``"land"`` tile against the ``"ocean"``
+        tile at a midlatitude: the land freezes over a far wider band and for a larger share of the year —
+        continentality, now written in ice (only meaningful for an ice-albedo march; a fixed-albedo cycle
+        that dips below ``Tf`` is *diagnostically* frozen but carries no feedback).
+        """
+        arr = {"land": self.T_land, "ocean": self.T_ocean, "mean": self.T_mean}[field]
+        return (arr < float(T_freeze)).mean(axis=1)
 
 
 def _time_of_max(series: np.ndarray, days: np.ndarray) -> float:
@@ -370,23 +443,45 @@ class SeasonalEBM:
 
     # -- the time-marcher (the engine-reuse method) ------------------------ #
     def march(self, albedo: Optional[np.ndarray | float] = None,
-              absorbed: Optional[np.ndarray] = None, T_init: Optional[float] = None,
+              absorbed: Optional[np.ndarray] = None,
+              coalbedo_fn: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None,
+              T_init: Optional[float] = None,
               tol: float = 1e-6, max_years: int = 80) -> SeasonalClimate:
         """March the Strang-split model to a converged annual limit cycle; return the last year's fields.
 
         Each substep is half-radiation (per tile, analytic exact for the frozen-α linear sink) /
         full-transport (the engine, on ``T̄`` with ``C_a``, redistributed to the tiles as an energy flux) /
         half-radiation. Runs whole years, comparing each year's day-0 state to the previous year's; stops
-        when ``max|ΔT| < tol`` (K) — the limit cycle. Seeded from a uniform ``T_init`` (or 15 °C); the
-        limit cycle is unique for the linear system, so the seed only sets the spin-up length (ocean
-        ``τ = C_O/B`` is a few years — hence the tens-of-years cap).
+        when ``max|ΔT| < tol`` (K) — the limit cycle. Seeded from a uniform ``T_init`` (or each latitude's
+        ice-free annual-mean radiative equilibrium); the seed sets the spin-up length **and**, under the
+        ice feedback, **selects the branch** (a cold start can settle on a snowball, a warm one on a
+        finite-ice climate — the bistability the Snowball loop rides, here inside the seasonal cycle).
+
+        The ice-albedo feedback (``coalbedo_fn``)
+        ----------------------------------------
+        Pass ``coalbedo_fn(x, T) -> (1 − α)`` (e.g. :func:`ice_coalbedo`) to make the absorbed shortwave
+        **state-dependent**: the co-albedo is re-evaluated on **each tile's own current temperature** at
+        the start of every radiation half-step, so ``absorbed_i = S(x, t)·coalbedo_fn(x, T_i)`` — the
+        land and ocean tiles freeze *independently*. This is the **only nonlinear path** (the spectral
+        solve requires fixed albedo), and it is why the seasonal model — unlike every equilibrium EBM
+        below it — grows a **migrating seasonal ice edge**. With ``coalbedo_fn=None`` (default) the forcing
+        is the fixed ``absorbed``/``albedo`` field and the march is **unchanged** (the spectral-consistent,
+        reduction-exact path); ``coalbedo_fn`` is mutually exclusive with ``absorbed``/``albedo``.
         """
-        A = (self.absorbed_series(albedo) if absorbed is None else np.asarray(absorbed, float))
+        if coalbedo_fn is not None and (absorbed is not None or albedo is not None):
+            raise ValueError("coalbedo_fn (state-dependent ice albedo) is exclusive with a fixed "
+                             "albedo/absorbed field")
+        # A_fixed: the fixed (ice-free unless overridden) absorbed field. In the ice path it is the
+        # co-albedo-free seed source AND the never-freezes reduction target; in the transport loop the ice
+        # path instead recomputes the absorbed per tile from S_inc × coalbedo_fn(x, T_i) each half-step.
+        A_fixed = (self.absorbed_series(albedo) if absorbed is None else np.asarray(absorbed, float))
+        S_inc = self.insolation_series() if coalbedo_fn is not None else None
         if T_init is None:
-            # Seed each tile at its per-latitude annual-mean radiative equilibrium ⟨S(1−α)−A⟩/B: the
-            # correct annual mean (independent of the spectral solve), so only the seasonal anomaly — not
-            # the slow global-mean offset — has to spin up, cutting the ocean τ=C_O/B transient.
-            TL = (A.mean(axis=1) - self.A) / self.B
+            # Seed each tile at its per-latitude ice-free annual-mean radiative equilibrium ⟨S(1−α)−A⟩/B:
+            # the correct annual mean (independent of the spectral solve), so only the seasonal anomaly —
+            # not the slow global-mean offset — has to spin up, cutting the ocean τ=C_O/B transient. Using
+            # the *ice-free* A_fixed here keeps the never-freezes ice path bit-identical to the fixed path.
+            TL = (A_fixed.mean(axis=1) - self.A) / self.B
             TO = TL.copy()
         else:
             TL = np.full(self.x.shape, float(T_init))
@@ -394,9 +489,15 @@ class SeasonalEBM:
         decayL = math.exp(-0.5 * self.dt * self.B / self.C_land)
         decayO = math.exp(-0.5 * self.dt * self.B / self.C_ocean)
 
-        def rad_half(TL, TO, absorbed_t):
-            TeqL = (absorbed_t - self.A) / self.B
-            TeqO = TeqL
+        def rad_half(TL, TO, idx):
+            if coalbedo_fn is None:                               # fixed forcing (unchanged path)
+                aL = aO = A_fixed[:, idx]
+            else:                                                 # ice feedback: per-tile absorbed
+                S_t = S_inc[:, idx]
+                aL = S_t * coalbedo_fn(self.x, TL)
+                aO = S_t * coalbedo_fn(self.x, TO)
+            TeqL = (aL - self.A) / self.B
+            TeqO = (aO - self.A) / self.B
             return TeqL + (TL - TeqL) * decayL, TeqO + (TO - TeqO) * decayO
 
         converged, year = False, 0
@@ -408,15 +509,13 @@ class SeasonalEBM:
             for s in range(self.n_steps):
                 TL_year[:, s] = TL
                 TO_year[:, s] = TO
-                a_now = A[:, s]
-                a_next = A[:, (s + 1) % self.n_steps]
-                TL, TO = rad_half(TL, TO, a_now)                  # half radiation @ t
+                TL, TO = rad_half(TL, TO, s)                       # half radiation @ t
                 if self.solver is not None:                       # transport (skipped in the D=0 slab limit)
                     Tbar = self.f_land * TL + self.f_ocean * TO
                     dTbar = self.solver.step(Tbar, self.dt) - Tbar  # implicit transport on the mean
                     TL = TL + (self.C_a / self.C_land) * dTbar    # energy-flux redistribution
                     TO = TO + (self.C_a / self.C_ocean) * dTbar
-                TL, TO = rad_half(TL, TO, a_next)                 # half radiation @ t+dt
+                TL, TO = rad_half(TL, TO, (s + 1) % self.n_steps)  # half radiation @ t+dt
             if max(np.max(np.abs(TL - TL_ref)), np.max(np.abs(TO - TO_ref))) < tol:
                 converged = True
                 break

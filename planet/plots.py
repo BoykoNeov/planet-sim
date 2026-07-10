@@ -972,3 +972,85 @@ def seasonal_map_figure(result):
     fig.suptitle("Planet Rung 5B.2 — seasons meet continents: continentality becomes a map (NMS83)",
                  fontsize=13)
     return fig
+
+
+# --------------------------------------------------------------------------- #
+# Rung 5B.1+ — the seasonal ice-albedo feedback: a migrating ice edge, ice asymmetry, bistability.
+# --------------------------------------------------------------------------- #
+def seasonal_ice_figure(result):
+    """The seasonal ice-albedo payoff: a migrating ice edge, continentality in ice (:mod:`planet.seasonal`).
+
+    Four panels off the converged ice-albedo limit cycle. **The cycle** (top-left, a midlatitude band):
+    the land- and ocean-tile temperatures over the year with the freezing isotherm drawn — the land tile
+    dips below freezing for a wide slab of the year (shaded: seasonal land ice) while the ocean tile stays
+    open. **The migrating ice edge** (top-right): a latitude–month Hovmöller of the land tile with the
+    ``T_freeze`` contour — a white ice cap that grows in winter and retreats in summer, in both hemispheres
+    half a year apart. **The ice asymmetry** (bottom-left): fraction of the year frozen vs latitude, land
+    vs ocean — the land curve reaches far equatorward, the ocean barely freezes. **Bistability**
+    (bottom-right): the warm-start (finite-ice) and cold-start (snowball) annual-mean profiles — one sun,
+    two climates, the seed picks the branch (Phase 1's Snowball, inside the seasonal cycle). Requires the
+    ``viz`` extra.
+    """
+    m, c = result.model, result.warm
+    lat = c.latitude_deg()
+    months = c.days / (365.25 / 12.0)
+    i = result.band_index()
+    Tf = T_FREEZE
+
+    fig, axd = plt.subplot_mosaic(
+        [["cycle", "hov"], ["frac", "bistab"]], figsize=(13.5, 8.5), constrained_layout=True,
+    )
+
+    # -- the cycle at one midlatitude band, with the freezing line + seasonal ice ---- #
+    ax = axd["cycle"]
+    ax.plot(months, c.T_land[i], color=SEASON_LAND, lw=2.2, label="land tile")
+    ax.plot(months, c.T_ocean[i], color=SEASON_OCEAN, lw=2.2, label="ocean tile")
+    ax.axhline(Tf, color="#4a4a4a", lw=1.0, ls="--", alpha=0.8)
+    ax.fill_between(months, c.T_land[i], Tf, where=c.T_land[i] < Tf,
+                    color=ICE_COLOR, alpha=0.8, label="land frozen")
+    ax.annotate("freezing", (0.2, Tf), textcoords="offset points", xytext=(0, 3),
+                fontsize=7, color="#4a4a4a")
+    ax.set_ylabel("surface temperature (°C)")
+    ax.set_title(f"the cycle at {abs(lat[i]):.0f}°{'N' if lat[i] >= 0 else 'S'} — land freezes "
+                 f"{100 * c.ice_fraction('land')[i]:.0f}% of the year, ocean stays open", fontsize=9)
+    ax.legend(fontsize=8, loc="lower right")
+
+    # -- the migrating ice edge (Hovmöller, land tile, with the T_freeze contour) ---- #
+    ax = axd["hov"]
+    im = ax.pcolormesh(months, lat, c.T_land, cmap="RdBu_r", shading="auto",
+                       vmin=-np.max(np.abs(c.T_land)), vmax=np.max(np.abs(c.T_land)))
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="land-tile T (°C)")
+    ax.contour(months, lat, c.T_land, levels=[Tf], colors="w", linewidths=1.6)
+    ax.axhline(0.0, color="k", lw=0.6, alpha=0.5)
+    ax.set_title("the ice edge migrates — white cap grows in winter, retreats in summer", fontsize=9)
+    ax.set_ylabel("latitude (°)")
+
+    # -- the ice asymmetry: fraction of year frozen vs latitude ---------------------- #
+    ax = axd["frac"]
+    ax.plot(lat, 100 * c.ice_fraction("land"), color=SEASON_LAND, lw=2.2, label="land tile")
+    ax.plot(lat, 100 * c.ice_fraction("ocean"), color=SEASON_OCEAN, lw=2.2, label="ocean tile")
+    ax.fill_between(lat, 100 * c.ice_fraction("ocean"), 100 * c.ice_fraction("land"),
+                    color=ICE_COLOR, alpha=0.25)
+    ax.set_xlabel("latitude (°)"); ax.set_ylabel("% of year frozen")
+    ax.set_ylim(-3, 103)
+    ax.set_title("continentality as ice — land freezes far equatorward, ocean barely does", fontsize=9)
+    ax.legend(fontsize=8, loc="upper center")
+
+    # -- bistability: warm (finite-ice) vs cold (snowball) annual-mean profiles ------ #
+    ax = axd["bistab"]
+    ax.plot(lat, result.warm.annual_mean("mean"), color="#b5402e", lw=2.2,
+            label=f"warm start (⟨T⟩ {result.warm.annual_mean('mean').mean():.0f} °C)")
+    ax.plot(lat, result.snowball.annual_mean("mean"), color="#3a6ea5", lw=2.2,
+            label=f"cold start (⟨T⟩ {result.snowball.annual_mean('mean').mean():.0f} °C)")
+    ax.axhline(Tf, color="#4a4a4a", lw=1.0, ls="--", alpha=0.8)
+    ax.set_xlabel("latitude (°)"); ax.set_ylabel("annual-mean T (°C)")
+    ax.set_title("bistability — one sun, two climates (the seed picks the branch)", fontsize=9)
+    ax.legend(fontsize=8, loc="center")
+
+    for key in ("cycle", "hov"):
+        axd[key].set_xlabel("month of year"); axd[key].set_xlim(0, 12)
+        axd[key].set_xticks(range(0, 13, 2))
+
+    fig.suptitle("Planet Rung 5B.1+ — seasonal ice-albedo: a migrating ice edge, continentality in ice",
+                 fontsize=13)
+    return fig
