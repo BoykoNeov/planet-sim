@@ -273,8 +273,11 @@ class SeasonalEBM:
         self.dt = SECONDS_PER_YEAR / self.n_steps
         self.day_seconds = np.arange(self.n_steps) * self.dt
         self.days = self.day_seconds / 86400.0
-        self._sin_delta = math.sin(math.radians(self.obliquity_deg)) * np.sin(
-            2.0 * math.pi * self.day_seconds / SECONDS_PER_YEAR)
+        # Phase the year so day 0 ≈ 1 January (NH winter solstice): δ(0) = −ε, rising to +ε at mid-year,
+        # so the figure's "month of year" axis reads as a familiar Jan-start calendar (NH summer near
+        # month 6–7). A uniform time-shift — it changes no amplitude, lag, or anchor, only the labels.
+        self._sin_delta = math.sin(math.radians(self.obliquity_deg)) * (
+            -np.cos(2.0 * math.pi * self.day_seconds / SECONDS_PER_YEAR))
 
     # -- forcing ----------------------------------------------------------- #
     def coalbedo(self, albedo: Optional[np.ndarray | float] = None) -> np.ndarray:
