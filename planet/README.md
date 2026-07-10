@@ -408,6 +408,30 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   in the cited ~0.3–0.5 band (Roe 2005; Smith & Evans 2007). **Payoff:** the Cascades lee drops
   ~90 → ~55 cm/yr, ~⅓ of the patch turns
   lee-desert, reclassified 41 % → 56 %. `tests/test_orographic_depletion.py`.
+- **Rung 5B.1 (seasonal cycle & continentality — heat capacity woken) — BUILT** (2026-07-10).
+  `planet/seasonal.py`: every EBM before this solved for an **equilibrium**, where the heat capacity `C`
+  *cancels* — so a land column and an ocean column at the same latitude reached the **identical**
+  temperature and continentality was exactly zero. This is the sibling model that turns on the **seasons**:
+  the same diffusive transport + linear radiation, but marched under axial-tilt insolation `S(x,t)` to a
+  converged **annual limit cycle** on the full sphere `x ∈ [−1, 1]` (the seasonal cycle is hemispherically
+  *anti*-symmetric — NH summer is SH winter — so the hemisphere grid can't carry it). Now `C` is
+  load-bearing: **two heat-capacity tiles per latitude** — a small-`C` land tile (`≈` the atmospheric
+  column `c_p p_s/g` + a ~2 m soil layer), a large-`C` ocean tile (`+` a ~50 m mixed layer, ~12× more) —
+  and the land tile swings hard and prompt while the ocean barely moves and lags ~2 months:
+  **continentality, from the `C` contrast alone.** The seasonal forcing **reuses the pinned
+  daily-insolation kernel** (`obliquity.daily_mean_insolation`, factored out for the purpose). Two
+  solvers: a **time-marcher** (the engine-reuse method — Strang-split to a limit cycle, the path that
+  later carries ice-albedo) and an exact **frequency-domain** solve (the tight reference — one complex
+  banded solve per temporal harmonic, whose `n=0` harmonic *is* the annual-mean EBM). **Tight:** the 0-D
+  slab `amplitude = F₁/√(B²+ω²C²)`, `lag = arctan(ωC/B)` (both solvers, transport off); the reduction
+  (spectral `n=0` == annual-mean `SphereEBM` to 1e-11, and `⟨T_L⟩ = ⟨T_O⟩` — **continentality lives
+  entirely in the seasonal amplitude, zero in the mean**); marcher → spectral at **first order in `dt`**
+  (the anti-damping cross-check); hemispheric antisymmetry `T(x,t) = T(−x, t+½yr)`; annual+global energy
+  balance. **Loose (calibrated):** land amplitude ~30 K, ocean ~3 K, ocean lag ~2.7 months — the observed
+  ballpark, direction banked (North & Coakley 1979; North, Mengel & Short 1983; Hartmann). **Named scope:**
+  same albedo on both tiles (continentality is *pure* heat capacity), fixed albedo (exact reduction; ice
+  is the marcher's future), uniform land fraction (exact energy conservation). The true `T(φ,λ,t)`
+  land–sea *map* is rung 5B.2. `tests/test_seasonal.py`.
 
 ## Test runner (tiered gate, ADR 0003)
 

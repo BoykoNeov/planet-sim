@@ -2783,6 +2783,52 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
     rain forest, lee woodland/shrubland). **Honest scope (named):** per-streamline (valid only for the
     zonal wind); the S&B bonus is not itself depleted; no on-patch refill (the L→∞ cost — the desert does
     not relax back within the window, a real one does over ~L). See [[planet-rung5a-orographic]].
+  - **Rung 5B — the seasonal 2-D EBM (seasons × continents), a spike-first sub-ladder.** The other
+    half of the geography seam: the **"needs seasonality"** row above (ocean heat capacity → thermal lag
+    + continentality). *"2-D EBM"* is a term of art for **two spatial dimensions** (lat × lon; North,
+    Mengel & Short 1983, *"…resolving the seasons and the continents"*), so the target is the full
+    `T(φ, λ, t)` land–sea map. But the shared prerequisite to any of it is the **seasonal time-march with
+    `C` load-bearing**: at annual-mean equilibrium `C` cancels, so a land and an ocean column at the same
+    latitude reach the *identical* temperature — continentality is **exactly zero** without a seasonal
+    cycle. So it is climbed staged (the user's call, the 5A pattern): validate the seasonal core zonally,
+    then add the longitude axis.
+    - **Rung 5B.1 — seasonal zonal EBM · BUILT 2026-07-10** (`planet/seasonal.py`,
+      `test_seasonal.py`, `demo_seasonal.py`, `plots.seasonal_figure`). North & Coakley (1979): a
+      **sibling** full-sphere EBM (`x ∈ [−1, 1]` — the seasonal cycle is hemispherically *anti*-symmetric,
+      so the rung-0 hemisphere-symmetry grid cannot carry it), the same diffusive transport + linear
+      radiation **marched under axial-tilt insolation `S(x, t)`** (reusing the pinned
+      `obliquity.daily_mean_insolation` kernel, factored out) to a converged **annual limit cycle** — not
+      a dead equilibrium, so `C` is finally **load-bearing**. Continentality is delivered by **two
+      heat-capacity tiles per latitude** (land ≈ the atmospheric column `c_p p_s/g` + a ~2 m soil layer;
+      ocean `+` a ~50 m mixed layer, ~12× more), sharing the meridional transport on the zonal mean
+      through an **effective transport heat capacity** `C_a = (f_L/C_L + f_O/C_O)⁻¹` that makes the
+      per-tile energy-flux redistribution **exactly reproduce** the engine's `T̄` step and conserve
+      column energy. **Two solvers:** the **time-marcher** (the engine-reuse method — Strang-split to a
+      limit cycle, the path ice-albedo later rides) and an exact **frequency-domain** solve (the tight
+      reference — one complex banded solve per temporal harmonic; the **`n=0` harmonic *is* the
+      annual-mean EBM**, so the reduction-to-parent falls out as the DC component). **Tight anchors:** the
+      0-D slab `amplitude = F₁/√(B²+ω²C²)`, `lag = arctan(ωC/B)` (both solvers, transport off — the
+      *mechanism*); the reduction (spectral `n=0` == annual-mean `SphereEBM.steady_linear` to 1e-11
+      **against the true `⟨S⟩`, not the P₂-truncated `insolation()`** — advisor-caught, else it fails at
+      ~1e-2; **and `⟨T_L⟩ = ⟨T_O⟩`** — continentality lives *entirely* in the amplitude, zero in the
+      mean); **marcher → spectral at first order in `dt`** (the anti-damping cross-check — every other
+      tight anchor is blind to time-accuracy in the backward-Euler transport substep, so a quiet
+      amplitude-damping bug would ship un-caught without this — advisor-caught); hemispheric antisymmetry
+      `T(x, t) = T(−x, t+½yr)`; annual+global energy balance. **Payoff:** at 45° the land tile swings
+      ~30 K (range ~59 K) nearly in step with the sun; the ocean tile ~3 K, lagging ~2.7 months — a ~10×
+      continentality contrast, emergent from `C` alone. **Loose (calibrated):** the amplitudes/lag magnitudes
+      ride the calibrated heat capacities (direction banked; land amplitude runs high-end because the model
+      damps only through `B` — no evaporative damping — so amplitude and lag are tied through the single
+      `C`). **Named scope:** same albedo both tiles (continentality is *pure* heat capacity), fixed albedo
+      (exact reduction; seasonal ice-albedo + its small-ice-cap instability are the marcher's future),
+      uniform land fraction (constant `C_a`, exact conservation). Sources ([[seasonal-ebm-source]]). See
+      [[planet-rung5b-seasonal]].
+    - **Rung 5B.2 — the true 2-D `T(φ, λ, t)` land–sea map · NAMED, not built.** Add the longitude
+      axis: 2-D transport (an ADI/operator-split *reuses* the 1-D tridiagonal solver along each sweep —
+      a bounded engine step, not a rewrite; the wrinkle is meridian convergence at the poles), a real
+      land mask, continental interiors showing the large seasonal range as a *map* (the NMS83 model).
+      The 5B.1 zonal two-tile reduction becomes the resolved 2-D diffusion of a single field with a
+      spatially-varying `C(φ, λ)`. → [[planet-rung5b-seasonal]].
 
 ### 12.6 Spin-outs — separate repos, not upgrades of this one
 

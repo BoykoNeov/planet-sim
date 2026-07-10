@@ -46,6 +46,10 @@ DEMOS: tuple[Demo, ...] = (
     Demo("obliquity", "planet.demo_obliquity", "Axial tilt (obliquity)",
          "how the planet's tilt reshapes the pole-to-equator sunlight",
          ("viz",), "docs/figures/planet-obliquity.png", "Climate — energy balance"),
+    Demo("seasonal", "planet.demo_seasonal", "Seasonal cycle & continentality",
+         "turn on the seasons and heat capacity wakes: a land tile swings far more than the ocean tile at "
+         "the same latitude — continentality from the C contrast alone",
+         ("viz",), "docs/figures/planet-seasonal.png", "Climate — energy balance"),
     Demo("shallowwater", "planet.demo_shallowwater", "Rotating shallow-water atmosphere",
          "geostrophic adjustment on the sphere — the circulation engine on its own",
          ("viz",), "docs/figures/planet-shallowwater.png",

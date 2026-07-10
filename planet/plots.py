@@ -823,3 +823,72 @@ def eddy_life_animation(eddy, *, interval: int = 120):
         return mesh, q, tlabel, cursor, pt_thru, pt_net
 
     return FuncAnimation(fig, update, frames=fr.times.size, interval=interval, blit=False)
+
+
+# --------------------------------------------------------------------------- #
+# Rung 5B.1 — the seasonal cycle & continentality.
+# --------------------------------------------------------------------------- #
+SEASON_LAND = "#c0622d"          # the small-C land tile — big, prompt seasonal swing
+SEASON_OCEAN = "#2f6fb0"         # the large-C ocean tile — small, lagged swing
+SEASON_SUN = "#e0b000"           # the insolation forcing
+
+
+def seasonal_figure(result):
+    """The Rung-5B.1 payoff: heat capacity woken, continentality cast (:mod:`planet.seasonal`).
+
+    Three panels off the converged annual limit cycle. **The cycle** (a midlatitude band, default 45°N):
+    the land tile's temperature swings hard and nearly in step with the sun, while the ocean tile at the
+    *same latitude* barely moves and lags ~2 months — continentality, from the ``C`` contrast alone (the
+    sun is drawn on a twin axis). **The march** — a latitude–month Hovmöller of the land-tile temperature,
+    the seasons sweeping pole to pole, the two hemispheres half a year out of phase (the antisymmetry).
+    **The law** — seasonal amplitude vs latitude for both tiles: the land curve towers over the ocean
+    curve everywhere, growing toward the poles. Requires the ``viz`` extra.
+    """
+    m, clim = result.model, result.climate
+    lat = clim.latitude_deg()
+    months = clim.days / (365.25 / 12.0)
+    i = m.nearest_index(result.band_lat_deg)
+
+    fig, axd = plt.subplot_mosaic(
+        [["cycle", "hov"], ["amp", "hov"]], figsize=(13, 8.5), constrained_layout=True,
+    )
+
+    # -- the cycle at one midlatitude band ------------------------------------ #
+    ax = axd["cycle"]
+    ax.plot(months, clim.T_land[i], color=SEASON_LAND, lw=2.2, label="land tile")
+    ax.plot(months, clim.T_ocean[i], color=SEASON_OCEAN, lw=2.2, label="ocean tile")
+    ax.set_ylabel("surface temperature (°C)")
+    ax.set_title(f"the seasonal cycle at {abs(lat[i]):.0f}°{'N' if lat[i] >= 0 else 'S'} — "
+                 f"land swings {clim.amplitude('land')[i]:.0f} K, ocean {clim.amplitude('ocean')[i]:.1f} K",
+                 fontsize=9)
+    axs = ax.twinx()
+    axs.plot(months, m.insolation_series()[i], color=SEASON_SUN, lw=1.4, ls=":", label="insolation")
+    axs.set_ylabel("insolation (W/m²)", color="#9a7b00")
+    ax.legend(fontsize=8, loc="upper left"); axs.legend(fontsize=8, loc="upper right")
+
+    # -- the pole-to-pole seasonal march (Hovmöller, land tile) --------------- #
+    ax = axd["hov"]
+    im = ax.pcolormesh(months, lat, clim.T_land, cmap="RdBu_r", shading="auto",
+                       vmin=-np.max(np.abs(clim.T_land)), vmax=np.max(np.abs(clim.T_land)))
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="land-tile T (°C)")
+    ax.axhline(0.0, color="k", lw=0.6, alpha=0.5)
+    ax.set_title("the seasons sweep pole to pole (hemispheres ½ year out of phase)", fontsize=9)
+    ax.set_ylabel("latitude (°)")
+
+    # -- the amplitude law vs latitude ---------------------------------------- #
+    ax = axd["amp"]
+    ax.plot(lat, clim.amplitude("land"), color=SEASON_LAND, lw=2.2, label="land tile")
+    ax.plot(lat, clim.amplitude("ocean"), color=SEASON_OCEAN, lw=2.2, label="ocean tile")
+    ax.fill_between(lat, clim.amplitude("ocean"), clim.amplitude("land"),
+                    color=SEASON_LAND, alpha=0.10)
+    ax.set_xlabel("latitude (°)"); ax.set_ylabel("seasonal amplitude (K)")
+    ax.set_title("continentality — the land tile towers over the ocean at every latitude", fontsize=9)
+    ax.legend(fontsize=8, loc="upper center")
+
+    for key in ("cycle", "hov"):
+        axd[key].set_xlabel("month of year"); axd[key].set_xlim(0, 12)
+        axd[key].set_xticks(range(0, 13, 2))
+
+    fig.suptitle("Planet Rung 5B.1 — the seasonal cycle wakes heat capacity, casting continentality",
+                 fontsize=13)
+    return fig

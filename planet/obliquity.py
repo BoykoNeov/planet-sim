@@ -105,27 +105,45 @@ _N_LAMBDA = 720                # year samples (0.5° of solar longitude) — the
 _N_PHI = 721                   # latitude samples (0.25°, equator→pole) — the P₂ projection integral
 
 
+def daily_mean_insolation(phi: np.ndarray, sin_delta: np.ndarray) -> np.ndarray:
+    """Daily-mean insolation kernel ``H₀·sinφ·sinδ + cosφ·cosδ·sinH₀`` (relative units; ``S₀/π`` dropped).
+
+    The one pinned formula ([[obliquity-insolation-source]]) — the day-averaged top-of-atmosphere flux at
+    latitude ``phi`` (radians) for a Sun of declination ``δ = arcsin(sin_delta)`` (radians). The sunset
+    hour angle ``H₀ = arccos(clip(−tanφ·tanδ, −1, 1))`` reduces to ``π`` in **polar day** (sun never sets)
+    and ``0`` in **polar night** through the ``clip``, so the formula needs no branching. Broadcasts a
+    latitude vector (rows) against a declination vector (cols) → an ``[n_phi, n_delta]`` array (a scalar
+    ``sin_delta`` yields a plain per-latitude vector). The leading ``S₀/π`` is dropped (every caller here
+    takes a ratio, so it cancels); multiply by ``S₀/π`` for an absolute W m⁻² flux whose global-annual mean
+    is ``S₀/4`` (the disk/sphere factor). Shared by :func:`annual_mean_insolation` (which averages it over a
+    year) and the **seasonal** EBM (:mod:`planet.seasonal`, which keeps the time axis) — one pinned kernel,
+    two consumers.
+    """
+    phi = np.asarray(phi, dtype=float)
+    sin_delta = np.asarray(sin_delta, dtype=float)
+    delta = np.arcsin(np.clip(sin_delta, -1.0, 1.0))
+    # tan(π/2) is large-but-finite in float and the arccos-argument clip turns it into the correct
+    # polar-day/-night limit; the einsum-free broadcast keeps latitude on rows, declination on cols.
+    with np.errstate(invalid="ignore"):
+        arg = -np.tan(phi)[:, None] * np.tan(delta).reshape(-1)[None, :]
+    H0 = np.arccos(np.clip(arg, -1.0, 1.0))
+    daily = (H0 * np.sin(phi)[:, None] * np.sin(delta).reshape(-1)[None, :]
+             + np.cos(phi)[:, None] * np.cos(delta).reshape(-1)[None, :] * np.sin(H0))
+    return daily if daily.shape[1] > 1 else daily[:, 0]
+
+
 def annual_mean_insolation(phi: np.ndarray, obliquity_deg: float, n_lambda: int = _N_LAMBDA) -> np.ndarray:
     """Annual-mean insolation ``Q̄(φ; ε)`` (relative units) at latitudes ``phi`` (radians) for tilt ``ε``.
 
-    Averages the daily-mean insolation ``H₀·sinφ·sinδ + cosφ·cosδ·sinH₀`` (the pinned formula, leading
-    ``S₀/π`` dropped) over a circular-orbit year — ``sin δ = sin ε·sin λ`` with ``λ`` uniform on
-    ``[0, 2π)``. The sunset hour angle ``H₀ = arccos(clip(−tanφ·tanδ, −1, 1))`` reduces to ``π`` in
-    polar day and ``0`` in polar night through the clip, so the formula needs no branching. Returns one
-    value per latitude (the year-average), the field :func:`insolation_p2_coefficient` projects onto P₂.
+    Averages the :func:`daily_mean_insolation` kernel over a circular-orbit year — ``sin δ = sin ε·sin λ``
+    with ``λ`` uniform on ``[0, 2π)``. Returns one value per latitude (the year-average), the field
+    :func:`insolation_p2_coefficient` projects onto P₂.
     """
     eps = np.radians(float(obliquity_deg))
     phi = np.asarray(phi, dtype=float)
     lam = np.linspace(0.0, 2.0 * np.pi, n_lambda, endpoint=False)
     sin_delta = np.sin(eps) * np.sin(lam)
-    delta = np.arcsin(np.clip(sin_delta, -1.0, 1.0))
-    # Broadcast latitude (rows) × solar longitude (cols); tan(π/2) is large-but-finite in float and
-    # the arccos-argument clip turns it into the correct polar-day/-night limit.
-    with np.errstate(invalid="ignore"):
-        arg = -np.tan(phi)[:, None] * np.tan(delta)[None, :]
-    H0 = np.arccos(np.clip(arg, -1.0, 1.0))
-    daily = (H0 * np.sin(phi)[:, None] * sin_delta[None, :]
-             + np.cos(phi)[:, None] * np.cos(delta)[None, :] * np.sin(H0))
+    daily = daily_mean_insolation(phi, sin_delta)         # [n_phi, n_lambda]
     return daily.mean(axis=1)
 
 
