@@ -37,6 +37,10 @@ DEMOS: tuple[Demo, ...] = (
     Demo("snowball", "planet.demo_snowball", "Snowball-Earth hysteresis",
          "one knob (the solar constant), two stable climates, a catastrophic freeze",
          ("viz",), "docs/figures/planet-snowball.png", "Climate — energy balance"),
+    Demo("bifurcation", "planet.demo_bifurcation", "The complete equilibrium diagram",
+         "every climate the sun allows, stable and unstable — and the second cliff: a polar cap smaller "
+         "than a critical size cannot exist (the small-ice-cap instability)",
+         ("viz",), "docs/figures/planet-bifurcation.png", "Climate — energy balance"),
     Demo("biomes", "planet.demo_biomes", "Climate → biome map",
          "the Whittaker (temperature, rainfall) classifier; warming migrates the bands poleward",
          ("viz",), "docs/figures/planet-biomes.png", "Climate — energy balance"),
@@ -50,6 +54,11 @@ DEMOS: tuple[Demo, ...] = (
          "turn on the seasons and heat capacity wakes: a land tile swings far more than the ocean tile at "
          "the same latitude — continentality from the C contrast alone",
          ("viz",), "docs/figures/planet-seasonal.png", "Climate — energy balance"),
+    Demo("seasonal_ice_map", "planet.demo_seasonal_ice_map", "Seasonal ice map — animated",
+         "the seasons, the continents and the snow: winter snow spreads over the land, sea ice lingers at the "
+         "poles, and the continents end colder in the annual mean (a month-by-month GIF)",
+         ("viz", "webviz"), "docs/figures/planet-seasonal-ice-map.gif", "Climate — energy balance",
+         interactive="docs/figures/planet-seasonal-ice-globe.html"),
     Demo("shallowwater", "planet.demo_shallowwater", "Rotating shallow-water atmosphere",
          "geostrophic adjustment on the sphere — the circulation engine on its own",
          ("viz",), "docs/figures/planet-shallowwater.png",

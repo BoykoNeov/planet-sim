@@ -1,6 +1,6 @@
 ---
 name: planet-rung5b-seasonal
-description: Rung 5B BUILT 2026-07-10 — 5B.1 seasonal zonal EBM (continentality from land/ocean C) + 5B.1+ seasonal ice-albedo (migrating ice edge, ice asymmetry, bistability; SICI deferred) + 5B.2 the full 2-D lat×lon map (NMS83); rung 5B COMPLETE
+description: Rung 5B BUILT 2026-07-10 — 5B.1 seasonal zonal EBM (continentality from land/ocean C) + 5B.1+ seasonal ice-albedo (migrating ice edge, ice asymmetry, bistability; SICI → resolved on rung 0, see planet-bifurcation-sici) + 5B.2 the full 2-D lat×lon map (NMS83) + 5B.3 seasonal ice ON the map + albedo maps (2026-09-02: the snow map, the annual mean SEES the mask by rectification); rung 5B COMPLETE
 metadata:
   type: project
 ---
@@ -111,3 +111,43 @@ banked. **Named scope (from 5B.1):** fixed ice-free albedo same on land/sea (con
 prescribed geography. **Deferred:** a 2-D frequency-domain solver (would make the annual-mean reduction
 machine-tight like 5B.1's spectral; the marcher's structural anchors already pin every piece). **Rung 5B
 COMPLETE.**
+
+**Rung 5B.3 — seasonal ice ON the map + albedo maps · BUILT 2026-09-02** (`seasonal_map.py`:
+`march(coalbedo_fn=…)`, `albedo=` now accepts a `[n_x, n_lon]` **map**, `T_init` a field; `ice_free_albedo_map`
+(the cheap-tier land/sea contrast knob, §12.5 "land/ocean → an albedo difference", default offsets 0),
+`masked_ice_coalbedo` (the step feedback on top of a map), `SeasonalMapClimate.ice_fraction/frozen/zonal_anomaly`;
+`test_seasonal_ice_map.py` (8 fast + 4 slow); `demo_seasonal_ice_map.py` → `planet-seasonal-ice-map.png` + a
+**month-by-month GIF** `planet-seasonal-ice-map.gif` (`plots.seasonal_ice_map_figure/_animation`) + a **month-slider
+Plotly globe** `seasonal_globe.py` → `planet-seasonal-ice-globe.html` (one `go.Surface`, 12 `surfacecolor` frames,
+frozen cells pinned to an ice-white top colour stop; reuses `planetmap._sphere_xyz/_polecapped`; `showspikes=False`);
+catalogue `seasonal_ice_map` (+`interactive=`); notebook §8.8). The 5B.1+ tile feedback broadcast over longitude — `sea.ice_coalbedo` works
+as-is on `x[:,None]`; the marcher's `forcing_at(s, T)` picks one of three forcings (fixed 1-D = the 5B.2
+arithmetic verbatim / fixed map / live `coalbedo_fn`).
+
+- **PAYOFF 1 — the seasonal-ice MAP** (45×90×360, 51 yr, 37 s): winter snow over the continental interiors
+  (at 53°N the interior frozen 34 % of the year, the ocean at the same latitude 0 %; NH seasonal-ice reach
+  land 45° vs ocean 58°), **land ice purely seasonal (0 % of land cells perennial), polar sea ice lingers
+  (5 % of ocean cells perennial)**. The 2-D interior freezes LESS than the 5B.1 zonal tile (34 % vs 60 % at
+  midlatitude) — the zonal sweep moderates it; 45° was too marginal (19 %), the story reads at 55°.
+- **PAYOFF 2 — the annual mean now SEES the mask (5B.2's theorem broken by design).** Zonal anomaly of
+  the annual mean: interior **−0.6 K**, open ocean **+0.2 K** (0.9 K east–west spread; **exactly 0** for
+  the fixed-albedo march — re-verified in the same test). Mechanism = **rectification**: winter snow
+  reflects sun the ocean keeps absorbing → a nonlinear (albedo-step) effect no linear model can show
+  whatever its `C`. Also the linear route to a visible mask: a fixed albedo **map** (brighter land).
+- **Anchors (tight):** warm-limit reduction **bit-identical** (`array_equal`) to the fixed 5B.2 march; a
+  zonally-uniform albedo map ≡ per-latitude albedo bit-for-bit; `masked_ice_coalbedo(offset-free map)` ≡
+  `sea.ice_coalbedo` bit-for-bit; all-land/all-ocean under ice → the 5B.1+ tile marcher (<1e-6, WITH ice
+  present); zonal invariance under ice (1e-11); **fixed albedo map is linear** → `D=0` per-cell annual mean
+  = its own radiative equilibrium (2e-6), and with transport the ZONAL MEAN of the annual-mean map = the
+  1-D parent driven by the ZONAL-MEAN co-albedo (<0.3 K); hemispheric antisymmetry under ice; global-annual
+  net TOA with the realized co-albedo ≈ 0. **Loose:** the ice fractions / the −0.6 K ride the calibrated
+  `C`, `T_f`, `a_ice`; direction banked. **Named:** the land/sea ice-free albedo *offset* is a knob
+  (default 0 — planetary contrast is muted by clouds vs the surface 0.06–0.10 ocean / 0.15–0.35 land,
+  Hartmann GPC Table 4.2; pick ~0.05, not the surface value); no snow-depth / melt physics (the step
+  albedo); idealized blocky mask. **SICI** for this rung: resolved on rung 0 ([[planet-bifurcation-sici]]);
+  the *seasonal* SICI sweep (Huang & Bowman 1992) stays named.
+- **Globe render traps (5B.3):** a cell-centred longitude grid leaves a **gash at the 0/360° seam** on a
+  `go.Surface` — append a wrap column (`_wrap_lon`, the lon-analogue of `planetmap._polecapped`); the banked HTML
+  loads Plotly from the **CDN**, so a sandboxed/offline browser screenshot renders blank — inline
+  `plotly.offline.get_plotlyjs()` into a scratch copy to verify (Playwright + `/opt/pw-browsers/chromium-1194/…/chrome`,
+  drive frames via `Plotly.animate(gd, ['Jul'], …)`). Verified Jan (snow over Eurasia, blue Arctic) / Jul (bare) 2026-09-02.

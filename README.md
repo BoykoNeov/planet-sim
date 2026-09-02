@@ -7,7 +7,10 @@ simulator for planetary climate: a latitudinal energy-balance model (EBM) with t
 bifurcation, a Whittaker biome classifier, rotating shallow-water atmospheric circulation, a
 one-way EBM→circulation coupler that grows an emergent jet, exoplanet knobs (stellar spectrum,
 planet size, obliquity), and an interactive Plotly globe — each leg validated against cited
-climate references.
+climate references. Beyond that rung-0 core a **research staircase** climbs toward a GCM one validated
+rung at a time: a moist water cycle, an energetic ITCZ, baroclinic eddy turbulence, a spectral greenhouse,
+orographic rain shadows, a seasonal land–sea map with winter snow, and the **complete equilibrium
+diagram** of the ice-albedo climate — every branch, both folds, the small-ice-cap instability.
 
 It is the program's capstone: the **only simulator built on two** separately-validated solver
 engines — the 1-D diffusion/heat solver (`engines/diffusion`, the meridional heat transport) and
@@ -23,9 +26,10 @@ engines/fluid/       # the rotating shallow-water solver (C-grid / SSP-RK3) (+ i
 planet/              # the simulator: ebm, albedo, climate_reference, biomes, precip,
                      #   circulation, coupler, exoplanet, obliquity, planetmap + planet_spec,
                      #   plots, demos, planet.ipynb
+ARCHITECTURE.md      # the repo map: layers, the one-way dependency rule, how a rung is added
 docs/decisions/      # ADRs 0001–0005 (incl. 0004 interactive maps, 0005 engines are living contracts)
 docs/plans/          # planet-earth-system.md — the full build plan
-docs/figures/        # banked figures (planet-*.png) + two interactive globes
+docs/figures/        # banked figures (planet-*.png / .gif) + the interactive globes
                      #   (planet-map.html, planet-coupler-map.html)
 ```
 
@@ -42,6 +46,8 @@ straight to one?
 
 ```powershell
 python -m planet snowball     # run one demo (prints its validation table + banks a figure)
+python -m planet bifurcation  # every climate the sun allows — the S-curve, both folds, the second cliff
+python -m planet seasonal_ice_map   # the seasons, the continents and the snow — a monthly GIF + a month-slider globe
 python -m planet list         # print the full catalogue of demos
 python -m planet interactive  # drag four knobs in your browser — a live what-if + plain-language "why"
 python -m planet notebook     # open the teaching notebook in JupyterLab (opens your browser for you)
@@ -76,11 +82,11 @@ extra to install rather than erroring. The notebook also hosts the live-slider g
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow"     # routine fast lane — 269 tests
-./run_tests.ps1                   # full suite — 299 tests (adds slow live-solver + notebook)
+./run_tests.ps1 -m "not slow"     # routine fast lane — 661 tests
+./run_tests.ps1                   # full suite — 729 tests (adds slow live-solver + notebook)
 ```
 
-The suite is **299 tests**, all green. The one **live-climlab** cross-check needs the
+The suite is **729 tests** (661 in the fast lane), all green. The one **live-climlab** cross-check needs the
 `[climate]` extra and otherwise skips — it is an opt-in bonus on top of the EBM's analytic +
 frozen-table validation, so it skips in CI by design. The Plotly map render smoke-tests need
 `[webviz]`; the planet-spec round-trip-identity test (the deep end's one real correctness

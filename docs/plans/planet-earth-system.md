@@ -2290,6 +2290,78 @@ mean-annual Legendre context, Nadeau & McGehee 2017 / North 1975). **Rung 4 pins
 Trenberth–Fasullo–Kiehl 2009; Soden & Held 2006; Myhre+ 1998); a line-by-line *spectral*-radiation source
 is still future (the named band upgrade).
 
+**Rung 0+ — the complete equilibrium diagram + the small-ice-cap instability BUILT** (2026-09-02,
+`planet/bifurcation.py`, 16 fast + 1 slow tests in `test_bifurcation.py`; `demo_bifurcation.py` +
+`test_demo_bifurcation.py` → `docs/figures/planet-bifurcation.png`; catalogue `bifurcation`; notebook §8.8).
+Closes the SICI line rung 5B.1+ named-deferred — on rung 0, where North found it. **The method is the
+INVERSE problem, and it is exact (dt-free):** prescribe the ice line ``x_s`` → the step albedo is a known
+field → the EBM is *linear* → one tridiagonal solve on the engine-pinned operator gives ``u(x)`` per unit
+``S₀`` → ``S₀(x_s) = (T_f + A/B)/u(x_s)``. Swept over every grid face it traces **every equilibrium with an
+ice line, stable and unstable** (North 1975's S-curve, off the same discrete operator the marcher uses);
+the ice-free / Snowball branches cap the ends. **Stability = the slope** (Cahalan & North 1979:
+stable ⟺ ``dS₀/dx_s > 0``), read off the curve and **checked by marching** (a ±1 K nudge returns on a
+stable segment, departs to another branch on an unstable one — the SICI jump run forwards and backwards).
+**Anchors (tight):** the FV curve → North's **even-Legendre-mode** solution (exact piecewise Gauss–Legendre
+projection of the albedo step; North's closed form is the ``n_modes=2`` truncation, ~1 % off) at **2nd
+order** in Δx in both face modes; the Phase-1 sweep **jumps within one sweep step of the exact folds**
+(freeze 1252 vs 1259; melt 1831 vs 1835); net TOA exact on every point. **Two marcher traps pinned:**
+*critical slowing* near a fold defeats the per-step ``tol`` (use ≤1e-11 + many iterations, or the curve),
+and the marcher's ice edge is **cell-quantized** (a whole cell flips albedo) vs the curve's face-interpolated
+edge — a ≤ one-cell gap that **halves per grid doubling** (Δx, not Δt). **FINDINGS (loose on the cited
+constants; the structure is the bank):** **two folds** at Earth parameters — the Snowball fold at 33.0°,
+S₀ = 1259 (−7.8 %) and the **small-ice-cap fold at 79.1° (θ_c = 10.9°, 720-cell grid), S₀ = 1367.3
+(+0.16 %)**; the **finite-cap window 1259…1367 W/m²** is the only band of suns holding a polar cap and
+**present day sits 2 W/m² below its top**; **five equilibria at today's sun** (ice-free, unstable small
+cap 84°, **Earth's stable cap 74.8°**, unstable separator 14°, Snowball — the ice-free branch starts at
+1359, *below* the SICI fold, so ice-free and finite-cap coexist in a 8 W/m² band); **θ_c ≈ 10° for weak
+transport, growing past D ≈ 0.4** (14° at D = 1) while the window narrows and **vanishes at D ≈ 1.4** (the
+folds merge — an efficiently-mixed planet is ice-free or Snowball only; not a ``√(D/B)`` law, the ratio
+drifts); and **the Phase-1 relaxation's O(Δt) fixed-point bias quantified and retired** (present-day ice
+line 64.8 → 73.3° over n_tau 0.5 → 0.02 vs the exact 74.8°; the last ~1° is the cell floor). The
+uniform-``x`` grid is ~2°/cell at 80°, exactly where this fold sits, so the D-sweep and the demo curve run
+on 720 cells (converged to 0.1°). ``ebm.py``/``albedo.py`` untouched (a sibling, ADR 0005). **Named:** the
+Legendre anchor needs a scalar ``D``; the *seasonal* SICI sweep (Huang & Bowman 1992, on the 5B.1+ marcher)
+stays named. [[planet-bifurcation-sici]]; sources North 1975 JAS 32, Cahalan & North 1979 JAS 36,
+North 1984 JAS 41.
+
+**Rung 5B.3 — seasonal ice ON the map + albedo maps BUILT** (2026-09-02, `planet/seasonal_map.py`
+extended — `march(coalbedo_fn=…)`, `albedo=` accepts a ``[n_x, n_lon]`` map, ``T_init`` a field,
+`ice_free_albedo_map` / `masked_ice_coalbedo`, `SeasonalMapClimate.ice_fraction/frozen/zonal_anomaly`;
+`test_seasonal_ice_map.py` 8 fast + 4 slow; `demo_seasonal_ice_map.py` → `planet-seasonal-ice-map.png` +
+the **month-by-month GIF** `planet-seasonal-ice-map.gif` + the **month-slider Plotly globe** `seasonal_globe.py`
+→ `planet-seasonal-ice-globe.html` (frozen cells pinned to an ice-white colour stop; the standing
+`showspikes=False`); catalogue `seasonal_ice_map`; notebook §8.8).
+The 5B.1+ tile feedback broadcast over longitude — `seasonal.ice_coalbedo` works as-is on ``x[:, None]``;
+the marcher's ``forcing_at(s, T)`` selects one of three forcings (fixed 1-D = the 5B.2 arithmetic verbatim,
+hence bit-identical; a fixed map; the live feedback). **PAYOFF 1 — the seasonal-ice map** (45×90×360,
+51 yr, ~40 s): winter snow over the continental interiors (at 53°N the interior frozen 34 % of the year,
+the ocean at the same latitude 0 %; NH seasonal-ice reach 45° over land vs 58° over ocean), land ice purely
+seasonal, polar sea ice lingers (5 % of ocean cells perennial). **PAYOFF 2 — the annual mean now SEES the
+mask**, 5B.2's theorem broken *by design*: zonal anomaly of the annual mean interior **−0.6 K**, open ocean
+**+0.2 K** (exactly 0 for the fixed-albedo march, re-verified in the same test) — **rectification**: winter
+snow reflects sun the ocean keeps absorbing, a nonlinear (albedo-step) effect no linear model can show
+whatever its ``C``. The cheap-tier **land/ocean → albedo difference** (§12.5) is now also consumable as a
+fixed albedo *map* (linear route to a visible mask; default offsets 0 — the planetary contrast is muted by
+clouds vs the surface 0.06–0.10 / 0.15–0.35, Hartmann GPC Table 4.2). **Anchors (tight):** warm-limit
+reduction **bit-identical** to the fixed 5B.2 march; a zonally-uniform map ≡ per-latitude albedo
+bit-for-bit; the offset-free masked feedback ≡ `ice_coalbedo` bit-for-bit; all-land / all-ocean under ice
+→ the 5B.1+ tile marcher (<1e-6, with ice present); zonal invariance under ice (1e-11); the fixed map is
+**linear** → ``D = 0`` per-cell annual mean = its own radiative equilibrium (2e-6) and, with transport, the
+*zonal mean* of the annual-mean map = the 1-D parent driven by the *zonal-mean* co-albedo (<0.3 K);
+hemispheric antisymmetry under ice; global-annual net TOA with the realized co-albedo ≈ 0. **Loose:** the
+fractions and the −0.6 K ride ``C``, ``T_f``, ``a_ice``. **Named:** the 2-D interior freezes *less* than
+the 5B.1 zonal tile (34 % vs 60 % — the zonal sweep moderates it; 45° is marginal at 19 %, the story reads
+at 55°); no snow-depth / melt physics (the step albedo); idealized blocky mask. [[planet-rung5b-seasonal]].
+
+**Repo structure — `ARCHITECTURE.md` WRITTEN** (2026-09-02). The monorepo's architecture file every
+`ARCHITECTURE.md §N` citation in this plan, the engine contracts and the docstrings points at was never
+carried into the standalone repo. The new root file restates the rules that survive the split: the five
+layers and the one-way dependency rule, the flat-package rationale, the **add-a-rung recipe** (spike →
+sibling → triad → walls → demo + catalogue + site → record ×3), the numerical conventions a session must
+know before touching a solver (the O(Δt) fixed-point bias, the cell-quantized ice edge, critical slowing,
+structural conservation, stated-as-measured), and the surface drift guards. Where this plan says
+"ARCHITECTURE.md §N", read the matching section there.
+
 ## 11. Spin-out roadmap — the editable-ocean GPU project (born here, across a contract seam)
 
 **The decision (recorded, not yet acted on).** A *separate* future project — an **editable land/ocean
@@ -2739,8 +2811,10 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
 
 ### 12.5 Editable geography & seasonality (§5 / §9.3)
 
-- **Cheap tier (rides rungs 0–1)** · elevation → a lapse-rate map diagnostic; land/ocean → an albedo
-  difference; fraction-per-band → continentality-lite. **No engine change — buildable now.** → §9.3.
+- **Cheap tier (rides rungs 0–1)** · elevation → a lapse-rate map diagnostic; ~~land/ocean → an albedo
+  difference~~ **BUILT 2026-09-02 as a fixed albedo *map* on the seasonal map** (`seasonal_map.ice_free_albedo_map`,
+  rung 5B.3 — linear, two exact annual-mean anchors); fraction-per-band → continentality-lite (superseded by
+  the real mask of 5B.2). The lapse-rate map diagnostic remains **[named upgrade]**. → §9.3.
 - **Seasonal cycle / ocean heat capacity** · annual-mean v1 drops `C` at equilibrium, so thermal lag +
   continentality need a seasonal cycle first. **[named, not built — the §3 scope edge]** → §9.3.
 - **True 2-D longitudinal geography** · regional climate, orographic precip, rain shadows (the north
@@ -2874,7 +2948,10 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
       edges/fractions ride the calibrated `C` + the cited `Tf`/`a_ice`; direction banked. **Named-deferred:**
       the **small-ice-cap instability** (North & Coakley's critical cap size / ice-edge jump) — a stability
       sweep this feedback *enables* but that this build does not attempt (the plain reading of "seasonal
-      ice-albedo on the marcher" is the mechanism, not the bifurcation study; SICI stays the eventual target).
+      ice-albedo on the marcher" is the mechanism, not the bifurcation study). **RESOLVED 2026-09-02 on rung
+      0** — the annual-mean SICI is BUILT as the complete equilibrium diagram (`planet/bifurcation.py`,
+      θ_c ≈ 10.9°, present day 0.16 % below the fold; §10 rung-0+ record, [[planet-bifurcation-sici]]); the
+      *seasonal* SICI sweep on this marcher (Huang & Bowman 1992) stays **[named upgrade]**.
       Sources ([[seasonal-ebm-source]], [[ebm-radiation-source]]). See [[planet-rung5b-seasonal]].
     - **Rung 5B.2 — the true 2-D `T(φ, λ, t)` land–sea map · BUILT 2026-07-10** (`planet/seasonal_map.py`,
       `test_seasonal_map.py`, `demo_seasonal_map.py`, `plots.seasonal_map_figure`). The longitude axis
@@ -2914,7 +2991,11 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
       ocean magnitudes ride the 5B.1 heat capacities; direction banked. **Named scope (from 5B.1):** fixed
       ice-free albedo identical over land/sea (continentality is *pure* heat capacity), **diffusive**
       continentality only (interior extremes + coastal moderation, no downwind wind-driven tilt), prescribed
-      geography. **Deferred:** a 2-D frequency-domain solver (would make the annual-mean reduction
+      geography. **Extended 2026-09-02 — Rung 5B.3 (seasonal ice ON the map + albedo maps, BUILT):** the
+      fixed-ice-free-albedo scope edge lifted on the map (`march(coalbedo_fn=…)`) → the seasonal-ice **map**
+      (+ a month-by-month GIF) and the annual mean **sees the mask** by rectification (interior −0.6 K vs
+      ocean +0.2 K; exactly 0 fixed-albedo); albedo *maps* accepted with two exact linear anchors. §10 record;
+      [[planet-rung5b-seasonal]]. **Deferred:** a 2-D frequency-domain solver (would make the annual-mean reduction
       machine-tight, like 5B.1's spectral did — the marcher's structural anchors already pin every piece of
       the numerics). → [[planet-rung5b-seasonal]], [[seasonal-ebm-source]].
 

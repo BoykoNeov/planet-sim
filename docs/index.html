@@ -66,6 +66,11 @@ footer { border-top: 1px solid #232c49; margin-top: 2.5rem; padding-top: 1.2rem;
   <h2>Explore the globes in 3D</h2>
   <p class="sub">Drag to rotate, scroll to zoom, hover for the numbers — no install, they open straight in your browser.</p>
   <div class="grid">
+    <a class="globe" href="figures/planet-seasonal-ice-globe.html">
+      <span class="orb">🌍</span>
+      <span class="t">Seasonal ice map — animated</span>
+      <span class="cta">Open interactive globe ↗</span>
+    </a>
     <a class="globe" href="figures/planet-coupler-map.html">
       <span class="orb">🌍</span>
       <span class="t">EBM → circulation coupler</span>
@@ -124,6 +129,16 @@ footer { border-top: 1px solid #232c49; margin-top: 2.5rem; padding-top: 1.2rem;
       </div>
     </article>
     <article class="card">
+      <a class="thumb" href="figures/planet-bifurcation.png"><img src="figures/planet-bifurcation.png" alt="The complete equilibrium diagram" loading="lazy"></a>
+      <div class="body">
+        <h4>The complete equilibrium diagram</h4>
+        <p>every climate the sun allows, stable and unstable — and the second cliff: a polar cap smaller than a critical size cannot exist (the small-ice-cap instability)</p>
+        <p class="badge">needs <code>.[viz]</code></p>
+        <p class="cmd"><code>python -m planet bifurcation</code></p>
+        
+      </div>
+    </article>
+    <article class="card">
       <a class="thumb" href="figures/planet-biomes.png"><img src="figures/planet-biomes.png" alt="Climate → biome map" loading="lazy"></a>
       <div class="body">
         <h4>Climate → biome map</h4>
@@ -161,6 +176,16 @@ footer { border-top: 1px solid #232c49; margin-top: 2.5rem; padding-top: 1.2rem;
         <p class="badge">needs <code>.[viz]</code></p>
         <p class="cmd"><code>python -m planet seasonal</code></p>
         
+      </div>
+    </article>
+    <article class="card">
+      <a class="thumb" href="figures/planet-seasonal-ice-map.gif"><img src="figures/planet-seasonal-ice-map.gif" alt="Seasonal ice map — animated" loading="lazy"></a>
+      <div class="body">
+        <h4>Seasonal ice map — animated</h4>
+        <p>the seasons, the continents and the snow: winter snow spreads over the land, sea ice lingers at the poles, and the continents end colder in the annual mean (a month-by-month GIF)</p>
+        <p class="badge">needs <code>.[viz]</code> <code>.[webviz]</code></p>
+        <p class="cmd"><code>python -m planet seasonal_ice_map</code></p>
+        <a class="cta" href="figures/planet-seasonal-ice-globe.html">Open interactive globe ↗</a>
       </div>
     </article>
   </div>

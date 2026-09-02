@@ -1054,3 +1054,242 @@ def seasonal_ice_figure(result):
     fig.suptitle("Planet Rung 5B.1+ — seasonal ice-albedo: a migrating ice edge, continentality in ice",
                  fontsize=13)
     return fig
+
+
+# --------------------------------------------------------------------------- #
+# Rung 0+ — the complete equilibrium diagram: every branch, both folds, the small-ice-cap instability.
+# --------------------------------------------------------------------------- #
+STABLE_COLOR = "#1f4e79"         # stable branches (solid)
+UNSTABLE_COLOR = "#b03a2e"       # unstable branches (dashed)
+FOLD_COLOR = "#d4711f"           # the folds (turning points)
+
+
+def bifurcation_figure(result):
+    """The equilibrium diagram (:mod:`planet.bifurcation`): the S-curve, its folds, and what they cost Phase 1.
+
+    Four panels. **The S-curve** (top-left): ice-line latitude vs solar constant for *every* equilibrium —
+    stable branches solid, unstable dashed (the slope-stability theorem read off the curve), the ice-free
+    and Snowball branches as the horizontal caps, the two folds marked, and the Phase-1 continuation sweep
+    overlaid as dots: it rides the stable branches and jumps at exactly the folds. **The small-ice-cap
+    zoom** (top-right): the narrow finite-cap window around today's sun — Earth's cap sits a couple of
+    W/m² below the cliff where caps smaller than ``θ_c`` cannot exist. **θ_c vs transport** (bottom-left):
+    a stronger transport needs a bigger cap, the window narrows, and past a critical ``D`` the finite-cap
+    branch is gone. **The retired bias** (bottom-right): Phase 1's relaxed ice line vs its step, converging
+    onto the exact curve. Requires the ``viz`` extra.
+    """
+    c, loop = result.curve, result.loop
+    lat = c.latitude_deg()
+    lo, hi = c.snowball_fold, c.small_ice_cap_fold
+    pres = result.present
+
+    fig, axd = plt.subplot_mosaic(
+        [["scurve", "zoom"], ["theta", "bias"]], figsize=(13.5, 8.8), constrained_layout=True,
+    )
+
+    def draw_branches(ax, lw=2.2):
+        # split the curve into runs of equal stability so solid/dashed segments join cleanly
+        stable = c.stable
+        start = 0
+        for k in range(1, stable.size + 1):
+            if k == stable.size or stable[k] != stable[start]:
+                sl = slice(start, min(k + 1, stable.size))
+                ax.plot(c.S0[sl], lat[sl], color=STABLE_COLOR if stable[start] else UNSTABLE_COLOR,
+                        ls="-" if stable[start] else "--", lw=lw)
+                start = k
+
+    # -- the S-curve ------------------------------------------------------------ #
+    ax = axd["scurve"]
+    draw_branches(ax)
+    ax.plot([c.ice_free_threshold_S0, loop.S0_up.max()], [90, 90], color=STABLE_COLOR, lw=2.2)
+    ax.plot([loop.S0_up.min(), c.snowball_threshold_S0], [0, 0], color=STABLE_COLOR, lw=2.2)
+    ax.plot(loop.S0_down, loop.iceline_down, "o", ms=3.2, color=COOLING_COLOR, alpha=0.8,
+            label="Phase-1 sweep — dimming")
+    ax.plot(loop.S0_up, loop.iceline_up, "o", ms=3.2, color=WARMING_COLOR, alpha=0.8,
+            label="Phase-1 sweep — brightening")
+    for f, name in ((lo, "Snowball fold"), (hi, "small-ice-cap fold")):
+        ax.plot(f.S0, f.latitude_deg, "D", ms=8, color=FOLD_COLOR, mec="k", mew=0.8, zorder=5)
+        ax.annotate(name, (f.S0, f.latitude_deg), textcoords="offset points",
+                    xytext=(10, -14 if f is lo else 8), fontsize=8, color="#4a3000")
+    ax.axvline(S0_EARTH, color=PRESENT_COLOR, lw=1.2, ls=":", alpha=0.9)
+    ax.plot(S0_EARTH, pres.latitude_deg, "*", ms=13, color=PRESENT_COLOR, mec="k", mew=0.6, zorder=6,
+            label=f"today: finite cap at {pres.latitude_deg:.0f}°")
+    ax.plot([], [], color=STABLE_COLOR, lw=2.2, label="stable (dS₀/dx_s > 0)")
+    ax.plot([], [], color=UNSTABLE_COLOR, lw=2.2, ls="--", label="unstable")
+    ax.set_xlim(loop.S0_up.min(), loop.S0_up.max()); ax.set_ylim(-3, 93)
+    ax.set_xlabel("solar constant S₀ (W m⁻²)"); ax.set_ylabel("ice-line latitude (°)")
+    ax.set_title("every equilibrium — the S-curve; the sweep rides the stable branches and jumps at the folds",
+                 fontsize=9)
+    ax.legend(fontsize=7.5, loc="center right")
+
+    # -- the small-ice-cap zoom ------------------------------------------------- #
+    ax = axd["zoom"]
+    draw_branches(ax, lw=2.4)
+    ax.plot([c.ice_free_threshold_S0, hi.S0 + 25], [90, 90], color=STABLE_COLOR, lw=2.4)
+    ax.axvspan(lo.S0, hi.S0, color=ICE_COLOR, alpha=0.25, label="finite-cap window")
+    ax.plot(hi.S0, hi.latitude_deg, "D", ms=9, color=FOLD_COLOR, mec="k", mew=0.8, zorder=5)
+    ax.axvline(S0_EARTH, color=PRESENT_COLOR, lw=1.2, ls=":")
+    ax.plot(S0_EARTH, pres.latitude_deg, "*", ms=14, color=PRESENT_COLOR, mec="k", mew=0.6, zorder=6)
+    ax.annotate(f"today: {hi.S0 - S0_EARTH:.1f} W/m² ({100 * (hi.S0 - S0_EARTH) / S0_EARTH:.2f} %)\n"
+                f"below the cliff", (S0_EARTH, pres.latitude_deg), textcoords="offset points",
+                xytext=(-120, -30), fontsize=8, color=PRESENT_COLOR,
+                arrowprops=dict(arrowstyle="-", color=PRESENT_COLOR, lw=0.8))
+    ax.annotate(f"θ_c = {hi.cap_radius_deg:.1f}°: no sun holds\na smaller cap", (hi.S0, hi.latitude_deg),
+                textcoords="offset points", xytext=(-10, 18), fontsize=8, ha="right", color="#4a3000")
+    ax.set_xlim(S0_EARTH - 40, hi.S0 + 20); ax.set_ylim(55, 92)
+    ax.set_xlabel("solar constant S₀ (W m⁻²)"); ax.set_ylabel("ice-line latitude (°)")
+    ax.set_title("the second cliff — a brightening cap shrinks to θ_c, then vanishes in a jump", fontsize=9)
+    ax.legend(fontsize=8, loc="lower left")
+
+    # -- θ_c vs D ----------------------------------------------------------------- #
+    ax = axd["theta"]
+    ok = ~np.isnan(result.theta_c)
+    ax.plot(result.D_values[ok], result.theta_c[ok], "o-", color=FOLD_COLOR, lw=2.0, ms=6, label="critical cap radius θ_c")
+    ax.set_xlabel("transport D (W m⁻² K⁻¹)"); ax.set_ylabel("θ_c (°)", color=FOLD_COLOR)
+    ax2 = ax.twinx()
+    width = result.window_hi - result.window_lo
+    ax2.plot(result.D_values[ok], width[ok], "s--", color=STABLE_COLOR, lw=1.6, ms=5, label="finite-cap window width")
+    ax2.set_ylabel("window width (W m⁻²)", color=STABLE_COLOR)
+    if (~ok).any():
+        Dgone = float(result.D_values[~ok].min())
+        ax.axvspan(Dgone, result.D_values.max() * 1.02, color="#dddddd", alpha=0.6)
+        ax.text(Dgone, 0.5 * np.nanmax(result.theta_c), "  no stable\n  finite cap", fontsize=8, va="center")
+    ax.axvline(0.555, color=PRESENT_COLOR, lw=1.0, ls=":")
+    ax.set_xlim(result.D_values.min() - 0.05, result.D_values.max() * 1.02)
+    ax.set_title("θ_c ≈ 10° at weak transport, growing past D ≈ 0.4 — and past a critical D the branch is gone",
+                 fontsize=9)
+    h1, l1 = ax.get_legend_handles_labels(); h2, l2 = ax2.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, fontsize=8, loc="upper left")
+
+    # -- the retired bias -------------------------------------------------------- #
+    ax = axd["bias"]
+    ax.semilogx(result.n_taus, result.relaxed_ice_line, "o-", color=COOLING_COLOR, lw=2.0, ms=6,
+                label="Phase-1 relaxation (n_tau = Δt/τ_rad)")
+    ax.axhline(pres.latitude_deg, color=PRESENT_COLOR, lw=2.0, label=f"exact curve: {pres.latitude_deg:.1f}°")
+    ax.invert_xaxis()
+    ax.set_xlabel("relaxation step Δt / τ_rad  (→ smaller)"); ax.set_ylabel("present-day ice line (°)")
+    ax.set_title("the marcher's O(Δt) fixed-point bias, quantified and retired: no step, no bias", fontsize=9)
+    ax.legend(fontsize=8, loc="lower right")
+
+    fig.suptitle("Planet Rung 0+ — the complete equilibrium diagram: two folds, one narrow window for a polar cap",
+                 fontsize=13)
+    return fig
+
+
+# --------------------------------------------------------------------------- #
+# Rung 5B.3 — seasonal ice on the map: the snow map, and a mask the annual mean can see.
+# --------------------------------------------------------------------------- #
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def _ice_overlay(ax, lon, lat, frozen, mask):
+    """Paint the frozen cells white on top of a temperature map, and draw the coastlines."""
+    ice = np.ma.masked_where(~frozen, np.ones_like(frozen, dtype=float))
+    ax.pcolormesh(lon, lat, ice, cmap=ListedColormap(["#f4f8fb"]), vmin=0, vmax=1, shading="auto")
+    ax.contour(lon, lat, mask.astype(float), levels=[0.5], colors="k", linewidths=0.7, alpha=0.6)
+
+
+def seasonal_ice_map_figure(result):
+    """The Rung-5B.3 payoff: the seasonal ice MAP and the rectified annual mean (:mod:`planet.seasonal_map`).
+
+    Four panels off the converged 2-D ice-albedo limit cycle. **January / July** (top): the temperature map
+    with the frozen cells painted white — winter snow sprawls across the northern continents while the
+    ocean at the same latitude stays open; six months later the snow is gone and the south wears it.
+    **Fraction of the year frozen** (bottom-left): the seasonal-ice map — continental interiors freeze
+    for months, the polar ocean is perennial, the midlatitude ocean never freezes. **The annual mean sees
+    the mask** (bottom-right): the annual-mean anomaly from its zonal mean — exactly zero for the fixed-
+    albedo 5B.2 map, now a cold imprint of every continent: winter snow reflects sun the ocean keeps
+    absorbing, so the seasonal cycle is *rectified* into a colder land mean. Requires the ``viz`` extra.
+    """
+    c = result.climate
+    lat, lon = c.latitude_deg(), c.longitude_deg()
+    mask = c.land_mask
+    steps = result.month_steps()
+    vlim = float(np.max(np.abs(c.T)))
+    i = result.band_index()
+    interior, ocean = result.sample_columns()
+
+    fig, axd = plt.subplot_mosaic(
+        [["jan", "jul"], ["frac", "anom"]], figsize=(13.5, 8.6), constrained_layout=True,
+    )
+    for key, mi in (("jan", 0), ("jul", 6)):
+        ax = axd[key]
+        im = ax.pcolormesh(lon, lat, c.T[:, :, steps[mi]], cmap="RdBu_r", vmin=-vlim, vmax=vlim, shading="auto")
+        _ice_overlay(ax, lon, lat, c.frozen(steps[mi]), mask)
+        ax.set_title(f"{_MONTHS[mi]} — surface temperature, frozen cells painted white "
+                     f"({100 * c.frozen(steps[mi]).mean():.0f}% of the globe iced)", fontsize=9)
+        ax.set_ylabel("latitude (°)")
+    fig.colorbar(im, ax=[axd["jan"], axd["jul"]], fraction=0.025, pad=0.02, label="surface T (°C)")
+
+    ax = axd["frac"]
+    frac = c.ice_fraction()
+    im = ax.pcolormesh(lon, lat, 100 * frac, cmap="Blues", vmin=0, vmax=100, shading="auto")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="% of year frozen")
+    ax.contour(lon, lat, mask.astype(float), levels=[0.5], colors="k", linewidths=0.7, alpha=0.6)
+    for k, col in ((interior, SEASON_LAND), (ocean, SEASON_OCEAN)):
+        ax.plot(lon[k], lat[i], "o", mfc=col, mec="w", mew=1.2, ms=8)
+    ax.set_title(f"the seasonal-ice map — at {abs(lat[i]):.0f}°N the interior is frozen "
+                 f"{100 * frac[i, interior]:.0f}% of the year, the ocean {100 * frac[i, ocean]:.0f}%", fontsize=9)
+    ax.set_xlabel("longitude (°)"); ax.set_ylabel("latitude (°)")
+
+    ax = axd["anom"]
+    anom = c.zonal_anomaly()
+    alim = float(np.max(np.abs(anom)))
+    im = ax.pcolormesh(lon, lat, anom, cmap="RdBu_r", vmin=-alim, vmax=alim, shading="auto")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="annual-mean T − zonal mean (K)")
+    ax.contour(lon, lat, mask.astype(float), levels=[0.5], colors="k", linewidths=0.7, alpha=0.6)
+    ax.set_title(f"the annual mean now SEES the mask — interior {anom[i, interior]:+.1f} K, ocean "
+                 f"{anom[i, ocean]:+.1f} K (was 0 with a fixed albedo)", fontsize=9)
+    ax.set_xlabel("longitude (°)")
+
+    fig.suptitle("Planet Rung 5B.3 — seasonal ice on the map: winter snow, sea ice, and a rectified annual mean",
+                 fontsize=13)
+    return fig
+
+
+def seasonal_ice_map_animation(result, *, interval: int = 160):
+    """The year, month by month: the temperature map with the snow/sea-ice cover painted white.
+
+    A single panel animated over the 12 month-centres (colour range fixed across frames so the eye reads
+    the real seasonal swing), the coastlines drawn, a month badge, and a running readout of the iced
+    fraction of the globe. Returns a :class:`matplotlib.animation.FuncAnimation`; save with a Pillow writer
+    (GIF, CI-safe). Requires the ``viz`` extra.
+    """
+    from matplotlib.animation import FuncAnimation
+
+    c = result.climate
+    lat, lon = c.latitude_deg(), c.longitude_deg()
+    mask = c.land_mask
+    steps = result.month_steps()
+    vlim = float(np.max(np.abs(c.T)))
+    ice_cmap = ListedColormap(["#f4f8fb"])
+
+    fig, ax = plt.subplots(figsize=(9.5, 5.6), constrained_layout=True)
+    fig.get_layout_engine().set(rect=(0.0, 0.14, 1.0, 0.86))
+    mesh = ax.pcolormesh(lon, lat, c.T[:, :, steps[0]], cmap="RdBu_r", vmin=-vlim, vmax=vlim, shading="auto")
+    fig.colorbar(mesh, ax=ax, fraction=0.035, pad=0.03, label="surface T (°C)")
+    ice_mesh = ax.pcolormesh(lon, lat, np.ma.masked_where(~c.frozen(steps[0]), np.ones(mask.shape)),
+                             cmap=ice_cmap, vmin=0, vmax=1, shading="auto")
+    ax.contour(lon, lat, mask.astype(float), levels=[0.5], colors="k", linewidths=0.7, alpha=0.6)
+    ax.set_xlabel("longitude (°)"); ax.set_ylabel("latitude (°)")
+    badge = ax.text(0.015, 0.97, "", transform=ax.transAxes, fontsize=16, fontweight="bold", va="top",
+                    bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="#888", alpha=0.9))
+    readout = ax.text(0.985, 0.97, "", transform=ax.transAxes, fontsize=9, va="top", ha="right",
+                      bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="#888", alpha=0.9))
+    ax.set_title("Rung 5B.3 — the seasonal ice map: frozen cells painted white, month by month", fontsize=10)
+    fig.text(0.5, 0.045,
+             "Every grid point freezes on its own temperature (the rung-0 step-function ice-albedo, re-frozen each\n"
+             "half-step). Small-C continents grow winter snow the ocean at the same latitude never does; the polar\n"
+             "ocean's sea ice lingers. Idealized blocky continents; a diffusive 2-D EBM, not a weather model.",
+             ha="center", va="center", fontsize=8.5, color="#333333")
+
+    def update(frame):
+        s = steps[frame]
+        mesh.set_array(c.T[:, :, s].ravel())
+        frozen = c.frozen(s)
+        ice_mesh.set_array(np.ma.masked_where(~frozen, np.ones(mask.shape)).ravel())
+        badge.set_text(_MONTHS[frame])
+        readout.set_text(f"iced: {100 * frozen.mean():.0f}% of globe · "
+                         f"{100 * frozen[mask].mean():.0f}% of land · {100 * frozen[~mask].mean():.0f}% of ocean")
+        return mesh, ice_mesh, badge, readout
+
+    return FuncAnimation(fig, update, frames=len(steps), interval=interval, blit=False)

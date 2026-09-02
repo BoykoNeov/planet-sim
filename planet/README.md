@@ -13,7 +13,7 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
 > the sphere, so the global mean is a plain `∫₀¹ T dx`). Latitudes are reported in **degrees**. The
 > engine is fed the latitudinal transport in these units directly.
 
-## Load pointer (per-session working set, ARCHITECTURE.md §11)
+## Load pointer (per-session working set — see the repo-root [`ARCHITECTURE.md`](../ARCHITECTURE.md) §2–4)
 
 - **To work on the EBM machinery (Phase 1):** `ebm.py` + `tests/test_ebm.py`. It loads
   `engines/diffusion/CONTRACT.md` (**heat mode**: array diffusivity `D_eng(x) = (D/C)(1−x²)`,
@@ -155,6 +155,21 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   globe** `docs/figures/planet-coupler-map.html` — the jet drawn as a `circulation` `vector_overlay`
   (Plotly cones) over the temperature field (`planetmap.circulation_layer` / `_vector_overlay_trace`,
   `build_view(jet=…)`; computed-then-viewed, not in the live-slider loop).
+- **To work on the complete equilibrium diagram / the small-ice-cap instability (rung 0+):** `bifurcation.py`
+  + `tests/test_bifurcation.py`. The **inverse solve** — prescribe the ice line, the EBM is linear, one
+  tridiagonal solve per ice line gives `S₀(x_s) = (T_f + A/B)/u(x_s)` → **every** equilibrium, stable and
+  unstable (`equilibrium_curve` → `EquilibriumCurve` with `folds` / `snowball_fold` / `small_ice_cap_fold` /
+  `finite_cap_window` / `equilibria_at(S0)`); stability by the **slope theorem** (`stable` = `dS₀/dx_s > 0`,
+  checked by `relax_from_curve`); the **Legendre-mode** analytic anchor (`legendre_equilibrium_curve`); the
+  D-sweep (`critical_cap_sweep`, 720 cells — the polar fold needs the fine grid) and the step-bias sweep
+  (`relaxation_bias_sweep`). Reads `ebm.py`'s pinned operator; `ebm.py`/`albedo.py` untouched. Banked:
+  `demo_bifurcation.py` → `docs/figures/planet-bifurcation.png`. The module docstring is its contract.
+- **To work on seasonal ice on the map / albedo maps (rung 5B.3):** `seasonal_map.py` (`march(coalbedo_fn=…)`,
+  `albedo=` as a `[n_x, n_lon]` map, `ice_free_albedo_map`, `masked_ice_coalbedo`, the climate's
+  `ice_fraction` / `frozen` / `zonal_anomaly`) + `tests/test_seasonal_ice_map.py`. Banked:
+  `demo_seasonal_ice_map.py` → `docs/figures/planet-seasonal-ice-map.png` + the month-by-month
+  `planet-seasonal-ice-map.gif` (`plots.seasonal_ice_map_figure` / `seasonal_ice_map_animation`) + the
+  month-slider globe `seasonal_globe.py` → `planet-seasonal-ice-globe.html` (`tests/test_seasonal_globe.py`, `[webviz]`).
 - **To use the shallow-water engine directly:** load `engines/fluid/CONTRACT.md` only — the
   one-page API contract (`ShallowWater`, `SWState`, `uniform_grid`; mass + tracer-mass machine-exact,
   energy/PV/variance bounded; the `tracer` slot is now advected as a **passive** scalar — rung 1
@@ -432,6 +447,29 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   same albedo on both tiles (continentality is *pure* heat capacity), fixed albedo (exact reduction; ice
   is the marcher's future), uniform land fraction (exact energy conservation). The true `T(φ,λ,t)`
   land–sea *map* is rung 5B.2. `tests/test_seasonal.py`.
+- **Rung 0+ (the complete equilibrium diagram + the small-ice-cap instability) — BUILT** (2026-09-02).
+  `planet/bifurcation.py`: the **inverse** solve — prescribe the ice line and the ice-albedo EBM is *linear*,
+  so one tridiagonal solve per ice line traces **every** equilibrium at once, the stable branches Phase 1's
+  sweep rode *and* the unstable ones it never could. **Two folds:** the Snowball fold at 33° (−7.8 % sun)
+  and the **small-ice-cap fold at 79°** — a cap smaller than `θ_c ≈ 10.9°` cannot be held by any sun, so a
+  brightening cap vanishes in a jump (North 1984); the finite-cap window is 1259…1367 W/m² and **today's
+  sun sits 2 W/m² below its top**. Five equilibria at today's sun. Stability by the **slope-stability
+  theorem** (Cahalan & North 1979), *checked* by marching; the FV curve converges to North's Legendre-mode
+  solution at 2nd order; the Phase-1 sweep jumps within one step of the exact folds; the marcher's O(Δt)
+  fixed-point bias is quantified (64.8° → 73.3° vs the exact 74.8°) and retired — the diagram needs no step.
+  `θ_c` ≈ 10° at weak transport, growing past `D ≈ 0.4`, the branch gone at `D ≈ 1.4`. `tests/test_bifurcation.py`.
+- **Rung 5B.3 (seasonal ice on the map, albedo maps) — BUILT** (2026-09-02). `seasonal_map.py`'s marcher
+  takes the 5B.1+ ice feedback per grid point (`coalbedo_fn`) and fixed albedo **maps**. **Payoff:** the
+  seasonal-ice **map** (winter snow over the continental interiors — 34 % of the year at 53°N where the
+  ocean stays open; land ice seasonal, polar sea ice perennial) as a still + a month-by-month GIF + a
+  **month-slider Plotly globe** (`seasonal_globe.py`, `docs/figures/planet-seasonal-ice-globe.html`), and
+  5B.2's theorem broken by design — **the annual mean now sees the mask** (interior −0.6 K, ocean +0.2 K:
+  winter snow rectifies the seasonal cycle through the albedo step; exactly 0 with a fixed albedo).
+  Reductions bit-identical (warm limit; map ≡ per-latitude; all-land/ocean → 5B.1+); the fixed map is linear
+  with two exact annual-mean anchors. `tests/test_seasonal_ice_map.py`.
+- **`ARCHITECTURE.md` written for the standalone repo** (2026-09-02): layers + the one-way dependency
+  rule, the add-a-rung recipe, numerical conventions, the surface drift guards — the file every
+  "ARCHITECTURE.md §N" citation pointed at since the monorepo split.
 - **Teaching notebook extended to the newer rungs — BUILT** (2026-07-10). §8 "Up the staircase" grew from
   four showcase sections to **seven**: **§8.3 rung 2.x** (the energetic ITCZ at the energy-flux equator +
   the radiation-limit resolution — both demos live, `demo_sphere_itcz` / `demo_itcz_radiation_limit`),

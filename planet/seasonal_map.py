@@ -90,12 +90,13 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 
 from .seasonal import SeasonalEBM, LAND_FRACTION, LAND_SOIL_DEPTH, OCEAN_MIXED_DEPTH
-from .ebm import A_OLR, B_OLR, D_TRANSPORT, S0_EARTH
+from .ebm import (A_OLR, B_OLR, D_TRANSPORT, S0_EARTH, T_FREEZE, ALBEDO_A0, ALBEDO_A2, ALBEDO_ICE,
+                  legendre_P2)
 from .obliquity import OBLIQUITY_EARTH
 
 
@@ -218,6 +219,47 @@ def earthlike_mask(x: np.ndarray, lon_rad: np.ndarray) -> np.ndarray:
 
 
 # --------------------------------------------------------------------------- #
+# Albedo maps — the cheap-tier geography knob (a land/sea ice-free contrast) and the
+# seasonal ice-albedo feedback on the map (rung 5B.3).
+# --------------------------------------------------------------------------- #
+def ice_free_albedo_map(x: np.ndarray, land_mask: np.ndarray, land_offset: float = 0.0,
+                        ocean_offset: float = 0.0, a0: float = ALBEDO_A0, a2: float = ALBEDO_A2) -> np.ndarray:
+    """The ice-free planetary albedo as a **map**: the zonal ``a₀ + a₂P₂(x)`` plus a per-surface offset.
+
+    ``land_offset`` / ``ocean_offset`` shift the albedo over land / ocean cells (dimensionless, both
+    default ``0`` = the 5B.2 scope: one ice-free albedo on both surfaces, so continentality is *pure*
+    heat capacity). A positive land offset is the **cheap-tier geography** knob (plan §12.5 — "land/ocean
+    → an albedo difference"): brighter land absorbs less sun, so the annual mean is no longer blind to
+    the mask (the linear result :meth:`SeasonalMapEBM.march` documents). *Loose, named:* the surface
+    contrast is large (ocean ~0.06–0.10 vs land ~0.15–0.35, Hartmann *GPC* Table 4.2) but the
+    **planetary** (top-of-atmosphere) contrast the EBM sees is muted by clouds — pick an order-0.05
+    offset, not the surface value. Returns ``[n_x, n_lon]``.
+    """
+    zonal = a0 + a2 * legendre_P2(np.asarray(x, dtype=float))
+    mask = np.asarray(land_mask, dtype=bool)
+    return np.where(mask, zonal[:, None] + float(land_offset), zonal[:, None] + float(ocean_offset))
+
+
+def masked_ice_coalbedo(ice_free_albedo: np.ndarray, T_freeze: float = T_FREEZE,
+                        ai: float = ALBEDO_ICE) -> Callable[[np.ndarray, np.ndarray], np.ndarray]:
+    """A ``coalbedo_fn(x, T)`` applying the rung-0 **step-function ice-albedo** on top of an ice-free *map*.
+
+    The map form of :func:`planet.seasonal.ice_coalbedo`: wherever a cell is frozen (``T < T_f``) the
+    co-albedo is ``1 − a_ice``, elsewhere ``1 − ice_free_albedo[x, λ]`` — so a land/sea ice-free
+    contrast (:func:`ice_free_albedo_map`) and the seasonal ice feedback compose. With the default
+    (offset-free) map this is *numerically identical* to :func:`planet.seasonal.ice_coalbedo`, the
+    reduction the tests pin. ``x`` is accepted for signature compatibility and ignored (the map already
+    carries the latitude structure).
+    """
+    ice_free_coalbedo = 1.0 - np.asarray(ice_free_albedo, dtype=float)
+    ice_coalbedo = 1.0 - float(ai)
+
+    def coalbedo_fn(x, T):
+        return np.where(np.asarray(T, dtype=float) < float(T_freeze), ice_coalbedo, ice_free_coalbedo)
+    return coalbedo_fn
+
+
+# --------------------------------------------------------------------------- #
 # The frozen result — plain arrays (the loose-coupling currency).
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
@@ -257,6 +299,31 @@ class SeasonalMapClimate:
     def amplitude(self) -> np.ndarray:
         """Seasonal amplitude ``(max − min)/2`` (K) per grid point — half the peak-to-peak range."""
         return 0.5 * self.seasonal_range()
+
+    def zonal_anomaly(self) -> np.ndarray:
+        """Annual-mean map minus its zonal mean, ``⟨T⟩(x, λ) − [⟨T⟩](x)`` (K) — how visible the mask is in the mean.
+
+        Exactly zero (to the marcher's convergence) for a fixed, mask-blind albedo (the 5B.2 headline);
+        **non-zero once the seasonal ice feedback is on** — the winter snow over the continents reflects
+        sun the ocean at the same latitude absorbs, so the land ends *colder in the annual mean* (the
+        ice-albedo **rectification**, rung 5B.3), or with a land/sea ice-free albedo contrast.
+        """
+        amean = self.annual_mean()
+        return amean - amean.mean(axis=1, keepdims=True)
+
+    def ice_fraction(self, T_freeze: float = T_FREEZE) -> np.ndarray:
+        """Fraction of the year each grid point spends frozen (``T < T_f``) — the seasonal-ice **map**.
+
+        ``0`` = open all year, ``1`` = frozen year-round (perennial ice), in between = seasonal snow /
+        sea ice that comes and goes. The map form of :meth:`planet.seasonal.SeasonalClimate.ice_fraction`
+        (only meaningful for an ice-albedo march; a fixed-albedo cycle dipping below ``T_f`` is
+        diagnostically frozen but carries no feedback).
+        """
+        return (self.T < float(T_freeze)).mean(axis=2)
+
+    def frozen(self, step: int, T_freeze: float = T_FREEZE) -> np.ndarray:
+        """Boolean ice mask ``T(x, λ, t_step) < T_f`` at one time sample — the snow/ice cover on a given day."""
+        return self.T[:, :, int(step)] < float(T_freeze)
 
 
 # --------------------------------------------------------------------------- #
@@ -334,28 +401,91 @@ class SeasonalMapEBM:
         diag = self.C + 2.0 * self.dt * self._zonal_a[:, None]   # [n_cells, n_lon]
         return _cyclic_thomas_rows(offdiag, diag, self.C * T)
 
+    def coalbedo_map(self, albedo=None) -> np.ndarray:
+        """Fixed co-albedo ``1 − α`` as a ``[n_x, n_lon]`` map from a scalar, a per-latitude ``[n_x]``, or a map."""
+        if albedo is None:
+            return np.broadcast_to(self.zonal.coalbedo()[:, None], (self.n_cells, self.n_lon)).copy()
+        alb = np.asarray(albedo, dtype=float)
+        if alb.ndim == 2:
+            if alb.shape != (self.n_cells, self.n_lon):
+                raise ValueError(f"albedo map must be shape {(self.n_cells, self.n_lon)}, got {alb.shape}")
+            return 1.0 - alb
+        return np.broadcast_to(self.zonal.coalbedo(alb)[:, None], (self.n_cells, self.n_lon)).copy()
+
     # -- the time-marcher (the engine-reuse method) ------------------------ #
-    def march(self, albedo=None, absorbed: Optional[np.ndarray] = None, T_init: Optional[float] = None,
-              tol: float = 1e-6, max_years: int = 60) -> SeasonalMapClimate:
+    def march(self, albedo=None, absorbed: Optional[np.ndarray] = None,
+              coalbedo_fn: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None,
+              T_init=None, tol: float = 1e-6, max_years: int = 60) -> SeasonalMapClimate:
         """March the split model to a converged annual limit cycle; return the last year's field.
 
         Each step is ½ radiation / meridional sweep / zonal sweep / ½ radiation (the module docstring's
         split). Runs whole years, comparing each year's day-0 state to the previous year's; stops when
-        ``max|ΔT| < tol`` (K). Seeded from each latitude's annual-mean radiative equilibrium (so only the
-        seasonal anomaly, not the slow global-mean offset, has to spin up — the ocean ``τ = C_O/B`` is a
-        few years). ``absorbed[x, t]`` may be injected (the slab / synthetic-forcing anchors).
+        ``max|ΔT| < tol`` (K). Seeded from each latitude's ice-free annual-mean radiative equilibrium (so
+        only the seasonal anomaly, not the slow global-mean offset, has to spin up — the ocean
+        ``τ = C_O/B`` is a few years), or from ``T_init`` (a scalar, or a ``[n_x, n_lon]`` field — a
+        warm/cold seed selects the branch under the ice feedback). ``absorbed[x, t]`` may be injected (the
+        slab / synthetic-forcing anchors).
+
+        Three forcings, one of which is live
+        -------------------------------------
+        * ``albedo`` — a **fixed** ice-free albedo: a scalar, a per-latitude ``[n_x]`` array (the 5B.2
+          path, byte-identical), or a ``[n_x, n_lon]`` **map** (:func:`ice_free_albedo_map` — the
+          cheap-tier land/sea contrast). With a fixed albedo the model is *linear*, so its annual mean
+          solves the annual-mean 2-D EBM with forcing ``⟨S⟩(1 − α(x, λ)) − A``: the **zonal mean** of the
+          annual-mean map equals the 1-D parent driven by the **zonal-mean** co-albedo, exactly, and with
+          ``D = 0`` every cell's annual mean is its own radiative equilibrium — the map's tight anchors.
+        * ``absorbed`` — an injected ``[n_x, n_steps]`` absorbed field (the anchors' synthetic forcing).
+        * ``coalbedo_fn(x, T) → [n_x, n_lon]`` — the **seasonal ice-albedo feedback on the map** (rung
+          5B.3): re-evaluated on every cell's *own* temperature at the start of each radiation half-step
+          (``absorbed = S(x, t)·coalbedo_fn(x, T)``), so each grid point freezes independently — exactly
+          the 5B.1+ tile feedback (:func:`planet.seasonal.ice_coalbedo` works as-is, broadcast over
+          longitude; :func:`masked_ice_coalbedo` composes it with an albedo map). Marcher-only and opt-in:
+          ``coalbedo_fn=None`` leaves the fixed path bit-identical. What it buys: a **map** of seasonal
+          snow and sea ice, and the annual mean is **no longer blind to the mask** — the winter snow the
+          small-``C`` land grows reflects sun the ocean at the same latitude keeps absorbing, so continents
+          end colder in the annual mean (the ice-albedo *rectification* of the seasonal cycle).
+          Exclusive with ``albedo`` / ``absorbed``.
         """
-        absorbed = (self.absorbed_series(albedo) if absorbed is None
-                    else np.asarray(absorbed, dtype=float))       # [n_x, n_steps]
-        if T_init is None:
-            T = self._radiative_equilibrium(absorbed)
+        if coalbedo_fn is not None and (absorbed is not None or albedo is not None):
+            raise ValueError("coalbedo_fn (state-dependent ice albedo) is exclusive with a fixed "
+                             "albedo/absorbed field")
+        alb_map = None
+        if absorbed is not None:
+            absorbed = np.asarray(absorbed, dtype=float)                 # [n_x, n_steps], injected
+        elif albedo is not None and np.ndim(albedo) == 2:
+            alb_map = self.coalbedo_map(albedo)                          # [n_x, n_lon] fixed map
+            absorbed = None
         else:
+            absorbed = self.absorbed_series(albedo)                      # [n_x, n_steps], the 5B.2 path
+        S_inc = self.zonal.insolation_series() if (coalbedo_fn is not None or alb_map is not None) else None
+        x2 = self.x[:, None]
+
+        if T_init is None:
+            # The annual-mean radiative equilibrium per cell (the 5B.1 seed rule). The ice path seeds from
+            # the ICE-FREE forcing, which keeps a never-freezing ice march bit-identical to the fixed path.
+            if alb_map is not None:
+                T = ((S_inc.mean(axis=1)[:, None] * alb_map) - self.A) / self.B
+            else:
+                T = self._radiative_equilibrium(absorbed)
+        elif np.ndim(T_init) == 0:
             T = np.full((self.n_cells, self.n_lon), float(T_init))
+        else:
+            T = np.array(T_init, dtype=float)
+            if T.shape != (self.n_cells, self.n_lon):
+                raise ValueError(f"T_init field must be shape {(self.n_cells, self.n_lon)}, got {T.shape}")
         # Per-cell half-step radiation decay factor (its own C at every point).
         decay = np.exp(-0.5 * self.dt * self.B / self.C)          # [n_cells, n_lon]
 
+        def forcing_at(s: int, T: np.ndarray) -> np.ndarray:
+            """Absorbed shortwave at time sample ``s`` — ``[n_x, 1]`` (fixed 1-D) or ``[n_x, n_lon]``."""
+            if coalbedo_fn is not None:
+                return S_inc[:, s][:, None] * coalbedo_fn(x2, T)   # the live ice feedback, per cell
+            if alb_map is not None:
+                return S_inc[:, s][:, None] * alb_map              # a fixed albedo MAP
+            return absorbed[:, s][:, None]                         # the 5B.2 path (unchanged arithmetic)
+
         def rad_half(T, absorbed_t):
-            Teq = ((absorbed_t - self.A) / self.B)[:, None]       # [n_x, 1] broadcast over λ
+            Teq = (absorbed_t - self.A) / self.B                  # broadcast over λ
             return Teq + (T - Teq) * decay
 
         converged, year = False, 0
@@ -364,12 +494,10 @@ class SeasonalMapEBM:
             T_ref = T.copy()
             for s in range(self.n_steps):
                 T_year[:, :, s] = T
-                a_now = absorbed[:, s]
-                a_next = absorbed[:, (s + 1) % self.n_steps]
-                T = rad_half(T, a_now)                            # ½ radiation @ t
+                T = rad_half(T, forcing_at(s, T))                 # ½ radiation @ t
                 T = self._meridional_sweep(T)                     # implicit meridional transport
                 T = self._zonal_sweep(T)                          # implicit periodic zonal transport
-                T = rad_half(T, a_next)                           # ½ radiation @ t+dt
+                T = rad_half(T, forcing_at((s + 1) % self.n_steps, T))   # ½ radiation @ t+dt
             if np.max(np.abs(T - T_ref)) < tol:
                 converged = True
                 break

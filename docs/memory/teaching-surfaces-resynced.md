@@ -58,3 +58,12 @@ Non-obvious gotchas (worth keeping):
   a one-line note reconciling the printed label.
 
 [[interactive-what-if]] [[planet-rung3-qg-built]] [[planet-rung25-mse-diffusion]] [[planet-rung1-two-way-coupler]]
+
+**Extended again 2026-09-02 — §8.8 added** (cells 51–53: markdown + a LIVE code cell running
+`bifurcation.equilibrium_curve(EBMParams(n_cells=720))` (0.1 s; output banked *surgically* by running the cell's
+source in a subprocess and pasting stdout as a `stream` output — no full nbclient re-execution) + an embed-only
+cell for `planet-bifurcation.png`, `planet-seasonal-ice-map.png`, `planet-seasonal-ice-map.gif`). §8 heading
+de-numbered ("the research rungs beyond rung 0", eight sections §8.1–§8.8); the "Where the numbers come from"
+table gained two rows. The notebook's original file ends WITHOUT a trailing newline — strip it after
+`json.dump` to keep the diff honest. `docs/index.html` regenerated for the two new catalogue rows
+(`bifurcation`, `seasonal_ice_map` + its `interactive=` globe).
