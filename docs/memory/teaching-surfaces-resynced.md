@@ -67,3 +67,7 @@ de-numbered ("the research rungs beyond rung 0", eight sections §8.1–§8.8); 
 table gained two rows. The notebook's original file ends WITHOUT a trailing newline — strip it after
 `json.dump` to keep the diff honest. `docs/index.html` regenerated for the two new catalogue rows
 (`bifurcation`, `seasonal_ice_map` + its `interactive=` globe).
+- **Notebook-hang data point (2026-09-02):** `test_planet_notebook` failed ONCE with the documented "Ubuntu" signature
+  (the §2 snowball cell timing out) when run under `pytest -n 3` alongside the slow 2-D-march tests on a 4-core Linux
+  container, then passed clean solo. Correlates with CPU contention, not content; run the notebook test solo (or the full
+  gate with fewer workers) before blaming a cell. Root cause still open.

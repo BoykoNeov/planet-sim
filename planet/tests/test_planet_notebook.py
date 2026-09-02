@@ -53,6 +53,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # lane never runs this `slow` test and the local full gate does (where it is reliable), so we skip
 # ONLY in CI to keep the badge meaningful instead of permanently red. REMOVE this gate once the
 # *Ubuntu* hang is itself reproduced and confirmed cleared.
+# 2026-09-02 data point (Linux container, 4 cores): the same signature — the §2 snowball cell timing
+# out — appeared ONCE when this test ran under `-n 3` alongside the slow 2-D-march tests (heavy CPU
+# contention), and the notebook then executed clean on a solo re-run. So the hang correlates with
+# load on the box, not with notebook content; a root cause is still not established.
 _SKIP_IN_CI = os.environ.get("CI", "").lower() in {"true", "1"}
 
 
