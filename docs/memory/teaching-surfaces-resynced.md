@@ -1,6 +1,6 @@
 ---
 name: teaching-surfaces-resynced
-description: "notebook §8 re-synced to rungs 1–4 (2026-06-15), EXTENDED to 2.x/5A/5B (2026-07-10), then §8.8/§8.9/§8.10 (2026-09-02/04) → TEN sections; the generated-HTML / big-notebook / surgical-re-bank / DOCS_FIGURE gotchas"
+description: "notebook §8 re-synced to rungs 1–4 (2026-06-15), EXTENDED to 2.x/5A/5B (2026-07-10), then §8.8/§8.9/§8.10 (2026-09-02/04) → TEN sections, plus the 2026-09-04 predict-then-check + missions pass; the generated-HTML / big-notebook / surgical-re-bank / DOCS_FIGURE gotchas"
 metadata: 
   node_type: memory
   type: project
@@ -93,3 +93,20 @@ Same surgical bank (subprocess → `stream` output, `execution_count` = 22). Two
 - the §8.10 markdown deliberately explains the rung's **negative** (deriving the 6.5 °C/km lapse rate
   reproduces it at mid-latitudes and loses to it in the tropics) in plain words — the notebook is where the
   "what did NOT work" half is most valuable, and it needs no jargon to land.
+
+
+**Extended again 2026-09-04 — the pedagogy pass (markdown-only, NO re-bank).** Six markdown cells added
+(five "🔮 Predict first" boxes before the live sliders in §§1–5, one "Four missions" cell at the end of §7):
+buckets A and B of [[pedagogy-novice-intermediate]]. The cheap-lane recipe, for the next markdown-only edit:
+- **No code cells ⇒ no output banking and no `docs/index.html` regeneration** — the two most expensive steps
+  of every previous §8 extension simply do not apply. `git diff --stat` came back **+222/−0** on the notebook.
+- **Insert by CONTENT, never by index** (advisor-caught): every insertion shifts the later cells, so the
+  patch script iterates the cell list and matches each anchor's lead text (the `# Live:` comment, the `## 8 —`
+  heading), then asserts the final count is exactly `old + 6` and that the §8 / provenance headings still
+  parse. Script kept at `M:\claud_projects	emp\pedagogy-ab\patch_notebook.py`.
+- The `json.dumps(nb, indent=1, ensure_ascii=False)` byte-identity check is now an **assert at the top of the
+  patch script**, not a manual pre-step; the no-trailing-newline rule still holds.
+- **Cells 54–56 in HEAD (the §8.9 block) carry no `id` field** — `nbformat.validate` warns about it. Pre-existing,
+  not introduced here; left alone rather than churning the diff.
+- `test_planet_notebook.py` re-run **solo** on the final state: `pytest planet/tests/test_planet_notebook.py -n0`
+  (the addopts carry `-n auto`, so `-p no:xdist` is a *parse error* — `-n0` is the in-process form).

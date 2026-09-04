@@ -480,6 +480,18 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   to match. The new modules `orographic_scene` / `orographic_depletion` (rung 5A.2/5A.3), `seasonal`
   ice-albedo (rung 5B.1+), and `seasonal_map` (rung 5B.2) are thus all showcased. `tests/test_demo_orographic.py`,
   `test_planet_notebook.py`.
+- **The notebook turns from a tour into a lab — predict-then-check + missions — BUILT** (2026-09-04). The two
+  pedagogy buckets deferred since 2026-06-10 (bucket C, the design bench, shipped then). **Bucket A:** five
+  **"🔮 Predict first"** cells, one immediately before each live slider in §§1–5 — a committed guess, then a
+  `<details>` answer in the notebook's existing collapsible idiom, so the payoff still lands on GitHub where the
+  widgets do not run. **Bucket B:** four **mission cards** at the end of §7 (*where · allowed knobs · goal ·
+  done-when*): freeze the planet, make a desert world, find the habitable-zone edges, build an M-dwarf world.
+  Markdown-only — no code cells, so no output re-banking and no `docs/index.html` regeneration. **The drafted
+  content did not survive contact with the code:** two prompts described controls their widget does not have,
+  the desert mission was **backwards** (warming *shrinks* the dry bands — the desert maximum is a *dim* Sun),
+  the M-dwarf mission was **unreachable** on the bench's slider range, and the habitable zone has only a **cold**
+  edge in this model (the OLR is linear — the runaway greenhouse is §8.5's territory), which is now the exercise
+  rather than an omission. Every number in every answer is measured, not recalled. `test_planet_notebook.py`.
 
 ## Test runner (tiered gate, ADR 0003)
 

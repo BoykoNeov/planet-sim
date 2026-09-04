@@ -1,6 +1,6 @@
 ---
 name: pedagogy-novice-intermediate
-description: planet.ipynb pedagogy roadmap — bucket C (design-a-world sandbox) BUILT 2026-06-10; buckets A (predict-then-check) + B (mission cards) DEFERRED with their concrete content
+description: planet.ipynb pedagogy — ALL THREE buckets now BUILT (C the design bench 2026-06-10; A predict-then-check + B mission cards 2026-09-04, after the drafted content failed against the code)
 metadata: 
   node_type: memory
   type: project
@@ -35,25 +35,56 @@ re-runs from `to_params()` (deterministic, teaches the API) and the prose is hon
 *arrays* are the manifest the §6 globe / external tools consume, not what the matplotlib bench reloads.
 See [[planet-interactive-map-design]].
 
-**Bucket A — "predict, then check" (DEFERRED; ~free, markdown-only).** Before each §'s slider, one
-prompt turning passive reading into a hypothesis-test loop. Concrete prompts to drop in:
-- §1: "Before you brighten the sun — will the *pole* or the *equator* warm more? Drag S₀ and watch."
-- §2: "You're at today's sun. Predict: if you dim then re-brighten to exactly the same S₀, do you get
-  the same climate back? Now do it." (the hysteresis 'gotcha').
-- §3: "Will warming move the *deserts* toward the equator or the poles? Crank −A and see."
-- §4/§5: "Which way does the jet blow — east or west? Predict before the arrows render."
+**Bucket A — "predict, then check" = BUILT 2026-09-04** (five markdown cells in `planet.ipynb`, one
+immediately before each live slider in §§1–5). Shape: a **"🔮 Predict first"** question that asks for a
+committed guess, then a `<details>` **"🔎 What you should see"** answer in the notebook's existing
+collapsible idiom — which is *also* why the addition earns its place: the payoff survives on GitHub /
+nbviewer, where none of the widgets run.
 
-**Bucket B — goal-directed "mission" cards (DEFERRED; cheap, reuses existing knobs).** Short challenge
-cards, each with a success criterion read straight off the figure:
-- *Freeze the planet* — find the Snowball threshold by hand with S₀ (§2).
-- *Make a desert world* — push −A / knobs until the temperate biome bands collapse (§3).
-- *Find the habitable-zone edges* — the inner/outer S₀ where biomes appear / vanish.
-- *Build an M-dwarf world* — use the star-spectrum knob; watch the ice line move (the §9.1 exoplanet
-  work). Same framing for the size and obliquity knobs.
-**Deferred follow-on to C — "two-world diff" (a stretch, NOT core C).** Load two saved specs and show
-Earth vs. your-world side by side (the layer registry already supports multiple views; a small
-side-by-side builder, or just two `load_world` panels). Was framed as a follow-on, correctly not built
-in the first cut.
+**The prompts drafted in 2026-06-10 did not survive contact with the code — check every one against its
+widget before writing it down.**
+Two were wrong (advisor-caught): the drafted §2 prompt ("dim then re-brighten — do you get the same climate
+back?") describes a control the §2 widget *does not have* (it is one Sun × two starting climates), and the
+drafted §4 prompt ("which way does the jet blow") belongs to §5's widget — §4's live cell is grid
+refinement. Same staleness class as the `circ_precip.py` pointer and the `∝1/D` line in plan §12.2: the
+drafts predate several builds. **Every answer was measured before being written**, not recalled:
+- §1 — the pole warms ~2× the equator while ice retreats (+4 vs +9 °C, 1361→1400) and **the sign flips once
+  ice-free** (+4.0 vs +2.6 °C, 1480→1520). "It was never about latitude, it was about ice"; cross-links to
+  §8.2, which gets polar amplification from moisture with no ice at all.
+- §2 — reframed to a question cell 10 does *not* already answer: **how many** Suns give both starting
+  climates the same answer. Exactly one (the dim closure ≈1253); the frozen branch does not melt out until
+  **≈1800 W/m², ~30 % brighter than today** — the asymmetry *is* the loop width.
+- §3 — poleward **and smaller** (dry share 24 %→10 %, tundra leaves the legend). The "smaller" is the
+  counter-intuitive half and the hook into Mission 2.
+- §4 — the sharpest of the five: refining the grid moves the **numerical error** (5.9 %→0.8 %) and **not the
+  physics** (radiated fraction ~86 % at every resolution), while the *bump-size* slider moves the physics
+  (95 %→53 % across 0.15→1.0 `L_R`). "A number that keeps moving as you refine has not measured anything."
+- §5 — the jet **slows** as the Sun brightens (20→16 m/s: melting ice weakens the very gradient that drives
+  it) and its latitude barely moves (44°→43°) — §1's prediction resurfacing one engine downstream.
 
-A and B are nearly free (markdown + framing over machinery that already works) and high-leverage for
-novice engagement; C was the bigger "turn the tour into a lab" piece and is done. [[planet-plan]].
+**Bucket B — mission cards = BUILT 2026-09-04** (one markdown cell at the end of §7, before §8 — the first
+point where every knob the missions need is on the page). Four cards in a fixed *where · allowed knobs ·
+goal · done-when* shape. **All four success criteria were verified reachable on the actual slider ranges**,
+and two of the drafted missions were not:
+- *Make a desert world* — the draft ("push −A until the temperate bands collapse") is **backwards**. Warming
+  *shrinks* the dry bands (a warmer atmosphere rains more: 24 %→10 %); the desert maximum is a **dim** Sun
+  (~38 % at 1250 W/m² plus a few greenhouse notches), bounded by the Snowball cliff. The card is now built
+  *around* that reversal, with §3's prediction box as the set-up.
+- *Build an M-dwarf world* — the draft was **unreachable**: the red-star freeze cliff sits at ≈1150 W/m²,
+  below the bench's 1250 minimum. Rebuilt as a one-notch demonstration at fixed `S₀ = 1250` — Sun-like
+  (5772 K) → frozen at −46 °C; dragged to 2600 K → alive at +5 °C, ice line 59°.
+- *Find the habitable-zone edges* — reframed as **one edge and an honest absence**: the cold edge brackets
+  between the bench's two dimmest notches (1250 frozen / 1260 not), and the hot edge **is not in this
+  model** (the OLR is linear in T; the runaway is §8.5's territory). "Find where the model stops modelling"
+  turns the project's honesty gradient into an exercise.
+- *Freeze the planet* — §2's slider, the ≈1253 cliff, unchanged from the draft.
+
+**The third deferred item, the two-world diff, was ALREADY BUILT** — §7 carries both
+`planet_spec.diff` ("Compare two worlds") and the `[webviz]` A · B · Δ comparison globes
+(`planet_spec.delta_view` → `planetmap.render_comparison`). The plan §12.4 checkbox was stale; struck.
+
+All three buckets are now built. A and B were indeed nearly free in *mechanism* (markdown over machinery
+that already works) but **not** in content: the cheap half is the prose, the expensive half is measuring
+every answer and re-deriving every prompt against the widget it sits in front of — half the drafted content
+was wrong. Markdown-only means no output re-banking and no `docs/index.html` regeneration; still re-run
+`test_planet_notebook.py` **solo** on the final state ([[teaching-surfaces-resynced]]). [[planet-plan]].
