@@ -54,8 +54,11 @@ drafts predate several builds. **Every answer was measured before being written*
 - §2 — reframed to a question cell 10 does *not* already answer: **how many** Suns give both starting
   climates the same answer. Exactly one (the dim closure ≈1253); the frozen branch does not melt out until
   **≈1800 W/m², ~30 % brighter than today** — the asymmetry *is* the loop width.
-- §3 — poleward **and smaller** (dry share 24 %→10 %, tundra leaves the legend). The "smaller" is the
-  counter-intuitive half and the hook into Mission 2.
+- §3 — asks about **size only**. The first cut asked "which way *and* does it grow?", but §3's heading cell
+  already says the bands migrate poleward, so half the question was spoiled before the reader reached it
+  (advisor-caught on a second pass): **the spoiler check is against the surrounding prose, not only against the
+  widget** — the same move §2's prompt needed. Answer: **smaller**, dry share 24 %→10 %, tundra leaves the
+  legend; the shrinking is the counter-intuitive half and the hook into Mission 2.
 - §4 — the sharpest of the five: refining the grid moves the **numerical error** (5.9 %→0.8 %) and **not the
   physics** (radiated fraction ~86 % at every resolution), while the *bump-size* slider moves the physics
   (95 %→53 % across 0.15→1.0 `L_R`). "A number that keeps moving as you refine has not measured anything."

@@ -488,7 +488,8 @@ remaining shared engine (`engines/fluid`, the shallow-water solver). Full plan:
   done-when*): freeze the planet, make a desert world, find the habitable-zone edges, build an M-dwarf world.
   Markdown-only — no code cells, so no output re-banking and no `docs/index.html` regeneration. **The drafted
   content did not survive contact with the code:** two prompts described controls their widget does not have,
-  the desert mission was **backwards** (warming *shrinks* the dry bands — the desert maximum is a *dim* Sun),
+  the desert mission was **backwards** (warming *shrinks* the dry bands — the desert maximum is a *dim* Sun), §3's
+  prompt had to be re-aimed at the desert's *size* because §3's own heading already gives the direction away,
   the M-dwarf mission was **unreachable** on the bench's slider range, and the habitable zone has only a **cold**
   edge in this model (the OLR is linear — the runaway greenhouse is §8.5's territory), which is now the exercise
   rather than an omission. Every number in every answer is measured, not recalled. `test_planet_notebook.py`.

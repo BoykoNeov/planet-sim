@@ -2935,8 +2935,11 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
   §1 polar amplification while ice retreats (+4 vs +9 °C, 1361→1400) that **flips sign once ice-free** (+4.0 vs
   +2.6 °C, 1480→1520 — "it was never about latitude, it was about ice"); §2 the two branches agree at
   **exactly one** Sun in the slider range (the dim closure ≈1253) because the frozen branch does not melt out
-  until ≈1800 W/m², ~30 % brighter than today; §3 poleward **and smaller** (dry share 24 %→10 %, the tundra
-  leaves the legend) — the counter-intuitive half, and the hook for Mission 2; §4 **grid refinement moves the
+  until ≈1800 W/m², ~30 % brighter than today; §3 asks about **size only**, because §3's own heading cell
+  already gives the direction away — the same spoiler check that re-aimed §2, and a reminder that the check is
+  against the *surrounding prose*, not only against the widget (advisor-caught on a second pass): the desert gets
+  **smaller**, dry share 24 %→10 %, the tundra leaving the legend — the counter-intuitive half and the hook for
+  Mission 2; §4 **grid refinement moves the
   numerical error (5.9 %→0.8 %) and not the physics** (radiated fraction 86 % throughout), while the *bump-size*
   slider does move the physics (95 %→53 % across 0.15→1.0 L_R) — the sharpest teaching point of the five;
   §5 the jet **slows** as the Sun brightens (20→16 m/s) because melting ice weakens the very gradient that
