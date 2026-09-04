@@ -71,3 +71,14 @@ table gained two rows. The notebook's original file ends WITHOUT a trailing newl
   (the §2 snowball cell timing out) when run under `pytest -n 3` alongside the slow 2-D-march tests on a 4-core Linux
   container, then passed clean solo. Correlates with CPU contention, not content; run the notebook test solo (or the full
   gate with fewer workers) before blaming a cell. Root cause still open.
+
+**Extended again 2026-09-04 — §8.9 added** (cells 54–56: markdown + a LIVE code cell running rung 5B.4's
+`seasonal_sici.annual_mean_curve` + a 4-point `hysteresis_loop` at 360 cells / 90 steps — **~9 s**, the
+slowest live cell in §8, so keep the grid at 360 if it is ever re-tuned — plus an embed-only cell for
+`planet-seasonal-sici.png`). Output banked **surgically** again (run the cell's source in a subprocess,
+paste stdout as a `stream` output; `execution_count` = max + 1 = 21). §8 now has **nine** sections
+§8.1–§8.9. `docs/index.html` regenerated for the new `seasonal_sici` catalogue row. Two gotchas re-learned:
+`json.dumps(nb, indent=1, ensure_ascii=False)` round-trips this notebook **byte-identically** (verify that
+before editing — it is the cheapest proof the rewrite is diff-clean), and the file still ends with **no**
+trailing newline. Also: `plots.py` is **not** imported by most of the suite, so a syntax error there passes
+the fast lane and surfaces only in the notebook test — `python -c "import planet.plots"` after every edit.

@@ -54,6 +54,10 @@ DEMOS: tuple[Demo, ...] = (
          "turn on the seasons and heat capacity wakes: a land tile swings far more than the ocean tile at "
          "the same latitude — continentality from the C contrast alone",
          ("viz",), "docs/figures/planet-seasonal.png", "Climate — energy balance"),
+    Demo("seasonal_sici", "planet.demo_seasonal_sici", "Do the seasons dissolve the second cliff?",
+         "the annual-mean model says a polar cap smaller than ~10° cannot exist; switch the seasons on and "
+         "it grows one grid cell at a time with no jump — and a deep, sluggish ocean brings the cliff back",
+         ("viz",), "docs/figures/planet-seasonal-sici.png", "Climate — energy balance", sim=True),
     Demo("seasonal_ice_map", "planet.demo_seasonal_ice_map", "Seasonal ice map — animated",
          "the seasons, the continents and the snow: winter snow spreads over the land, sea ice lingers at the "
          "poles, and the continents end colder in the annual mean (a month-by-month GIF)",

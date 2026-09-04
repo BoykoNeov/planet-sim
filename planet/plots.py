@@ -1293,3 +1293,131 @@ def seasonal_ice_map_animation(result, *, interval: int = 160):
         return mesh, ice_mesh, badge, readout
 
     return FuncAnimation(fig, update, frames=len(steps), interval=interval, blit=False)
+
+
+# --------------------------------------------------------------------------- #
+# Rung 5B.4 — the seasonal small-ice-cap instability.
+# --------------------------------------------------------------------------- #
+def seasonal_sici_figure(result):
+    """The seasons dissolving the small-ice-cap fold (:mod:`planet.seasonal_sici`) — and where it comes back.
+
+    Four panels. **The forbidden band** (top-left): the annual-mean equilibrium diagram of this very model
+    near the pole — ice-line latitude against solar constant, stable branches solid, unstable dashed — with
+    the shaded band of cap sizes it says no sun can hold, and the *seasonal* sweep's perennial ice edge
+    laid over it, walking straight through. **One cell at a time** (top-right): the same sweep read as the
+    un-interpolated perennial ice-**cell** count, dimming and brightening on top of each other; a fold
+    would show as a step of several cells and a visible gap between the two legs. **Bringing it back**
+    (bottom-left): plant a cap of the critical size at the fold's sun and deepen the ocean mixed layer —
+    the seasonal swing dies, and past some depth the planted cap survives where a warm start grows none,
+    i.e. two climates at one sun. **The grid is not the answer** (bottom-right): the loop width at three
+    resolutions against the parent's own loop — the verdict does not move as the polar cell shrinks.
+    Requires the ``viz`` extra.
+    """
+    r = result
+    parent, loop = r.parent, r.loop
+    theta_c = r.theta_c
+
+    fig, axd = plt.subplot_mosaic(
+        [["band", "cells"], ["depth", "res"]], figsize=(13.5, 8.8), constrained_layout=True,
+    )
+
+    # -- the annual mean's forbidden band, and the seasonal sweep crossing it -------- #
+    ax = axd["band"]
+    lat = parent.latitude_deg()
+    near_pole = lat >= 60.0
+    stable = parent.stable
+    labelled = set()                                        # each branch kind labelled once, not per run
+    start = 0
+    for k in range(1, stable.size + 1):                     # solid/dashed runs, as the rung-0 figure draws
+        if k == stable.size or stable[k] != stable[start]:
+            sl = slice(start, min(k + 1, stable.size))
+            sel = near_pole[sl]
+            if sel.any():
+                kind = bool(stable[start])
+                ax.plot(parent.S0[sl][sel], lat[sl][sel],
+                        color=STABLE_COLOR if kind else UNSTABLE_COLOR,
+                        ls="-" if kind else "--", lw=2.2,
+                        label=None if kind in labelled else
+                        ("annual mean — stable cap" if kind else "annual mean — unstable (no cap lives here)"))
+                labelled.add(kind)
+            start = k
+    ax.axhspan(90.0 - theta_c, 90.0, color=UNSTABLE_COLOR, alpha=0.12)
+    ax.annotate(f"caps smaller than θ_c = {theta_c:.1f}°\ncannot exist at equilibrium",
+                (0.03, 0.93), xycoords="axes fraction", fontsize=8, va="top", color=UNSTABLE_COLOR)
+    down, up = loop.down, loop.up
+    for cont, colour, tag in ((down, COOLING_COLOR, "seasonal — dimming"),
+                              (up, WARMING_COLOR, "seasonal — brightening")):
+        has_ice = cont.perennial_cap_deg > 0.0
+        ax.plot(cont.S0[has_ice], 90.0 - cont.perennial_cap_deg[has_ice], "o", ms=4.5,
+                color=colour, alpha=0.85, label=tag)
+    ax.set_xlabel("solar constant S₀ (W m⁻²)")
+    ax.set_ylabel("edge of the year-round ice (° latitude)")
+    ax.set_ylim(60, 91)
+    ax.set_xlim(min(down.S0.min(), parent.ice_free_threshold_S0) - 12.0, down.S0.max() + 3.0)
+    ax.set_title("the seasonal planet holds caps the annual mean forbids", fontsize=9)
+    ax.legend(fontsize=7.5, loc="lower left")
+
+    # -- the un-interpolated read: perennial cells, one at a time -------------------- #
+    ax = axd["cells"]
+    ax.step(down.S0, down.n_perennial_cells, where="mid", color=COOLING_COLOR, lw=2.2,
+            label="dimming")
+    ax.step(up.S0, up.n_perennial_cells, where="mid", color=WARMING_COLOR, lw=1.4, ls="--",
+            label="brightening (retraces it)")
+    ax.set_xlabel("solar constant S₀ (W m⁻²)")
+    ax.set_ylabel("cells frozen all year (one hemisphere)")
+    ax.set_title(f"the cap grows {down.max_cell_jump} cell"
+                 f"{'s' if down.max_cell_jump != 1 else ''} per step — a fold would switch on "
+                 f"{r.fold_cells} at once", fontsize=9)
+    ax.annotate("the albedo feedback only ever flips whole cells,\n"
+                "so this is the honest read — the interpolated\n"
+                "cap radius could look smooth over a jump",
+                (0.40, 0.97), xycoords="axes fraction", fontsize=7.5, va="top", color="#4a4a4a")
+    ax.legend(fontsize=8, loc="lower left")
+
+    # -- deepen the ocean and the bistability returns -------------------------------- #
+    ax = axd["depth"]
+    depths = np.array(r.depths, dtype=float)
+    gaps = np.array([s.gap_deg for s in r.seed_points])
+    swings = np.array([s.warm_polar_amplitude_K for s in r.seed_points])
+    colours = [UNSTABLE_COLOR if s.bistable else STABLE_COLOR for s in r.seed_points]
+    ax.bar(np.arange(depths.size), gaps, color=colours, alpha=0.85, width=0.55)
+    ax.axhline(r.seed_points[0].threshold_deg, color="#4a4a4a", lw=1.0, ls="--")
+    ax.annotate("detection threshold (½ polar cell)", (0.02, r.seed_points[0].threshold_deg),
+                xycoords=("axes fraction", "data"), textcoords="offset points", xytext=(0, 3),
+                fontsize=7.5, color="#4a4a4a")
+    ax.set_xticks(np.arange(depths.size))
+    ax.set_xticklabels([f"{d:.0f} m" for d in depths])
+    ax.set_xlabel("ocean mixed-layer depth (the seasonal-swing knob)")
+    ax.set_ylabel("difference between the two climates (°)")
+    ax.set_title("damp the seasons and the fold returns — two climates at one sun", fontsize=9)
+    twin = ax.twinx()
+    swing_colour = "#7a5195"                                # distinct from either bar colour
+    twin.plot(np.arange(depths.size), swings, "o-", color=swing_colour, lw=1.6, ms=5)
+    twin.set_ylabel("seasonal swing at 80° (K)", color=swing_colour)
+    twin.tick_params(axis="y", colors=swing_colour)
+    twin.set_ylim(0, max(swings.max() * 1.35, 0.1))
+
+    # -- the resolution check --------------------------------------------------------- #
+    ax = axd["res"]
+    idx = np.arange(len(r.res_n_cells))
+    ax.bar(idx, r.res_loop_width, color=STABLE_COLOR, alpha=0.85, width=0.55,
+           label="seasonal loop width")
+    ax.axhline(r.parent_loop_width, color=UNSTABLE_COLOR, lw=1.8, ls="--",
+               label=f"the annual mean's own loop ({r.parent_loop_width:.1f} W m⁻²)")
+    for i, (j, fc) in enumerate(zip(r.res_max_jump, r.res_fold_cells)):
+        ax.annotate(f"{j}/step (a fold: {fc})", (i, 0.06 * max(r.parent_loop_width, 1.0)),
+                    ha="center", fontsize=7.5, color="#333333")
+    ax.set_xticks(idx)
+    ax.set_xticklabels([f"{n} cells\n(polar cell {pc:.1f}°)"
+                        for n, pc in zip(r.res_n_cells, r.res_polar_cell)], fontsize=8)
+    for i, w in enumerate(r.res_loop_width):
+        ax.annotate(f"{w:.1f}", (i, w), textcoords="offset points", xytext=(0, 4),
+                    ha="center", fontsize=9, fontweight="bold", color=STABLE_COLOR)
+    ax.set_ylabel("hysteresis loop width (W m⁻²)")
+    ax.set_ylim(0, max(r.parent_loop_width * 1.35, 1.0))
+    ax.set_title("not a grid artifact — the verdict holds as the polar cell shrinks", fontsize=9)
+    ax.legend(fontsize=7.5, loc="upper right")
+
+    fig.suptitle("Planet Rung 5B.4 — the seasons dissolve the small-ice-cap instability "
+                 "(and a deep ocean brings it back)", fontsize=13)
+    return fig

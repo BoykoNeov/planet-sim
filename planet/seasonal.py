@@ -445,17 +445,21 @@ class SeasonalEBM:
     def march(self, albedo: Optional[np.ndarray | float] = None,
               absorbed: Optional[np.ndarray] = None,
               coalbedo_fn: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None,
-              T_init: Optional[float] = None,
+              T_init: Optional[float | np.ndarray | tuple[np.ndarray, np.ndarray]] = None,
               tol: float = 1e-6, max_years: int = 80) -> SeasonalClimate:
         """March the Strang-split model to a converged annual limit cycle; return the last year's fields.
 
         Each substep is half-radiation (per tile, analytic exact for the frozen-α linear sink) /
         full-transport (the engine, on ``T̄`` with ``C_a``, redistributed to the tiles as an energy flux) /
         half-radiation. Runs whole years, comparing each year's day-0 state to the previous year's; stops
-        when ``max|ΔT| < tol`` (K) — the limit cycle. Seeded from a uniform ``T_init`` (or each latitude's
-        ice-free annual-mean radiative equilibrium); the seed sets the spin-up length **and**, under the
-        ice feedback, **selects the branch** (a cold start can settle on a snowball, a warm one on a
-        finite-ice climate — the bistability the Snowball loop rides, here inside the seasonal cycle).
+        when ``max|ΔT| < tol`` (K) — the limit cycle. Seeded from ``T_init``: ``None`` (each latitude's
+        ice-free annual-mean radiative equilibrium), a **scalar** (a uniform slab), a **profile array**
+        ``[n_cells]`` (both tiles), or a **tuple** ``(T_land, T_ocean)`` of per-tile profiles — the last
+        being the *continuation* seed a swept sequence of solar constants uses (:mod:`planet.seasonal_sici`),
+        which resumes from a converged neighbour rather than re-spinning up. The seed sets the spin-up
+        length **and**, under the ice feedback, **selects the branch** (a cold start can settle on a
+        snowball, a warm one on a finite-ice climate — the bistability the Snowball loop rides, here inside
+        the seasonal cycle; a continuation seed keeps the sweep *on* its branch until the branch ends).
 
         The ice-albedo feedback (``coalbedo_fn``)
         ----------------------------------------
@@ -483,9 +487,19 @@ class SeasonalEBM:
             # the *ice-free* A_fixed here keeps the never-freezes ice path bit-identical to the fixed path.
             TL = (A_fixed.mean(axis=1) - self.A) / self.B
             TO = TL.copy()
-        else:
+        elif np.isscalar(T_init):
             TL = np.full(self.x.shape, float(T_init))
             TO = np.full(self.x.shape, float(T_init))
+        elif isinstance(T_init, tuple):
+            # Per-tile warm start (TL, TO) — the continuation seed: resume from a converged neighbour's
+            # day-0 state instead of a uniform slab, so a swept sequence of solar constants costs a small
+            # relaxation each rather than a full spin-up (and, under the ice feedback, STAYS on the branch
+            # it was seeded onto — which is the whole point of a continuation sweep).
+            TL, TO = (np.array(np.broadcast_to(np.asarray(t, dtype=float), self.x.shape)) for t in T_init)
+        else:
+            profile = np.asarray(T_init, dtype=float)
+            TL = np.array(np.broadcast_to(profile, self.x.shape))
+            TO = TL.copy()
         decayL = math.exp(-0.5 * self.dt * self.B / self.C_land)
         decayO = math.exp(-0.5 * self.dt * self.B / self.C_ocean)
 

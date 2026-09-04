@@ -60,6 +60,10 @@ precedence trap caught: `a * b @ P` parses as `(a*b)@P` — parenthesize the mat
 
 **Named edges:** uniform scalar `D` only for the Legendre anchor (a callable `D(x)` is not mode-diagonal —
 the FV curve accepts it); the theorem is for this EBM class (diffusive, step albedo, linear OLR); the
-seasonal SICI (Huang & Bowman 1992 — does the seasonal marcher's cap vanish by a jump?) is the natural
-next sweep on [[planet-rung5b-seasonal]]'s 5B.1+ marcher, named not built. Sources: North 1975 JAS 32;
+seasonal SICI (Huang & Bowman 1992 — does the seasonal marcher's cap vanish by a jump?) was the natural
+next sweep on [[planet-rung5b-seasonal]]'s 5B.1+ marcher and is now **BUILT 2026-09-04 as rung 5B.4**
+([[planet-rung5b4-seasonal-sici]]) — **answer: no**, the seasons dissolve this fold (the cap grows one
+grid cell at a time through θ_c with zero hysteresis) and it only returns as the mixed layer deepens
+toward the annual-mean limit. So `θ_c ≈ 10.9°` here is a property of the **annual-mean idealisation**,
+not of the ice-albedo feedback as such — quote it with that caveat. Sources: North 1975 JAS 32;
 Cahalan & North 1979 JAS 36 1178; North 1984 JAS 41 3390. → [[ebm-radiation-source]], [[planet-phase1]].

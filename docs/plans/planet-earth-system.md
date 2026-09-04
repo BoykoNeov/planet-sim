@@ -2353,6 +2353,73 @@ fractions and the −0.6 K ride ``C``, ``T_f``, ``a_ice``. **Named:** the 2-D in
 the 5B.1 zonal tile (34 % vs 60 % — the zonal sweep moderates it; 45° is marginal at 19 %, the story reads
 at 55°); no snow-depth / melt physics (the step albedo); idealized blocky mask. [[planet-rung5b-seasonal]].
 
+**Rung 5B.4 — the SEASONAL small-ice-cap sweep BUILT** (2026-09-04, `planet/seasonal_sici.py`,
+`test_seasonal_sici.py` 13 fast + 3 slow, `demo_seasonal_sici.py` + `test_demo_seasonal_sici.py` (2 slow),
+`plots.seasonal_sici_figure` →
+`planet-seasonal-sici.png`; catalogue `seasonal_sici`). Closes the *seasonal* SICI line rung 0+ and 5B.1+
+both left named. A **sibling**: `seasonal.py` untouched but for one `T_init` branch (array / per-tile
+`(T_L, T_O)` continuation seed, beside the byte-identical `None`/scalar paths; 5B.1+'s two bit-identical
+reductions are the guard).
+**THE FINDING — the fold is an artifact of the annual-mean idealisation.** The annual-mean parent of this
+very model forbids caps below `θ_c ≈ 9.9°` (hysteresis loop **6.8 W/m²**). Same model, seasons on, Earth
+tilt, 50 m mixed layer: the perennial cap grows **one grid cell at a time** (`max_cell_jump == 1` at
+ΔS₀ = 0.5) straight **through** `θ_c`, and the dimming/brightening legs retrace each other — largest cap
+gap **0.18° at 720 cells, 0.08° at 1440**, both under the ½-polar-cell threshold ⟹ **loop width 0** where
+the parent's is ~7. Stable caps at 3.1°/4.7°/5.9° — sizes the annual mean forbids outright. **It returns
+with depth:** plant a `θ_c` cap at the parent's fold sun and deepen the mixed layer (damping the swing,
+annual-mean sunlight untouched) → warm-vs-planted gap 0.05° @50 m (one climate), 0.13° @200 m,
+**8.46° @800 m** (two climates — the warm start finds *no* cap, the planted one survives as a ~4-cell,
+8.5° cap). Run at **720 cells, deliberately**: at 360 a `θ_c` cap is one cell, so this control would have
+been one frozen cell versus none — on the very grid the resolution table prints as *too coarse to tell*
+(advisor-caught; the test now guards it with `cells_in_cap(θ_c) >= 4` and requires the surviving cap to be
+wider than a polar cell).
+**THE AXIS DECISION (load-bearing).** Obliquity is the obvious "no seasons" axis and is **confounded** —
+tilt moves the *annual-mean* gradient too, so the parent moves with it: measured, **ε=0 has no SICI at
+all**, ε=15° is still resolution-limited at 2880 cells (θ_c 2.45°, loop 0.93 and falling), only ε=23.44°
+converges (θ_c → 9.87°, loop → 6.76). Mixed-layer **depth** moves only the seasonal amplitude ⟹ one fixed
+converged reference for the whole sweep.
+**THE GRID TRAP (what this rung is really about).** The polar cell spans `≈ √(2Δx)` in latitude — 6.0°/360,
+4.3°/720, 3.0°/1440 — and shrinks only as `√Δx`. So *"the cap shrank smoothly to nothing"* and *"θ_c fell
+below the polar cell"* are **the same data** at coarse resolution. Three guards, weakest → strongest:
+(i) **loop width in S₀** (resolution-robust; defined against an explicit ½-polar-cell threshold so *no
+loop* ≠ *loop below detection*); (ii) **seed dependence at one sun** (`plant_cap` + march — independent of
+sweep direction, because a warm-started continuation *can* walk through a bistable band pinned to one
+branch); (iii) **the perennial ice-CELL COUNT** — the cap *radius* is **interpolated**
+(`ice_line_latitude`, e.g. a 3.10° cap inside a 4.27° cell) but the albedo flips **whole cells**, so a
+radius curve can look smooth over a stepping state; `+1 per S₀ step` is what makes "continuous" a fact —
+**but only against a scale**: a fold flips a whole `θ_c` cap on in ONE step, which is **5 cells at 720 and
+11 at 1440 but exactly 1 at 360**, so on the coarsest grid "grew by one cell" and "a fold fired" are the
+*same observation* and the claim is vacuous. `SICIConfig.cells_in_cap` reports that scale beside every
+count, the demo prints it, and the payoff test **refuses the claim** on any grid where it is under 4.
+**Anchors (tight).** `annual_mean_curve` transplants rung 0+'s inverse solve onto the *seasonal* model's own
+full-sphere `L_T` and its own annual-mean insolation (the time-mean of `insolation_series()`, **not** the
+P₂-truncated `insolation()` — the 5B.1 lesson; = the pinned `obliquity.annual_mean_insolation` to machine
+precision at `n_steps=720`) and returns a `bifurcation.EquilibriumCurve`, so the fold algebra is **reused,
+not re-derived**: the curve satisfies its own steady EBM to ~1e-8, hits `T_f` at the prescribed face to
+1e-9, is symmetric to 1e-9; **cross-model** it finds the same fold as rung 0+'s independent hemisphere
+solve, differing **θ_c 9.85° vs 10.86°** / S₀ 0.34 % — the **P₄+ moments the P₂ truncation drops, stated in
+advance**; and the **ε=0 marched ice line converges onto the exact curve at first order in dt**
+(0.149→0.076→0.039→0.019 over n_steps 45→360; ratios 1.95/1.98/1.99) — the Strang rate, the same shape as
+5B.1+'s ε=0 check. **Conservation:** a swept point still closes global+annual net TOA with the realized
+co-albedo. **The instrument's positive control** (advisor-caught gap, closed): every *other* marched call to
+the loop detector returns zero, so on its own the headline would rest on a detector shown to read non-zero
+only on hand-built arrays — pointed at an 800 m mixed layer the **same** detector and the **same** sweep
+find the fold, width **8.00 W/m² against the parent's 8.86** (7.50 at the cheaper test settings), in the
+right band of suns, with a sun inside the loop where the dimming leg carries *no* year-round ice and the
+brightening leg still does. A detector that always reads zero is indistinguishable from a broken one; this
+is what separates *"the seasons dissolved the fold"* from *"the instrument is blind"*. **Two traps found:** seeding the seasonal marcher with the *annual-mean* profile is effectively a
+**cold** start (winter runs tens of K below the mean) and runs away to a snowball — hence `plant_cap`
+perturbs an already-converged limit cycle instead; and **critical slowing near a fold** makes an
+early-quitting march look like a *smooth shrink*, the one systematic error biased toward this rung's
+answer — hence `tol=1e-7`, `max_years` to 8000, and a per-point `converged` flag no fold is read across.
+**Loose:** every magnitude rides the calibrated `C`/`T_f`/`a_ice`; direction banked. **Named scope:** one
+tilt, a step-function albedo on temperature alone (**no sea-ice thermodynamics** — "perennial" means only
+*never rose above `T_f` this year*), uniform two-tile mix run all-ocean (there is no year-round *land* ice
+at these insolations, 5B.1+, so all-land is a different question). Agrees in **direction** with Wagner &
+Eisenman 2015 and in **mechanism** with Huang & Bowman 1992 (the seasonal-cycle *amplitude*) but is a
+replication of **neither**. [[planet-rung5b4-seasonal-sici]]; sources North 1984 JAS 41, Huang & Bowman
+1992 Clim. Dyn. 7:205, Wagner & Eisenman 2015 J. Climate 28:3998, Cahalan & North 1979 JAS 36.
+
 **Repo structure — `ARCHITECTURE.md` WRITTEN** (2026-09-02). The monorepo's architecture file every
 `ARCHITECTURE.md §N` citation in this plan, the engine contracts and the docstrings points at was never
 carried into the standalone repo. The new root file restates the rules that survive the split: the five
@@ -2951,7 +3018,8 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
       ice-albedo on the marcher" is the mechanism, not the bifurcation study). **RESOLVED 2026-09-02 on rung
       0** — the annual-mean SICI is BUILT as the complete equilibrium diagram (`planet/bifurcation.py`,
       θ_c ≈ 10.9°, present day 0.16 % below the fold; §10 rung-0+ record, [[planet-bifurcation-sici]]); the
-      *seasonal* SICI sweep on this marcher (Huang & Bowman 1992) stays **[named upgrade]**.
+      *seasonal* SICI sweep on this marcher is now ~~**[named upgrade]**~~ **BUILT 2026-09-04 as rung 5B.4**
+      (see below) — and its answer is that the fold does **not** survive the seasons.
       Sources ([[seasonal-ebm-source]], [[ebm-radiation-source]]). See [[planet-rung5b-seasonal]].
     - **Rung 5B.2 — the true 2-D `T(φ, λ, t)` land–sea map · BUILT 2026-07-10** (`planet/seasonal_map.py`,
       `test_seasonal_map.py`, `demo_seasonal_map.py`, `plots.seasonal_map_figure`). The longitude axis
@@ -2998,6 +3066,24 @@ prescribed closures or caveats a *future* rung must clear — left as descriptiv
       [[planet-rung5b-seasonal]]. **Deferred:** a 2-D frequency-domain solver (would make the annual-mean reduction
       machine-tight, like 5B.1's spectral did — the marcher's structural anchors already pin every piece of
       the numerics). → [[planet-rung5b-seasonal]], [[seasonal-ebm-source]].
+    - **Rung 5B.4 — the seasonal small-ice-cap instability · BUILT 2026-09-04** (`planet/seasonal_sici.py`,
+      `test_seasonal_sici.py`, `demo_seasonal_sici.py`, `plots.seasonal_sici_figure`). The bifurcation study
+      5B.1+ named-deferred and rung 0+ left open for the *seasonal* marcher, and it comes back a **negative
+      on the fold**: the annual-mean parent of this very model forbids polar caps below `θ_c ≈ 9.9°` (loop
+      6.8 W/m²), but with the seasons on at Earth tilt and a 50 m mixed layer the perennial cap grows **one
+      grid cell at a time** straight through `θ_c` with the dimming and brightening legs retracing each
+      other (largest gap 0.18° at 720 cells, 0.08° at 1440 — both under ½ a polar cell, so **loop width 0**).
+      **Deepening the mixed layer brings it back** (planted-cap-vs-warm-start gap 0.07° at 50 m → 5.04° at
+      800 m), which is the reduction *and* the control: the difference is the seasonal **amplitude**, not
+      the machinery. **The axis was the decision** — obliquity is confounded (it moves the annual-mean
+      gradient too: no SICI at all at ε=0, still resolution-limited at ε=15°), so depth at fixed Earth tilt
+      is the only axis with a pinned reference. **The grid is the trap** — the polar cell spans `√(2Δx)` in
+      latitude and shrinks only as `√Δx`, so the verdict is read off the **perennial ice-cell count** (whole
+      cells, what the albedo actually flips) and the **loop width** (resolution-robust), never the
+      interpolated cap radius alone. **Named scope:** one tilt, step-function albedo, no sea-ice
+      thermodynamics, all-ocean — the **mechanism** is banked, not a general claim, and it is a replication
+      of neither Wagner & Eisenman 2015 nor Huang & Bowman 1992 though it agrees with both in direction.
+      §10 record; → [[planet-rung5b4-seasonal-sici]], [[planet-bifurcation-sici]].
 
 ### 12.6 Spin-outs — separate repos, not upgrades of this one
 

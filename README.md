@@ -10,7 +10,10 @@ planet size, obliquity), and an interactive Plotly globe — each leg validated 
 climate references. Beyond that rung-0 core a **research staircase** climbs toward a GCM one validated
 rung at a time: a moist water cycle, an energetic ITCZ, baroclinic eddy turbulence, a spectral greenhouse,
 orographic rain shadows, a seasonal land–sea map with winter snow, and the **complete equilibrium
-diagram** of the ice-albedo climate — every branch, both folds, the small-ice-cap instability.
+diagram** of the ice-albedo climate — every branch, both folds, the small-ice-cap instability. The newest
+rung turns that last result on itself: switch the **seasons** on and the small-ice-cap instability
+**dissolves** — a polar cap the annual-mean model says cannot exist grows one grid cell at a time, with no
+jump — and it only comes back as the ocean is made deep and sluggish enough to erase the seasonal cycle.
 
 It is the program's capstone: the **only simulator built on two** separately-validated solver
 engines — the 1-D diffusion/heat solver (`engines/diffusion`, the meridional heat transport) and
@@ -48,6 +51,7 @@ straight to one?
 python -m planet snowball     # run one demo (prints its validation table + banks a figure)
 python -m planet bifurcation  # every climate the sun allows — the S-curve, both folds, the second cliff
 python -m planet seasonal_ice_map   # the seasons, the continents and the snow — a monthly GIF + a month-slider globe
+python -m planet seasonal_sici      # do the seasons dissolve the second cliff? (they do — and a deep ocean brings it back)
 python -m planet list         # print the full catalogue of demos
 python -m planet interactive  # drag four knobs in your browser — a live what-if + plain-language "why"
 python -m planet notebook     # open the teaching notebook in JupyterLab (opens your browser for you)

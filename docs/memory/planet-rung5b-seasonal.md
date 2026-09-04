@@ -145,7 +145,10 @@ arithmetic verbatim / fixed map / live `coalbedo_fn`).
   (default 0 — planetary contrast is muted by clouds vs the surface 0.06–0.10 ocean / 0.15–0.35 land,
   Hartmann GPC Table 4.2; pick ~0.05, not the surface value); no snow-depth / melt physics (the step
   albedo); idealized blocky mask. **SICI** for this rung: resolved on rung 0 ([[planet-bifurcation-sici]]);
-  the *seasonal* SICI sweep (Huang & Bowman 1992) stays named.
+  the *seasonal* SICI sweep (Huang & Bowman 1992) is **BUILT 2026-09-04 as rung 5B.4**
+  ([[planet-rung5b4-seasonal-sici]]) — on THIS 5B.1+ marcher, and it finds the fold **gone** at Earth's
+  50 m mixed layer (returning only as the layer deepens). Note for reuse: `march`'s `T_init` now also
+  accepts an array / a per-tile `(T_L, T_O)` continuation seed.
 - **Globe render traps (5B.3):** a cell-centred longitude grid leaves a **gash at the 0/360° seam** on a
   `go.Surface` — append a wrap column (`_wrap_lon`, the lon-analogue of `planetmap._polecapped`); the banked HTML
   loads Plotly from the **CDN**, so a sandboxed/offline browser screenshot renders blank — inline
