@@ -1,6 +1,6 @@
 ---
 name: smith-barstad-orographic-source
-description: Rung 5A cited source pin — the Smith & Barstad (2004) linear-theory orographic-precip constants + transfer function + the closed-form triangle-ridge exact solution that planet/orographic.py pins and test_orographic.py anchors on
+description: Rung 5A cited source pin — the Smith & Barstad (2004) linear-theory orographic-precip constants + transfer function + the closed-form triangle-ridge exact solution that planet/orographic.py pins and test_orographic.py anchors on; + the 5A.3 drying-ratio band (Roe 2005 / Smith & Evans 2007) and the 5A.4 freezing-level + polar-inversion pins (Harris Bowman & Shin 2000; Serreze et al. 1992)
 metadata: 
   node_type: memory
   type: reference
@@ -65,3 +65,35 @@ drying-ratio pin.) The one new knob is the incoming column precipitable water **
 derived (not pinned): the evaporative refill length `L = U·W₀/P_base` (~16 000 km at Earthlike numbers) —
 the scale that makes the no-refill (`L→∞`) budget honest on a ~450 km patch. NOT from memory — cite at
 any reuse.
+
+
+**Rung 5A.4 addendum — the freezing-level benchmark + the polar-inversion caveat**
+(`planet/elevation_temperature.py`, built 2026-09-04). Two numbers, both **WebSearch-verified at build,
+not from memory** (the 5A.3 lesson above).
+
+1. **`OBSERVED_TROPICAL_FREEZING_LEVEL_M = (4500, 5000)`** — the observed altitude of the **0 °C
+   isotherm** (freezing level) in the deep tropics, the single observational check that decides which
+   lapse rate this module defaults to. **Source:** **A. R. Harris, K. P. Bowman & D.-B. Shin (2000)**,
+   "Comparison of Freezing-Level Altitudes from the NCEP Reanalysis with TRMM Precipitation Radar
+   Brightband Data", *J. Climate* **13**(23), 4137–4148 — a 20-year global climatology of the 0 °C
+   isotherm from 6-hourly NCEP reanalysis, cross-checked against TRMM radar brightband heights:
+   **tropical freezing levels are the highest on the planet at ≈ 5000 m**, with the lowest intramonth
+   and interannual variability; they fall and grow more variable through the subtropics and
+   midlatitudes. Corroborated by **R. S. Bradley et al. (2009)**, "Recent changes in freezing level
+   heights in the Tropics…", *Geophys. Res. Lett.* **36**, L17701 (doi:10.1029/2009GL037712) — same
+   ~5000 m tropical level, rising ~45 m over the last ~30 years.
+   **Read it honestly:** the cited central value is ≈ **5.0 km**, so the module's band is a generous
+   read of "the tropics" (its warm edge is the pinned number). The 6.5 K/km constant puts the level at
+   **4.38 km — just BELOW the band**, not inside it; the moist adiabat puts it at **7.09 km, ~45 %
+   above**. The verdict that keeps the constant as the default therefore rests on the **ordering**
+   (the constant is close, the adiabat is far), which is robust, *not* on the constant landing inside
+   the band. Say "just below" — do not upgrade it to "in band".
+2. **The polar surface inversion** — why the module declines to bank its own predicted latitude
+   contrast (`Γ_m` steepening toward the dry adiabat in cold air ⟹ mountains cooling *more* at high
+   latitude). **Source:** **M. C. Serreze, J. D. Kahl & R. C. Schnell (1992)**, "Low-Level Temperature
+   Inversions of the Eurasian Arctic and Comparisons with Soviet Drifting Station Data", *J. Climate*
+   **5**, 615–629: from rawinsonde climatology, low-level inversions occur in **over 95 % of winter
+   soundings** east of Novaya Zemlya and are typically **surface-based**, strongest in winter under the
+   large surface radiative deficit. So the real high-latitude lower troposphere is stably stratified —
+   often *warming* with height — and a saturated-adiabat lapse rate is the wrong idealisation there.
+   NOT from memory — cite at any reuse.

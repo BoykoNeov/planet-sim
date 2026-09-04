@@ -20,7 +20,13 @@ precipitation field, on a **regional Cartesian patch** with **exact analytic anc
    swamps the biome classifier); it goes through :data:`OROGRAPHIC_HOURS_PER_YEAR`, an *effective annual
    duration of active orographic uplift* — a named, loose-magnitude calibration knob, in exactly the
    spirit of :mod:`planet.precip`'s loose band amplitudes.
-4. **Serialization.** The regional scene is a :class:`~planet.planetmap.Grid` + a stack of
+4. **The temperature underneath (Rung 5A.4, added 2026-09-04).** 5A.2 broadcast the zonal-mean
+   temperature across the patch unchanged, so a 2500 m crest and the valley beside it got the *same*
+   temperature: the elevation drove the rain but not the thermometer. The opt-in ``lapse=True`` turns on
+   :mod:`planet.elevation_temperature`, which cools each cell by its own terrain height before the
+   Whittaker classification — and the crest reads **alpine tundra**. Default off, so the 5A.2/5A.3 scene
+   is bit-for-bit unchanged.
+5. **Serialization.** The regional scene is a :class:`~planet.planetmap.Grid` + a stack of
    :class:`~planet.planetmap.Layer` s, so it round-trips through the *grid-agnostic*
    :mod:`planet.planet_spec` schema for free — the interchange seam needs no new machinery.
 
@@ -96,7 +102,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from planet import biomes, orographic as og, orographic_depletion as ogd
+from planet import biomes, elevation_temperature as elev, orographic as og, orographic_depletion as ogd
 from planet.planetmap import Grid, Layer, LayerKind, _biome_style
 
 R_EARTH_M = 6.371e6              # m   — Earth's mean radius (the tangent-plane metric; matches circulation.R_EARTH)
@@ -246,10 +252,13 @@ class OrographicScene:
     Fields
     ------
     lat_deg, lon_deg : 1-D degree axes of the patch grid.
-    elevation_m : the terrain (m) — now **live** (it drives ``orographic_precip_cm``), not the inert
-        seam it is on the coarse globe.
-    temperature_C : the zonal-mean EBM temperature sampled to the patch latitudes (°C), broadcast in lon
-        — the climate underneath stays zonal-mean (the honest scope; only precipitation goes 2-D).
+    elevation_m : the terrain (m) — now **live** (it drives ``orographic_precip_cm``, and with
+        ``lapse=True`` the temperature too), not the inert seam it is on the coarse globe.
+    sea_level_temperature_C : the zonal-mean EBM temperature sampled to the patch latitudes (°C),
+        broadcast in lon — the sea-level climate, still zonal-mean.
+    temperature_C : the surface temperature actually used to classify (°C) — ``sea_level_temperature_C``
+        cooled by the terrain under the Rung-5A.4 lapse rate (:mod:`planet.elevation_temperature`) when
+        ``lapse=True``; **identical** to it under the default ``lapse=False``.
     baseline_precip_cm : the Phase-2 zonal-mean precip (cm/yr) sampled to the patch, broadcast in lon.
     orographic_precip_cm : the Smith & Barstad windward-enhancement bonus (cm/yr) on the patch.
     depletion_factor : ``g ∈ (0, 1]`` — the along-wind lee moisture depletion (Rung 5A.3,
@@ -259,6 +268,9 @@ class OrographicScene:
         to ``baseline + orographic`` when ``g ≡ 1``.
     biome_codes / baseline_biome_codes : Whittaker biomes for the total vs the baseline precip — their
         difference is the *payoff* (where the mountain changes the map).
+    sea_level_biome_codes : the biomes the **same total precipitation** would give at the *uncooled*
+        sea-level temperature — the control that isolates the Rung-5A.4 cooling from the Rung-5A rain.
+        Identical to ``biome_codes`` under ``lapse=False``.
     wind_speed / wind_direction_deg : the prescribed cross-mountain wind used (m/s; meteorological deg).
     lat_ref_deg : the reference latitude for the tangent-plane metric and the Coriolis parameter.
     hours_per_year : the :data:`OROGRAPHIC_HOURS_PER_YEAR` calibration used for mm/hr → cm/yr.
@@ -267,6 +279,7 @@ class OrographicScene:
     lat_deg: np.ndarray
     lon_deg: np.ndarray
     elevation_m: np.ndarray
+    sea_level_temperature_C: np.ndarray
     temperature_C: np.ndarray
     baseline_precip_cm: np.ndarray
     orographic_precip_cm: np.ndarray
@@ -274,6 +287,7 @@ class OrographicScene:
     precip_cm: np.ndarray
     biome_codes: np.ndarray
     baseline_biome_codes: np.ndarray
+    sea_level_biome_codes: np.ndarray
     wind_speed: float
     wind_direction_deg: float
     lat_ref_deg: float
@@ -283,6 +297,26 @@ class OrographicScene:
     def biome_changed_fraction(self) -> float:
         """Fraction of patch cells whose biome differs from the zonal-mean baseline — the payoff metric."""
         return float(np.mean(self.biome_codes != self.baseline_biome_codes))
+
+    @property
+    def elevation_cooling_K(self) -> np.ndarray:
+        """How much the terrain cooled each cell (K, ≥ 0) — ``sea_level_temperature_C − temperature_C``.
+
+        Identically zero under the Rung-5A.2/5A.3 default (``lapse=False``); under ``lapse=True`` it is
+        ``Γ·z`` for the constant rate and the integrated moist-adiabat drop for ``moist_lapse=True``
+        (:mod:`planet.elevation_temperature`).
+        """
+        return self.sea_level_temperature_C - self.temperature_C
+
+    @property
+    def alpine_fraction(self) -> float:
+        """Fraction of cells the **terrain cooling alone** re-classifies — the Rung-5A.4 payoff metric.
+
+        Compares :attr:`biome_codes` against :attr:`sea_level_biome_codes`, i.e. the *same* (orographic)
+        rainfall at the uncooled sea-level temperature. That isolates the lapse-rate effect from the
+        rain-shadow effect :attr:`biome_changed_fraction` measures; it is 0 under ``lapse=False``.
+        """
+        return float(np.mean(self.biome_codes != self.sea_level_biome_codes))
 
     @property
     def lee_desert_fraction(self) -> float:
@@ -299,6 +333,7 @@ def build_scene(result, lat_deg: np.ndarray, lon_deg: np.ndarray, elevation_m: n
                 jet=None, speed: float = og.U_REF_M_S, direction_deg: float = og.DIRECTION_WESTERLY_DEG,
                 hours_per_year: float = OROGRAPHIC_HOURS_PER_YEAR,
                 deplete: bool = False, pwv_in_mm: float = ogd.PWV_IN_MM,
+                lapse: bool = False, moist_lapse: bool = False, lapse_rate: float = elev.LAPSE_RATE,
                 lat_ref_deg: float | None = None, **orographic_kwargs) -> OrographicScene:
     """Assemble an :class:`OrographicScene` — place the patch, source the wind, rain the shadow, re-map biomes.
 
@@ -324,6 +359,15 @@ def build_scene(result, lat_deg: np.ndarray, lon_deg: np.ndarray, elevation_m: n
         zonal mean — the real rain-shadow desert.
     pwv_in_mm : the incoming column precipitable water ``W₀`` for the depletion budget
         (:data:`planet.orographic_depletion.PWV_IN_MM`); only used when ``deplete=True``.
+    lapse : opt-in Rung 5A.4 elevation temperature correction
+        (:mod:`planet.elevation_temperature`). Default ``False`` leaves the temperature at the
+        zonal-mean sea-level climate — the 5A.2/5A.3 behaviour, bit-for-bit. With ``True`` the terrain
+        **cools its own air** before the Whittaker classification, so a high crest reads alpine.
+    moist_lapse : with ``lapse=True``, integrate rung 4's emergent moist adiabat instead of the pinned
+        constant ``Γ``. Default ``False``: the constant is the one that survives the freezing-level
+        benchmark (see :mod:`planet.elevation_temperature`), so the emergent path is a diagnostic.
+    lapse_rate : the constant ``Γ`` (K m⁻¹) when ``moist_lapse=False``; defaults to rung 4's pinned
+        :data:`planet.radiation.LAPSE_RATE`.
     lat_ref_deg : reference latitude for the tangent-plane metric + Coriolis ``f``; defaults to the
         patch's centre latitude.
     **orographic_kwargs : forwarded to :func:`planet.orographic.orographic_precip` (e.g. ``Cw``, ``Nm``).
@@ -366,17 +410,28 @@ def build_scene(result, lat_deg: np.ndarray, lon_deg: np.ndarray, elevation_m: n
     hemi_lat = state.latitude_deg()
     T_1d = np.interp(np.abs(lat_deg), hemi_lat, state.T)
     base_1d = np.interp(np.abs(lat_deg), hemi_lat, result.precip_cm)
-    T_2d = np.repeat(T_1d[:, None], lon_deg.size, axis=1)
+    T_sea_2d = np.repeat(T_1d[:, None], lon_deg.size, axis=1)
     baseline_cm = np.repeat(base_1d[:, None], lon_deg.size, axis=1)
+
+    # Elevation → temperature (Rung 5A.4, opt-in): the terrain cools its own air before classification.
+    # lapse=False returns the sea-level field itself (the same object), so the 5A.2/5A.3 scene is
+    # bit-for-bit unchanged and `elevation_cooling_K` is identically zero.
+    if lapse:
+        T_2d = elev.terrain_temperature(T_sea_2d, elevation_m, moist=moist_lapse, lapse_rate=lapse_rate)
+    else:
+        T_2d = T_sea_2d
 
     precip_cm = g * baseline_cm + orographic_cm             # depleted baseline + windward enhancement
     biome_codes = biomes.classify_field(T_2d, precip_cm)
-    baseline_biome = biomes.classify_field(T_2d, baseline_cm)
+    baseline_biome = biomes.classify_field(T_sea_2d, baseline_cm)
+    sea_level_biome = biomes.classify_field(T_sea_2d, precip_cm)    # same rain, no cooling — the 5A.4 control
 
     return OrographicScene(
-        lat_deg=lat_deg, lon_deg=lon_deg, elevation_m=elevation_m, temperature_C=T_2d,
+        lat_deg=lat_deg, lon_deg=lon_deg, elevation_m=elevation_m,
+        sea_level_temperature_C=T_sea_2d, temperature_C=T_2d,
         baseline_precip_cm=baseline_cm, orographic_precip_cm=orographic_cm, depletion_factor=g,
         precip_cm=precip_cm, biome_codes=biome_codes, baseline_biome_codes=baseline_biome,
+        sea_level_biome_codes=sea_level_biome,
         wind_speed=float(speed), wind_direction_deg=float(direction_deg),
         lat_ref_deg=ref, hours_per_year=float(hours_per_year),
     )
@@ -388,7 +443,9 @@ def build_scene(result, lat_deg: np.ndarray, lon_deg: np.ndarray, elevation_m: n
 def scene_to_view(scene: OrographicScene):
     """The regional scene as a :class:`~planet.planetmap.PlanetView` — the render + serialization seam.
 
-    Registers the patch's layers on a regional :class:`~planet.planetmap.Grid`: **temperature**,
+    Registers the patch's layers on a regional :class:`~planet.planetmap.Grid`: **temperature** (the
+    *surface* temperature actually classified — terrain-cooled when the scene was built with
+    ``lapse=True``, the sea-level zonal mean otherwise),
     the zonal-mean **precipitation** baseline, the **orographic precipitation** bonus, the enhancement
     **total precipitation**, the now-**live elevation** (``inert=False`` — on the patch it finally
     *drives* the rain, unlike the inert globe seam, §9.3), and the **biome** map. Because
@@ -427,7 +484,7 @@ def scene_to_view(scene: OrographicScene):
 def demo_scene(range_name: str = "cascades", *, n_lat: int = 41, n_lon: int = 161,
                lat_span_deg: float = 6.0, lon_span_deg: float = 6.0,
                amplitude_m: float = 2500.0, use_jet: bool = True,
-               deplete: bool = False) -> OrographicScene:
+               deplete: bool = False, lapse: bool = False, moist_lapse: bool = False) -> OrographicScene:
     """Build a demo :class:`OrographicScene`: a meridional ridge under the westerlies for a named range.
 
     Solves the present-day zonal-mean climate, (optionally) the emergent coupled jet, places a fine
@@ -435,7 +492,9 @@ def demo_scene(range_name: str = "cascades", *, n_lat: int = 41, n_lon: int = 16
     ``use_jet`` the cross-mountain wind is read off the emergent jet at that latitude; otherwise the S&B
     reference westerly is used (a fallback that does not need the shallow-water spin-up). With
     ``deplete`` the Rung-5A.3 lee moisture budget is turned on, drawing the lee below baseline (the real
-    rain-shadow desert); the default is the enhancement-only 5A.2 combination.
+    rain-shadow desert); the default is the enhancement-only 5A.2 combination. With ``lapse`` the
+    Rung-5A.4 elevation temperature correction is turned on so the crest reads alpine
+    (``moist_lapse`` swaps the pinned constant for the emergent moist adiabat); both default off.
     """
     from planet import demo_biomes
 
@@ -452,4 +511,5 @@ def demo_scene(range_name: str = "cascades", *, n_lat: int = 41, n_lon: int = 16
         from planet import coupler
         jet = coupler.couple_jet(result.state)
 
-    return build_scene(result, lat, lon, elevation, jet=jet, lat_ref_deg=lat_c, deplete=deplete)
+    return build_scene(result, lat, lon, elevation, jet=jet, lat_ref_deg=lat_c, deplete=deplete,
+                       lapse=lapse, moist_lapse=moist_lapse)

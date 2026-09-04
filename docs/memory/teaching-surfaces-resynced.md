@@ -1,6 +1,6 @@
 ---
 name: teaching-surfaces-resynced
-description: "notebook §8 re-synced to rungs 1–4 (2026-06-15) then EXTENDED to 2.x/5A/5B (2026-07-10, now 7 sections); the generated-HTML / big-notebook / DOCS_FIGURE gotchas"
+description: "notebook §8 re-synced to rungs 1–4 (2026-06-15), EXTENDED to 2.x/5A/5B (2026-07-10), then §8.8/§8.9/§8.10 (2026-09-02/04) → TEN sections; the generated-HTML / big-notebook / surgical-re-bank / DOCS_FIGURE gotchas"
 metadata: 
   node_type: memory
   type: project
@@ -82,3 +82,14 @@ paste stdout as a `stream` output; `execution_count` = max + 1 = 21). §8 now ha
 before editing — it is the cheapest proof the rewrite is diff-clean), and the file still ends with **no**
 trailing newline. Also: `plots.py` is **not** imported by most of the suite, so a syntax error there passes
 the fast lane and surfaces only in the notebook test — `python -c "import planet.plots"` after every edit.
+
+
+**Extended again 2026-09-04 — §8.10 added** (cells 57–59: markdown + a LIVE code cell running rung 5A.4's
+`demo_alpine_biomes.compute(use_jet=False)` — **~1.4 s**, cheap enough to run live unlike §8.6's jet-sourced
+5A cell — plus an embed-only cell for `planet-alpine-biomes.png`). §8 now has **ten** sections §8.1–§8.10.
+Same surgical bank (subprocess → `stream` output, `execution_count` = 22). Two things to carry:
+- the subprocess needs `env=dict(os.environ, PYTHONIOENCODING="utf-8")` or its stdout comes back cp1252 on
+  Windows and the capture dies on `→` / `°`;
+- the §8.10 markdown deliberately explains the rung's **negative** (deriving the 6.5 °C/km lapse rate
+  reproduces it at mid-latitudes and loses to it in the tropics) in plain words — the notebook is where the
+  "what did NOT work" half is most valuable, and it needs no jargon to land.

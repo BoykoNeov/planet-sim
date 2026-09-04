@@ -1421,3 +1421,101 @@ def seasonal_sici_figure(result):
     fig.suptitle("Planet Rung 5B.4 — the seasons dissolve the small-ice-cap instability "
                  "(and a deep ocean brings it back)", fontsize=13)
     return fig
+
+
+# --------------------------------------------------------------------------- #
+# Rung 5A.4 — the mountain is cold: elevation → temperature → alpine biomes.
+# --------------------------------------------------------------------------- #
+SEA_LEVEL_COLOR = "#c0863d"      # the uncorrected zonal-mean (sea-level) temperature
+TERRAIN_T_COLOR = "#1f4e79"      # the terrain-cooled surface temperature (what gets classified)
+CONSTANT_G_COLOR = "#1f4e79"     # the pinned 6.5 K/km constant (the default that survived)
+MOIST_G_COLOR = "#b03a2e"        # the emergent moist adiabat (the diagnostic that did not)
+OBSERVED_BAND_COLOR = "#1f6f4a"  # the observed tropical freezing-level band
+
+
+def alpine_biomes_figure(scene, sea_level_scene, diagnostic):
+    """The Rung-5A.4 story: the terrain cools its own air, and the crest turns alpine.
+
+    Four panels. **transect** — a mid-patch cross-section of the sea-level zonal-mean temperature
+    (flat) against the terrain-cooled surface temperature (which dives over the ridge), with the
+    Whittaker cold thresholds drawn so the crossing is visible over the drawn terrain: this is the
+    whole mechanism in one line. **before** / **after** — the biome map under the *same* orographic
+    rainfall without and with the cooling, the changed cells outlined, so the alpine cap is
+    attributable to the lapse rate alone. **rates** — the verdict: the effective rate the emergent
+    moist adiabat realises versus the pinned 6.5 K/km constant across latitude, and (twin axis) the
+    freezing level each implies against the observed tropical band — the benchmark the constant lands just
+    below and the moist adiabat overshoots by ~45 %, an ordering that is why the constant stays the default.
+
+    Consumes an :class:`~planet.orographic_scene.OrographicScene` built with ``lapse=True``, the same
+    scene built without it, and a :class:`~planet.elevation_temperature.LapseDiagnostic`. Requires the
+    ``viz`` extra.
+    """
+    from .elevation_temperature import OBSERVED_TROPICAL_FREEZING_LEVEL_M
+    from .biomes import BOREAL_MAX_C, TUNDRA_MAX_C
+
+    lon, lat = scene.lon_deg, scene.lat_deg
+    mid = scene.temperature_C.shape[0] // 2
+
+    fig, axd = plt.subplot_mosaic(
+        [["transect", "rates"], ["before", "after"]], figsize=(13, 9), constrained_layout=True,
+    )
+
+    # 1. The mechanism: the temperature transect over the ridge, against the cold thresholds.
+    ax = axd["transect"]
+    ax.plot(lon, scene.sea_level_temperature_C[mid, :], color=SEA_LEVEL_COLOR, lw=1.8, ls="--",
+            label="sea-level zonal mean (rung 0)")
+    ax.plot(lon, scene.temperature_C[mid, :], color=TERRAIN_T_COLOR, lw=2.2,
+            label="terrain-cooled surface (rung 5A.4)")
+    ax.axhline(0.0, color=FREEZE_COLOR, lw=1.0, ls=":")
+    ax.annotate("freezing", xy=(lon[2], 0.0), fontsize=7, color=FREEZE_COLOR, va="bottom")
+    for thr, name in ((BOREAL_MAX_C, "boreal"), (TUNDRA_MAX_C, "tundra")):
+        ax.axhline(thr, color=ICELINE_COLOR, lw=0.9, ls="-.", alpha=0.7)
+        ax.annotate(f"{name} threshold", xy=(lon[2], thr), fontsize=7, color=ICELINE_COLOR, va="bottom")
+    ax.set_ylabel("surface temperature (°C)")
+    ax.set_title(f"the crest cools {scene.elevation_cooling_K.max():.0f} K and crosses the cold thresholds",
+                 fontsize=9)
+    ax.legend(fontsize=8, loc="lower left")
+    axe = ax.twinx()
+    axe.fill_between(lon, 0, scene.elevation_m[mid, :], color="#c8b28a", alpha=0.45, zorder=0)
+    axe.set_ylabel("elevation (m)", color="#8a6d3b")
+
+    # 2. The verdict: the two lapse rates, and the freezing-level benchmark that chose between them.
+    ax = axd["rates"]
+    d = diagnostic
+    ax.plot(d.latitude_deg, 1e3 * d.gamma_moist, color=MOIST_G_COLOR, lw=2.0,
+            label="emergent moist adiabat (effective)")
+    ax.plot(d.latitude_deg, 1e3 * d.gamma_constant, color=CONSTANT_G_COLOR, lw=2.0, ls="--",
+            label="pinned constant Γ (the default)")
+    ax.set_xlabel("latitude (°)"); ax.set_ylabel("lapse rate over the ridge (K/km)")
+    ax.set_title("the emergent rate CONFIRMS the constant at mid-latitudes, diverges elsewhere", fontsize=9)
+    ax.legend(fontsize=8, loc="upper left")
+    axf = ax.twinx()
+    axf.plot(d.latitude_deg, d.freezing_constant_m / 1e3, color=CONSTANT_G_COLOR, lw=1.2, ls=":")
+    axf.plot(d.latitude_deg, d.freezing_moist_m / 1e3, color=MOIST_G_COLOR, lw=1.2, ls=":")
+    lo, hi = OBSERVED_TROPICAL_FREEZING_LEVEL_M
+    axf.axhspan(lo / 1e3, hi / 1e3, color=OBSERVED_BAND_COLOR, alpha=0.13, zorder=0)
+    axf.scatter([d.latitude_deg[0]] * 2, [d.freezing_constant_m[0] / 1e3, d.freezing_moist_m[0] / 1e3],
+                s=26, color=[CONSTANT_G_COLOR, MOIST_G_COLOR], zorder=4)
+    axf.annotate(f"observed tropical freezing level {lo / 1e3:.1f}–{hi / 1e3:.1f} km\n"
+                 "the constant lands just below it; the moist adiabat overshoots ~45 %",
+                 xy=(d.latitude_deg[-1], hi / 1e3), xytext=(0.28, 0.545), textcoords="axes fraction",
+                 fontsize=7, color=OBSERVED_BAND_COLOR, ha="left", va="top")
+    axf.set_ylabel("freezing level (km, dotted)", color="#555555")
+
+    # 3+4. The payoff: the same rain, classified without and with the terrain cooling.
+    cmap, norm = _biome_cmap_norm()
+    for key, sc_, title in (("before", sea_level_scene, "same rain, NO terrain cooling (rung 5A.3)"),
+                            ("after", scene, "with terrain cooling — the alpine cap (rung 5A.4)")):
+        ax = axd[key]
+        ax.pcolormesh(lon, lat, sc_.biome_codes, cmap=cmap, norm=norm, shading="auto")
+        ax.set_xlabel("longitude (°)"); ax.set_ylabel("latitude (°)")
+        ax.set_title(title, fontsize=9)
+        _biome_legend_inset(ax, sc_.biome_codes)
+    changed = scene.biome_codes != scene.sea_level_biome_codes
+    axd["after"].contour(lon, lat, changed.astype(float), levels=[0.5], colors="#c0392b", linewidths=1.2)
+    axd["after"].set_title(f"with terrain cooling — {100 * scene.alpine_fraction:.0f}% re-classified "
+                           "by the lapse rate alone", fontsize=9)
+
+    fig.suptitle("Planet Rung 5A.4 — the mountain is COLD, not only wet: elevation → temperature → alpine biomes",
+                 fontsize=13)
+    return fig

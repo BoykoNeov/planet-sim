@@ -14,6 +14,11 @@ diagram** of the ice-albedo climate — every branch, both folds, the small-ice-
 rung turns that last result on itself: switch the **seasons** on and the small-ice-cap instability
 **dissolves** — a polar cap the annual-mean model says cannot exist grows one grid cell at a time, with no
 jump — and it only comes back as the ocean is made deep and sluggish enough to erase the seasonal cycle.
+Newest of all: mountains stop being merely *wet*. Cool every cell by its own terrain height and the ridge
+crest that the rain shadow left a forest turns **alpine tundra** — and the attempt to derive the textbook
+6.5 °C/km cooling rate rather than assume it comes back a **negative**: the derived rate reproduces the
+constant at mid-latitudes and does worse than it in the tropics, so the constant stays and the derivation
+ships as a diagnostic with its failure named.
 
 It is the program's capstone: the **only simulator built on two** separately-validated solver
 engines — the 1-D diffusion/heat solver (`engines/diffusion`, the meridional heat transport) and
@@ -52,6 +57,7 @@ python -m planet snowball     # run one demo (prints its validation table + bank
 python -m planet bifurcation  # every climate the sun allows — the S-curve, both folds, the second cliff
 python -m planet seasonal_ice_map   # the seasons, the continents and the snow — a monthly GIF + a month-slider globe
 python -m planet seasonal_sici      # do the seasons dissolve the second cliff? (they do — and a deep ocean brings it back)
+python -m planet alpine       # the mountain is cold, not only wet — a forest crest turns alpine tundra
 python -m planet list         # print the full catalogue of demos
 python -m planet interactive  # drag four knobs in your browser — a live what-if + plain-language "why"
 python -m planet notebook     # open the teaching notebook in JupyterLab (opens your browser for you)
@@ -86,11 +92,11 @@ extra to install rather than erroring. The notebook also hosts the live-slider g
 **Run the tests** (the tiered gate — [ADR 0003](docs/decisions/0003-test-execution-policy.md)):
 
 ```powershell
-./run_tests.ps1 -m "not slow"     # routine fast lane — 661 tests
-./run_tests.ps1                   # full suite — 729 tests (adds slow live-solver + notebook)
+./run_tests.ps1 -m "not slow"     # routine fast lane — 704 tests
+./run_tests.ps1                   # full suite — 777 tests (adds slow live-solver + notebook)
 ```
 
-The suite is **729 tests** (661 in the fast lane), all green. The one **live-climlab** cross-check needs the
+The suite is **777 tests** (704 in the fast lane), all green. The one **live-climlab** cross-check needs the
 `[climate]` extra and otherwise skips — it is an opt-in bonus on top of the EBM's analytic +
 frozen-table validation, so it skips in CI by design. The Plotly map render smoke-tests need
 `[webviz]`; the planet-spec round-trip-identity test (the deep end's one real correctness

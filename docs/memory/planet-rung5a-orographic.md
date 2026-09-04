@@ -1,6 +1,6 @@
 ---
 name: planet-rung5a-orographic
-description: "Rung 5A (first step off the zonal mean) BUILT 2026-07-09 (planet/orographic.py = Smith & Barstad linear orographic precip) + 5A.2 integration BUILT 2026-07-10 (planet/orographic_scene.py: tangent-plane patch + jet-sourced wind + mm/hr→cm/yr + enhancement-only biome re-map + serialization + demo figure) + 5A.3 lee-depletion BUILT 2026-07-10 (planet/orographic_depletion.py: opt-in along-wind moisture budget draws the lee BELOW baseline = the real desert; drying-ratio-calibrated) — PAYOFF: the mountain changes the biome map AND casts a real rain-shadow desert"
+description: "Rung 5A (first step off the zonal mean) BUILT 2026-07-09 (planet/orographic.py = Smith & Barstad linear orographic precip) + 5A.2 integration BUILT 2026-07-10 (planet/orographic_scene.py: tangent-plane patch + jet-sourced wind + mm/hr→cm/yr + enhancement-only biome re-map + serialization + demo figure) + 5A.3 lee-depletion BUILT 2026-07-10 (planet/orographic_depletion.py: opt-in along-wind moisture budget draws the lee BELOW baseline = the real desert; drying-ratio-calibrated) — PAYOFF: the mountain changes the biome map AND casts a real rain-shadow desert; + 5A.4 elevation->temperature BUILT 2026-09-04 (planet/elevation_temperature.py, build_scene(lapse=True)): the crest turns ALPINE TUNDRA (16 K colder, 42% of the patch re-classified by the cooling alone) — and the bet to make the 6.5 K/km lapse rate EMERGENT came back a NEGATIVE (the moist adiabat reproduces the constant at midlatitudes and loses to it on the tropical freezing level), so the constant stays the default"
 metadata:
   node_type: memory
   type: project
@@ -107,6 +107,55 @@ depletion-in-lee; **directional payoff** = lee total below baseline; loose = the
 41 % → 56 % (windward temperate rain forest, lee woodland/shrubland). **Honest scope (named, not fixed):**
 per-streamline (zonal wind only); the S&B bonus is not itself depleted (simplest-first); no on-patch
 refill (the L→∞ cost).
+
+**5A.4 — BUILT 2026-09-04** (`planet/elevation_temperature.py` + `test_elevation_temperature.py`
+(15 anchors) + `build_scene(..., lapse=True)` + 7 new scene cases + `demo_alpine_biomes.py` +
+`plots.alpine_biomes_figure` + catalogue `alpine` **and** `orographic` — the 5A demo had never been
+catalogued, a real drift against the ARCHITECTURE §4.5 recipe, fixed here under a new "Geography —
+mountains" section). The last unstruck line of §12.5's *cheap tier*: 5A/5A.2/5A.3 woke the elevation seam
+on the **rain** side only — the temperature stayed the zonal mean broadcast across longitude, so a 2500 m
+crest and its valley got the **same** number. Now each cell is cooled by its own terrain height before the
+Whittaker classifier runs. **Diagnostic and one-way** (no EBM re-solve, no snow/albedo feedback on the cold
+crest, no S&B re-run; `C_w` stays at its upstream sea-level value).
+
+**THE PAYOFF:** the Cascades crest cools **16.2 K** (6.58 → −9.67 °C), crosses both Whittaker cold
+thresholds and turns **woodland/shrubland → tundra**; the cooling **alone** (measured against the *same*
+rainfall at the uncooled temperature — the new `sea_level_biome_codes` control) re-classifies **42 %** of
+the patch; total vs the zonal-mean map 56 % (rain only) → 60 % (rain + cooling).
+
+**THE BET → A NEGATIVE (the more interesting half; the rung-4 "retire the prescribed number" habit fails
+here).** The target was `radiation.LAPSE_RATE = 6.5 K/km`, to be replaced by rung 4's **own** `Γ_m(T,p)`
+integrated up a hydrostatic column. It loses twice: (i) at the demo latitude the emergent effective rate is
+**6.31 K/km** — it *reproduces* the constant (~3 %) instead of retiring it, revealing the textbook number as
+a **mid-latitude calibration**; (ii) on the one observation available — the **freezing level** (0 °C isotherm,
+the deep tropics' being the planet's highest at **≈ 5 km**; Harris, Bowman & Shin 2000, pinned in
+[[smith-barstad-orographic-source]]) — the constant lands **4.38 km, just BELOW the band** and the moist
+adiabat **7.09 km, ~45 % above**, because a saturated **parcel** adiabat is not the **environmental** lapse
+rate of an unsaturated mean column. **Say "just below", not "in band"** — the verdict is the *ordering*
+(one close, one far), and the tests assert exactly that. Its predicted latitude contrast (same mountain
+cooling ~9 K in the tropics, ~22 K at 85°) is **anti-correlated with reality at both ends** (polar surface
+inversions: >95 % of Eurasian-Arctic winter soundings, Serreze, Kahl & Schnell 1992). ⟹ `moist=False` is the **default**,
+the emergent path is **opt-in as a diagnostic**, the contrast is reported as the idealisation's and **not
+banked as the planet's** — the [[planet-rung5b4-seasonal-sici]] pattern (an axis rejected after being tried).
+
+**Anchors:** tight/exact = the closed form `T − Γz`; **the integrator reduces to it exactly under a constant
+`Γ` callable** (so emergent and prescribed are the *same code*, not two implementations); `Γ_m` is rung 4's
+function **by identity** ([[planet-rung4-radiation]]); two exact nulls on the scene (default-off, and
+flat terrain with the correction on). Tight/convergent = Heun march **second order in the height step**
+(ratios ~4.0; shipped `n_steps=64` good to 9e-5 K over 3 km) + the small-`z` limit `T₀ − Γ_m(T₀,p₀)·z` with
+an O(z²) residual. **No conservation leg exists** (cooling a surface without re-solving the EBM breaks the
+TOA budget — the [[planet-phase2]] classifier precedent, stated not papered over); the substitute is the
+exact identity `⟨T_sea − T⟩ = Γ·⟨z⟩` + the partition still tiling.
+
+**Traps + named scope:** (1) **the z→p circularity** the advisor flagged — `radiation.moist_adiabat_temperature`
+maps height to pressure through a *fixed* isothermal scale height, so integrating there would leave the
+"emergent" rate leaning on a prescribed constant; this module integrates pressure **hydrostatically in the
+marched `T`** instead, so the circularity is *absent*, not merely small. (2) **The classifier's cold bands
+are precipitation-independent**, so on the crest (wet *and* cold) the rain shadow can no longer change the
+answer — 5A and 5A.4 genuinely **degenerate** there; that is why the total only moves 56 → 60 %, and it is
+pinned as a test rather than rediscovered later. (3) Terrain above 12 km is **refused, not clamped** (a
+tropospheric march, no cold-trap floor). (4) The EBM temperature is treated as a **sea-level** temperature —
+exact for this model (rung 0 has no terrain), approximate for Earth.
 
 Then Rung 5B/5C = the 2-D EBM engine step (needs seasonality for continentality) / Charney–Eliassen
 stationary waves.

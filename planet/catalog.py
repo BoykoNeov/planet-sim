@@ -63,6 +63,15 @@ DEMOS: tuple[Demo, ...] = (
          "poles, and the continents end colder in the annual mean (a month-by-month GIF)",
          ("viz", "webviz"), "docs/figures/planet-seasonal-ice-map.gif", "Climate — energy balance",
          interactive="docs/figures/planet-seasonal-ice-globe.html"),
+    Demo("orographic", "planet.demo_orographic", "Rain shadow behind a mountain range",
+         "raise a north–south ridge under the westerlies and the windward slope drowns while the lee "
+         "falls below the zonal mean — a real rain-shadow desert, and a biome map redrawn by geography",
+         ("viz",), "docs/figures/planet-orographic.png", "Geography — mountains"),
+    Demo("alpine", "planet.demo_alpine_biomes", "The mountain is cold, not only wet",
+         "cool each cell by its own terrain height and the ridge crest stops being forest and turns "
+         "alpine tundra — plus the negative: making the lapse rate emergent confirms the textbook "
+         "constant instead of retiring it",
+         ("viz",), "docs/figures/planet-alpine-biomes.png", "Geography — mountains"),
     Demo("shallowwater", "planet.demo_shallowwater", "Rotating shallow-water atmosphere",
          "geostrophic adjustment on the sphere — the circulation engine on its own",
          ("viz",), "docs/figures/planet-shallowwater.png",

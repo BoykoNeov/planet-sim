@@ -9,6 +9,14 @@ combination leaves the **lee at the baseline** and lifts the **windward** above 
 **changes the biome map** — the payoff). What is **loose** is the absolute cm/yr magnitude (the
 :data:`~planet.orographic_scene.OROGRAPHIC_HOURS_PER_YEAR` calibration + the cited S&B constants).
 
+**Rung 5A.4 (2026-09-04) added here too:** the opt-in ``lapse=True`` wiring of
+:mod:`planet.elevation_temperature` — the terrain finally cools its *own* air, so the crest reads alpine.
+Its own triad lives in :mod:`planet.tests.test_elevation_temperature`; what is pinned *here* is the
+**integration**: the default-off and flat-terrain reductions (bit-for-bit 5A.2), the exact ``Γ·z``
+correction the classifier saw, the alpine payoff, its robustness to which lapse rate, and the **named
+degeneracy** that the Whittaker cold bands ignore precipitation — so on the crest the rain shadow and the
+lapse rate act on the same cells but only one of them can change the answer.
+
 Honest scope note (advisor-caught): the "zonal ridge casts ≈ no shadow" idealisation does *not* hold on
 the finite zero-padded engine — a lon-uniform ridge is localised by the pad into a responding block. So
 the pad-safe orientation anchor is a **compact hill's latitude-symmetry**, not a zonal ridge's
@@ -19,7 +27,7 @@ import types
 import numpy as np
 import pytest
 
-from planet import biomes, demo_biomes, orographic as og, orographic_scene as sc
+from planet import biomes, demo_biomes, elevation_temperature as et, orographic as og, orographic_scene as sc
 from planet import planet_spec as ps
 from planet.albedo import EBMParams
 
@@ -206,6 +214,80 @@ def test_orographic_magnitude_is_sane(result):
     scene = sc.build_scene(result, lat, lon, elev, speed=15.0, direction_deg=270.0, lat_ref_deg=lat_c)
     peak = scene.orographic_precip_cm.max()
     assert 50.0 < peak < 1500.0                                       # a few hundred cm/yr — a sane surplus
+
+
+# --------------------------------------------------------------------------- #
+# Rung 5A.4 — the terrain cools its own air (opt-in; the module triad is test_elevation_temperature)
+# --------------------------------------------------------------------------- #
+def _ridge_scene(result, **kw):
+    lat_c, lon_c, lat, lon = _cascades_grid()
+    elev = sc.meridional_ridge(lat, lon, lon_center=lon_c, amplitude_m=2500.0)
+    return elev, sc.build_scene(result, lat, lon, elev, speed=15.0, direction_deg=270.0,
+                                lat_ref_deg=lat_c, **kw)
+
+
+def test_lapse_is_default_off_and_the_5a2_scene_is_bit_for_bit_unchanged(result):
+    # the default-off reduction (ARCHITECTURE §4.2): with lapse off nothing about 5A.2/5A.3 moves
+    _, scene = _ridge_scene(result)
+    assert np.array_equal(scene.temperature_C, scene.sea_level_temperature_C)
+    assert np.all(scene.elevation_cooling_K == 0.0)
+    assert scene.alpine_fraction == 0.0
+    assert np.array_equal(scene.biome_codes, scene.sea_level_biome_codes)
+
+
+def test_flat_terrain_with_lapse_on_reproduces_the_lapse_off_scene(result):
+    # the other exact null: turning the correction ON over zero terrain changes nothing, bit-for-bit
+    lat_c, lon_c, lat, lon = _cascades_grid()
+    flat = np.zeros((lat.size, lon.size))
+    off = sc.build_scene(result, lat, lon, flat, speed=15.0, direction_deg=270.0, lat_ref_deg=lat_c)
+    on = sc.build_scene(result, lat, lon, flat, speed=15.0, direction_deg=270.0, lat_ref_deg=lat_c,
+                        lapse=True)
+    assert np.array_equal(on.temperature_C, off.temperature_C)
+    assert np.array_equal(on.biome_codes, off.biome_codes)
+
+
+def test_patch_cooling_is_exactly_gamma_times_the_elevation(result):
+    # the consistency leg on the scene: the correction the classifier saw IS Γ·z, cell by cell
+    elev, scene = _ridge_scene(result, lapse=True)
+    assert np.allclose(scene.elevation_cooling_K, et.LAPSE_RATE * elev, atol=1e-12)
+    assert float(scene.elevation_cooling_K.mean()) == pytest.approx(et.LAPSE_RATE * float(elev.mean()))
+
+
+def test_the_crest_turns_alpine_the_5a4_payoff(result):
+    # THE payoff: a 2500 m crest under a temperate-forest latitude reads as a COLD-limited biome
+    elev, scene = _ridge_scene(result, lapse=True)
+    mid = scene.biome_codes.shape[0] // 2
+    crest = int(np.argmax(elev[mid, :]))
+    assert scene.biome_codes[mid, crest] in (biomes.Biome.TUNDRA, biomes.Biome.BOREAL_FOREST)
+    _, warm = _ridge_scene(result)                                    # the same rain, no cooling
+    assert warm.biome_codes[mid, crest] not in (biomes.Biome.TUNDRA, biomes.Biome.BOREAL_FOREST)
+    assert scene.alpine_fraction > 0.2                                # the cooling alone moves a lot of map
+    # and the partition still tiles the patch (the biomes.py consistency leg, carried through)
+    assert sum(biomes.biome_area_fractions(scene.biome_codes).values()) == pytest.approx(1.0)
+
+
+def test_the_payoff_is_robust_to_which_lapse_rate(result):
+    # the emergent moist adiabat ≈ the pinned constant at this latitude, so the story does not ride on it
+    _, fixed = _ridge_scene(result, lapse=True)
+    _, moist = _ridge_scene(result, lapse=True, moist_lapse=True)
+    assert abs(fixed.alpine_fraction - moist.alpine_fraction) < 0.05
+    assert abs(float(fixed.elevation_cooling_K.max()) - float(moist.elevation_cooling_K.max())) < 2.0
+
+
+def test_cold_crest_ignores_the_orographic_rain_the_named_degeneracy(result):
+    """The classifier's cold bands are precip-independent, so on the crest 5A and 5A.4 degenerate.
+
+    :mod:`planet.biomes` states it plainly ("a very wet sub-zero climate is still called boreal here").
+    Where the terrain has cooled a cell below the cold-limited threshold, the Whittaker rule stops
+    reading precipitation at all — so the rain shadow and the lapse rate act on the same cells but only
+    one of them can change the answer there. Named in :mod:`planet.elevation_temperature`, pinned here.
+    """
+    elev, scene = _ridge_scene(result, lapse=True)
+    cold = scene.temperature_C < biomes.BOREAL_MAX_C
+    assert cold.any()
+    with_rain = biomes.classify_field(scene.temperature_C[cold], scene.precip_cm[cold])
+    without_rain = biomes.classify_field(scene.temperature_C[cold], scene.baseline_precip_cm[cold])
+    assert np.array_equal(with_rain, without_rain)
 
 
 # --------------------------------------------------------------------------- #
